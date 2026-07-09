@@ -449,8 +449,29 @@
 
         // ===== 初始化 =====
         async init() {
-          this.apiKey = localStorage.getItem('sitelog_api_key') || '';
-          this.apiProvider = localStorage.getItem('sitelog_api_provider') || 'qwen';
+          // ─── 方案 B：URL 参数自动填 Key（云端版"零配置"）───
+          // 用法：?key=sk-xxx&provider=qwen
+          // 适用于通过「共享 Key 引导页」生成的链接
+          const urlParams = new URLSearchParams(window.location.search);
+          const urlKey = urlParams.get('key');
+          const urlProvider = urlParams.get('provider');
+          if (urlKey && urlKey.length > 10) {
+            // 检测到 URL 带 Key → 自动填入 + 标记为注入（隐藏明文）
+            this.apiKey = urlKey;
+            this.apiProvider = urlProvider || 'qwen';
+            localStorage.setItem('sitelog_api_key', this.apiKey);
+            localStorage.setItem('sitelog_api_provider', this.apiProvider);
+            localStorage.setItem('sitelog_api_injected', '1');
+            localStorage.setItem('sitelog_api_injected_at', new Date().toISOString());
+            // 清理 URL 参数（保留其他参数）
+            const newQs = urlParams.toString().replace(/key=[^&]+&?/g, '').replace(/provider=[^&]+&?/g, '').replace(/^&/, '');
+            const newUrl = window.location.pathname + (newQs ? '?' + newQs : '');
+            window.history.replaceState({}, document.title, newUrl);
+          } else {
+            this.apiKey = localStorage.getItem('sitelog_api_key') || '';
+            this.apiProvider = localStorage.getItem('sitelog_api_provider') || 'qwen';
+          }
+
           this.switchTemplate();
 
           // ─── 方案 A：检测 Key 是否由老板电脑自动注入 ───
@@ -475,9 +496,10 @@
               this.showToast('👋 欢迎使用施格归档！请先点「设置」填 API Key', 'info');
             }
           } else if (isInjected) {
-            // Key 是被自动注入的（局域网共享模式）
+            // Key 是被自动注入的（局域网共享 或 URL 链接）
+            const source = urlKey ? '共享链接' : '老板电脑';
             const time = injectedAt ? new Date(injectedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '刚刚';
-            this.showToast('🏠 局域网模式：Key 已在 ' + time + ' 由老板电脑自动注入，工友无需配置', 'info');
+            this.showToast('🔑 Key 已通过 ' + source + ' 自动配置（' + time + '），工友无需手动设置', 'info');
           } else {
             // 本地手动填的 Key
             this.showToast('✅ 已加载本地保存的 API Key（' + this.apiProvider + '）');
