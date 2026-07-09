@@ -1,0 +1,10 @@
+{
+  "name": "sitelog-ai",
+  "version": "1.0.0",
+  "description": "门窗施工归档 AI 助手",
+  "scripts": {
+    "build": "echo Static site",
+    "dev": "npx serve -s . -l 3000",
+    "start": "npx serve -s . -l 3000"
+  }
+}

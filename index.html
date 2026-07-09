@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>施格归档 · 现场施工归档 AI 助手</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js" defer></script>
+  <script src="vendor/jspdf.umd.min.js"></script>
+  <script src="vendor/html2canvas.min.js"></script>
+  <script>
+    // ===== html2pdf 轻量胶水层（本地化，无 CDN 依赖）=====
+    // 用法：await html2pdf().set(opt).from(element).save();
+    (function () {
+      function html2pdf() {
+        var opt = {
+          margin:       [10, 10, 10, 10],
+          filename:     'document.pdf',
+          image:        { type: 'jpeg', quality: 0.95 },
+          html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+        var source = null;
+
+        function set(o) {
+          for (var k in o) {
+            if (typeof opt[k] === 'object' && opt[k] !== null && !Array.isArray(opt[k])) {
+              opt[k] = Object.assign({}, opt[k], o[k] || {});
+            } else {
+              opt[k] = o[k];
+            }
+          }
+          return api;
+        }
+        function from(el) { source = (typeof el === 'string') ? document.querySelector(el) : el; return api; }
+
+        function save() {
+          if (!source) return Promise.reject(new Error('html2pdf: no source element'));
+          if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+            return Promise.reject(new Error('html2pdf: jsPDF 未加载'));
+          }
+          if (typeof window.html2canvas === 'undefined') {
+            return Promise.reject(new Error('html2pdf: html2canvas 未加载'));
+          }
+
+          var jsPDF = window.jspdf.jsPDF;
+          var pdf = new jsPDF({
+            unit:        opt.jsPDF.unit,
+            format:      opt.jsPDF.format,
+            orientation: opt.jsPDF.orientation
+          });
+
+          var pageW = pdf.internal.pageSize.getWidth();
+          var pageH = pdf.internal.pageSize.getHeight();
+          var marginL = (Array.isArray(opt.margin) ? opt.margin[1] : opt.margin) || 0;
+          var marginR = (Array.isArray(opt.margin) ? opt.margin[3] : opt.margin) || 0;
+          var marginT = (Array.isArray(opt.margin) ? opt.margin[0] : opt.margin) || 0;
+          var marginB = (Array.isArray(opt.margin) ? opt.margin[2] : opt.margin) || 0;
+          var contentW = pageW - marginL - marginR;
+          var contentH = pageH - marginT - marginB;
+
+          return window.html2canvas(source, Object.assign({}, opt.html2canvas)).then(function (canvas) {
+            var imgW = contentW;
+            var scale = contentW / canvas.width;
+            var imgH = canvas.height * scale;
+
+            if (imgH <= contentH) {
+              var imgData = canvas.toDataURL(opt.image.type, opt.image.quality);
+              pdf.addImage(imgData, 'JPEG', marginL, marginT, imgW, imgH, undefined, 'FAST');
+            } else {
+              // 多页切片
+              var pageCanvas = document.createElement('canvas');
+              pageCanvas.width = canvas.width;
+              var pageCtx = pageCanvas.getContext('2d');
+              var ratio = canvas.width / contentW;
+              var sliceHeightSrc = Math.floor(contentH * ratio);
+              var yOffset = 0;
+              var firstPage = true;
+              while (yOffset < canvas.height) {
+                var remaining = canvas.height - yOffset;
+                var h = Math.min(sliceHeightSrc, remaining);
+                pageCanvas.height = h;
+                pageCtx.fillStyle = '#ffffff';
+                pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+                pageCtx.drawImage(canvas, 0, yOffset, canvas.width, h, 0, 0, canvas.width, h);
+                var sliceData = pageCanvas.toDataURL(opt.image.type, opt.image.quality);
+                var sliceH_mm = h / ratio;
+                if (!firstPage) pdf.addPage();
+                pdf.addImage(sliceData, 'JPEG', marginL, marginT, contentW, sliceH_mm, undefined, 'FAST');
+                firstPage = false;
+                yOffset += h;
+              }
+            }
+            pdf.save(opt.filename);
+            return pdf;
+          });
+        }
+
+        var api = { set: set, from: from, save: save };
+        return api;
+      }
+      window.html2pdf = html2pdf;
+    })();
+  </script>
+  <style>
+    [contenteditable] { outline: none; transition: background 0.15s; }
+    [contenteditable]:focus { background: #fef9c3; border-radius: 2px; }
+    .editable-block { min-height: 1.5em; }
+
+    @media print {
+      .no-print { display: none !important; }
+      .print-only { display: block !important; }
+      body { background: white !important; font-size: 11pt; }
+      .page-break { page-break-before: always; }
+      @page { margin: 1.8cm; size: A4; }
+      #report-content { box-shadow: none !important; padding: 0 !important; max-width: 100% !important; }
+      h1 { font-size: 22pt; }
+      h2 { font-size: 14pt; page-break-after: avoid; }
+      h3 { font-size: 12pt; page-break-after: avoid; }
+      img { page-break-inside: avoid; }
+      section { page-break-inside: avoid; }
+    }
+
+    .drag-over {
+      background: #dbeafe !important;
+      border-color: #3b82f6 !important;
+      transform: scale(1.02);
+      transition: all 0.2s;
+    }
+
+    .image-thumb {
+      transition: all 0.2s;
+    }
+    .image-thumb:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    /* 渐变品牌色 */
+    .brand-gradient {
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #0e7490 100%);
+    }
+
+    /* 工艺亮点徽章 */
+    .highlight-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      margin: 2px;
+      background: #dbeafe;
+      color: #1e40af;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body class="bg-slate-50" x-data="siteLogApp()">
+
+  <!-- ========== 顶部导航栏 ========== -->
+  <header class="no-print brand-gradient text-white shadow-lg sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="text-3xl">🏗️</div>
+        <div>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span></h1>
+          <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <select x-model="templateType" @change="switchTemplate" class="text-slate-900 text-sm px-3 py-1.5 rounded border-0">
+          <option value="框架施工">🔲 框架施工归档</option>
+          <option value="玻扇施工">🪟 玻扇施工归档</option>
+          <option value="五金安装">🔧 五金安装归档</option>
+        </select>
+        <button @click="openSettings()" class="px-3 py-1.5 text-sm hover:bg-white/10 rounded transition flex items-center gap-1.5" title="API Key 设置">
+          <span>⚙️ 设置</span>
+          <span x-show="apiKey && apiKey.length > 10" class="w-1.5 h-1.5 bg-green-400 rounded-full" title="Key 已配置"></span>
+        </button>
+        <button @click="loadSampleData" class="px-3 py-1.5 text-sm hover:bg-white/10 rounded transition" title="载入示例数据">
+          📂 示例
+        </button>
+        <button @click="exportPDF" class="px-4 py-1.5 text-sm bg-white text-blue-900 font-semibold rounded hover:bg-blue-50 transition">
+          📥 导出 PDF
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========== 主内容区 ========== -->
+  <main class="max-w-7xl mx-auto p-6 grid grid-cols-12 gap-6">
+
+    <!-- ========== 左侧：图片工作台 ========== -->
+    <aside class="col-span-3 no-print">
+      <div class="bg-white rounded-lg border border-slate-200 p-4 sticky top-24">
+
+        <!-- 上传区 -->
+        <div
+          @drop.prevent="handleDrop($event)"
+          @dragover.prevent="dragOver = true"
+          @dragleave="dragOver = false"
+          :class="dragOver ? 'drag-over' : ''"
+          class="border-2 border-dashed border-slate-300 rounded-lg p-5 text-center cursor-pointer hover:bg-slate-50 transition mb-4"
+          @click="$refs.fileInput.click()"
+        >
+          <div class="text-4xl mb-2">📤</div>
+          <p class="text-sm text-slate-700 font-medium">点击或拖拽上传照片</p>
+          <p class="text-xs text-slate-400 mt-1">支持多张 JPG / PNG · 单张 ≤ 10MB</p>
+          <input type="file" x-ref="fileInput" @change="handleFileSelect($event)" accept="image/*" multiple class="hidden">
+        </div>
+
+        <!-- 操作按钮 -->
+        <button
+          @click="aiOrganizeAll"
+          :disabled="processing || images.length === 0"
+          class="w-full mb-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+        >
+          <span x-show="!processing">✨</span>
+          <span x-show="processing">⏳</span>
+          <span x-text="processing ? `整理中 ${processedCount}/${images.length}` : 'AI 一键整理'"></span>
+        </button>
+
+        <button
+          @click="clearAllImages"
+          x-show="images.length > 0"
+          class="w-full mb-4 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition"
+        >
+          🗑️ 清空全部图片
+        </button>
+
+        <!-- 已上传图片列表 -->
+        <div x-show="images.length > 0" class="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+          <div class="text-xs font-semibold text-slate-500 mb-2 sticky top-0 bg-white py-1">
+            已上传 <span x-text="images.length"></span> 张
+          </div>
+          <template x-for="(img, idx) in images" :key="img.id">
+            <div class="image-thumb border border-slate-200 rounded-lg p-2 hover:border-blue-300 transition bg-white">
+              <div class="flex items-start gap-2">
+                <div class="relative flex-shrink-0">
+                  <img :src="img.dataUrl" class="w-16 h-16 object-cover rounded">
+                  <span class="absolute -top-1 -left-1 bg-blue-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center" x-text="idx + 1"></span>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <input
+                    x-model="img.title"
+                    @input.debounce.500ms="syncToReport()"
+                    placeholder="节点标题..."
+                    class="w-full text-xs font-semibold px-2 py-1 border border-slate-200 rounded mb-1 focus:border-blue-400 focus:outline-none"
+                  >
+                  <select
+                    x-model="img.category"
+                    @change="syncToReport()"
+                    class="w-full text-xs px-1 py-0.5 border border-slate-200 rounded bg-white"
+                  >
+                    <option value="框架施工">框架</option>
+                    <option value="玻扇施工">玻扇</option>
+                    <option value="五金安装">五金</option>
+                    <option value="密封收口">密封</option>
+                    <option value="成品保护">保护</option>
+                    <option value="其他">其他</option>
+                  </select>
+                  <p class="text-xs text-slate-400 mt-1 truncate" x-text="img.time"></p>
+                  <div class="flex gap-2 mt-1">
+                    <button @click="reAnalyze(img)" :disabled="!apiKey || img.analyzing" class="text-xs text-blue-600 hover:underline" x-text="img.analyzing ? '分析中...' : '重分析'"></button>
+                    <button @click="removeImage(img.id)" class="text-xs text-red-600 hover:underline">删除</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- 空状态 -->
+        <div x-show="images.length === 0" class="text-center py-6 text-slate-400 text-sm">
+          暂无照片
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- ========== 右侧：归档报告（可编辑） ========== -->
+    <section class="col-span-9">
+      <!-- 编辑模式提示条 -->
+      <div class="no-print mb-3 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-center gap-2">
+        <span>✏️</span>
+        <span><strong>直接点击右侧文字</strong>即可编辑修改。AI 整理是初稿，您是终审。</span>
+      </div>
+
+      <!-- 报告正文（contenteditable） -->
+      <article
+        id="report-content"
+        class="bg-white rounded-lg shadow-sm p-10 max-w-4xl mx-auto"
+        :class="templateType"
+      >
+        <div x-html="reportHtml"></div>
+      </article>
+    </section>
+
+  </main>
+
+      <!-- ========== 设置弹窗 ========== -->
+  <div
+    x-show="showSettings"
+    x-transition.opacity.duration.150ms
+    class="no-print fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+    @click.self="closeSettings()"
+    @keydown.escape.window="closeSettings()"
+  >
+    <div class="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl" @click.stop>
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-lg text-slate-900">⚙️ AI 视觉模型设置</h3>
+        <button @click="closeSettings()" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">×</button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">服务方</label>
+          <select x-model="apiProvider" @change="saveSettings" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+            <option value="qwen">通义千问 Qwen-VL（推荐 · 国内直连）</option>
+            <option value="openai">OpenAI GPT-4o（需境外网络）</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">API Key</label>
+          <input
+            type="password"
+            x-model="apiKey"
+            @input="saveSettings()"
+            @keydown.enter.prevent="closeSettings()"
+            placeholder="sk-xxxxxxxxxxxxxxxxxx"
+            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none"
+          >
+          <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">
+            🔒 Key 仅保存在你本地浏览器（localStorage），<strong>不上传任何服务器</strong>。<br>
+            📷 图片也只在浏览器内存中处理，<strong>不会发给 AI 厂商做训练</strong>。
+          </p>
+        </div>
+
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900">
+          <p class="font-semibold mb-1">💡 免费申请 Key：</p>
+          <a href="https://dashscope.console.aliyun.com/apiKey" target="_blank" class="text-blue-600 hover:underline">👉 通义千问控制台</a>
+          <span class="text-slate-500">（新用户有 100 万 token 免费额度，约可识别 5000 张照片）</span>
+        </div>
+
+        <div class="flex justify-between items-center pt-2">
+          <button @click="testConnection" :disabled="!apiKey || testing" class="text-sm text-blue-600 hover:underline disabled:opacity-50" x-text="testing ? '测试中...' : '🔌 测试连接'"></button>
+          <div class="flex gap-2">
+            <button @click="closeSettings()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition">取消</button>
+            <button @click="closeSettings()" class="px-5 py-2 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800 transition">完成 ✓</button>
+          </div>
+        </div>
+
+        <div x-show="testResult" x-html="testResult" class="text-xs"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 导出 PDF 指引弹窗（方案1：浏览器原生另存为 PDF） ========== -->
+  <div
+    x-show="exportGuideOpen"
+    x-transition.opacity.duration.150ms
+    class="no-print fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+    @click.self="closeExportGuide()"
+    @keydown.escape.window="closeExportGuide()"
+  >
+    <div class="bg-white rounded-xl p-6 w-full max-w-lg shadow-2xl" @click.stop>
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-lg text-slate-900">📄 导出 PDF 操作指引</h3>
+        <button @click="closeExportGuide()" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">×</button>
+      </div>
+
+      <div class="space-y-3 text-sm text-slate-700 leading-relaxed">
+        <p class="font-semibold text-slate-900">点击下方「⬇️ 立即下载 PDF」，浏览器会自动把报告保存为 PDF 文件，无需再选打印机。</p>
+
+        <div class="bg-blue-50 border-l-4 border-blue-500 rounded p-4 space-y-2">
+          <p><strong class="text-blue-900">第 1 步</strong>：点「<strong>立即下载 PDF</strong>」按钮。</p>
+          <p><strong class="text-blue-900">第 2 步</strong>：浏览器弹出文件夹选择窗口，你可以选：</p>
+          <ul class="ml-4 space-y-1 text-slate-600">
+            <li>• 桌面（最方便）</li>
+            <li>• 业主专属文件夹</li>
+            <li>• 网盘同步目录（OneDrive / iCloud / 百度网盘）</li>
+          </ul>
+          <p><strong class="text-blue-900">第 3 步</strong>：点「<strong>保存</strong>」 → 完成！文件就在你刚选的文件夹里。</p>
+        </div>
+
+        <div class="bg-amber-50 border-l-4 border-amber-500 rounded p-3 text-xs text-amber-900">
+          <p class="font-semibold mb-1">⚠️ 如果下载失败：</p>
+          <p>请检查网络能否访问 <strong>cdnjs.cloudflare.com</strong>；若网络受限，可改用顶部菜单「导出 PDF」右侧的浏览器打印功能，手动选「另存为 PDF」。</p>
+        </div>
+
+        <div class="bg-green-50 border-l-4 border-green-500 rounded p-3 text-xs text-green-900">
+          <p class="font-semibold mb-2">📝 文件名（可直接修改）：</p>
+          <div class="flex items-center gap-2">
+            <input
+              type="text"
+              x-model="pdfFilename"
+              @input="pdfFilenameTouched = true"
+              class="flex-1 px-3 py-2 text-sm font-mono border border-green-300 rounded focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
+              placeholder="例：潮南悦璟苑3栋2201框架施工归档"
+            >
+            <span class="text-sm font-mono text-slate-600">.pdf</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1.5">💡 留空时自动用模板默认名；带「/ \ : * ? " &lt; &gt; |」的字符会被替换成下划线</p>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-4 mt-4 border-t border-slate-200">
+        <button @click="closeExportGuide()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition">取消</button>
+        <button @click="generatePDF()" class="px-5 py-2 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800 transition">⬇️ 立即下载 PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 全局通知 ========== -->
+  <div
+    x-show="toast.show"
+    x-transition
+    class="no-print fixed bottom-6 right-6 z-50 px-5 py-3 rounded-lg shadow-2xl text-white"
+    :class="toast.type === 'error' ? 'bg-red-600' : 'bg-slate-900'"
+  >
+    <span x-text="toast.msg"></span>
+  </div>
+
+
+  <!-- ========== 应用逻辑 ========== -->
+  <script>
+    function siteLogApp() {
+      return {
+        // ===== 状态 =====
+        apiKey: '',
+        apiProvider: 'qwen',
+        templateType: '框架施工',
+        images: [],
+        reportHtml: '',
+        reportTitle: '',
+        pdfFilename: '',
+        pdfFilenameTouched: false,
+        processing: false,
+        processedCount: 0,
+        showSettings: false,
+        exportGuideOpen: false,
+        dragOver: false,
+        testing: false,
+        testResult: '',
+        toast: { show: false, msg: '', type: 'info' },
+
+        // ===== 初始化 =====
+        async init() {
+          this.apiKey = localStorage.getItem('sitelog_api_key') || '';
+          this.apiProvider = localStorage.getItem('sitelog_api_provider') || 'qwen';
+          this.switchTemplate();
+
+          // ─── 方案 A：检测 Key 是否由老板电脑自动注入 ───
+          const isInjected = localStorage.getItem('sitelog_api_injected') === '1';
+          const injectedAt = localStorage.getItem('sitelog_api_injected_at');
+
+          if (!this.apiKey || this.apiKey.length < 10) {
+            // 没有 Key：检查是否能走代理模式
+            try {
+              const resp = await fetch('/api/health', { cache: 'no-store' });
+              if (resp.ok) {
+                const health = await resp.json();
+                if (health.key_configured) {
+                  this.showToast('⚠️ 老板电脑代理可用，但本地 Key 为空，请点「设置」填 Key 或刷新页面', 'error');
+                } else {
+                  this.showToast('👋 欢迎使用施格归档！请先点「设置」填 API Key', 'info');
+                }
+              } else {
+                this.showToast('👋 欢迎使用施格归档！请先点「设置」填 API Key', 'info');
+              }
+            } catch (e) {
+              this.showToast('👋 欢迎使用施格归档！请先点「设置」填 API Key', 'info');
+            }
+          } else if (isInjected) {
+            // Key 是被自动注入的（局域网共享模式）
+            const time = injectedAt ? new Date(injectedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '刚刚';
+            this.showToast('🏠 局域网模式：Key 已在 ' + time + ' 由老板电脑自动注入，工友无需配置', 'info');
+          } else {
+            // 本地手动填的 Key
+            this.showToast('✅ 已加载本地保存的 API Key（' + this.apiProvider + '）');
+          }
+        },
+
+        saveSettings() {
+          localStorage.setItem('sitelog_api_key', this.apiKey);
+          localStorage.setItem('sitelog_api_provider', this.apiProvider);
+        },
+
+        // ===== 统一关闭设置（带视觉反馈） =====
+        closeSettings() {
+          // 1) 强制立即保存（不等 debounce）
+          this.saveSettings();
+          // 2) 关闭弹窗
+          this.showSettings = false;
+          // 3) 视觉反馈（无论是否有 key 都给提示）
+          if (this.apiKey && this.apiKey.trim().length > 0) {
+            this.showToast('✅ 设置已保存（Key 已存到本地浏览器）');
+          } else {
+            this.showToast('⚠️ 弹窗已关闭，但 Key 为空，下次使用前请先填写', 'error');
+          }
+        },
+
+        openSettings() {
+          this.showSettings = true;
+        },
+
+        // ===== 模板切换 =====
+        switchTemplate() {
+          // 模板切换时询问是否保留已编辑内容
+          if (this.images.length > 0 && !confirm('切换模板会清空当前报告内容，是否继续？')) {
+            return;
+          }
+          this.images = [];
+          this.reportHtml = this.getTemplateHtml();
+          this.reportTitle = this.templateType + '归档';
+        },
+
+        getTemplateHtml() {
+          if (this.templateType === '框架施工') return TEMPLATES.frame();
+          if (this.templateType === '玻扇施工') return TEMPLATES.glass();
+          if (this.templateType === '五金安装') return TEMPLATES.hardware();
+          return TEMPLATES.frame();
+        },
+
+        // ===== 文件处理 =====
+        async handleFileSelect(event) {
+          const files = Array.from(event.target.files);
+          await this.processFiles(files);
+          event.target.value = ''; // 重置以便重复上传
+        },
+
+        async handleDrop(event) {
+          this.dragOver = false;
+          const files = Array.from(event.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+          await this.processFiles(files);
+        },
+
+        async processFiles(files) {
+          if (files.length === 0) return;
+          for (const file of files) {
+            if (file.size > 10 * 1024 * 1024) {
+              this.showToast(`⚠️ ${file.name} 超过 10MB，已跳过`, 'error');
+              continue;
+            }
+            const dataUrl = await this.fileToDataUrl(file);
+            const img = {
+              id: Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+              file: file,
+              dataUrl: dataUrl,
+              category: this.guessCategory(file.name),
+              time: new Date().toLocaleString('zh-CN', { hour12: false }),
+              title: '',
+              desc: '',
+              highlights: [],
+              analyzing: false
+            };
+            this.images.push(img);
+          }
+          this.showToast(`✅ 已上传 ${files.length} 张照片`);
+          this.syncToReport();
+        },
+
+        guessCategory(filename) {
+          const f = filename.toLowerCase();
+          if (/框架|框体|立柱|横梁|电钻|打孔|水平/.test(f)) return '框架施工';
+          if (/玻|玻璃|扇|合片|中空/.test(f)) return '玻扇施工';
+          if (/五金|把手|锁|铰链|合页|风撑/.test(f)) return '五金安装';
+          if (/胶|密封|收口|打胶|注胶/.test(f)) return '密封收口';
+          if (/保护|膜|覆盖|清场/.test(f)) return '成品保护';
+          return this.templateType; // 默认归到当前归档类型
+        },
+
+        fileToDataUrl(file) {
+          return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        },
+
+        removeImage(id) {
+          this.images = this.images.filter(i => i.id !== id);
+          this.syncToReport();
+        },
+
+        clearAllImages() {
+          if (confirm('确定清空所有图片？')) {
+            this.images = [];
+            this.syncToReport();
+          }
+        },
+
+        // ===== AI 视觉识别 =====
+        async aiOrganizeAll() {
+          if (!this.apiKey) {
+            this.showSettings = true;
+            this.showToast('⚠️ 请先在设置中填入 API Key', 'error');
+            return;
+          }
+          this.processing = true;
+          this.processedCount = 0;
+          try {
+            for (const img of this.images) {
+              if (!img.title) {
+                img.analyzing = true;
+                try {
+                  await this.analyzeImage(img);
+                } catch (e) {
+                  console.error('分析失败', img.file.name, e);
+                  img.title = `施工节点 ${this.images.indexOf(img) + 1}`;
+                  img.desc = '[AI 识别失败，请手动填写]';
+                }
+                img.analyzing = false;
+              }
+              this.processedCount++;
+              this.syncToReport();
+            }
+            this.showToast(`✨ AI 整理完成，共 ${this.processedCount} 张`);
+          } finally {
+            this.processing = false;
+          }
+        },
+
+        async reAnalyze(img) {
+          if (!this.apiKey) {
+            this.showSettings = true;
+            return;
+          }
+          img.analyzing = true;
+          try {
+            await this.analyzeImage(img);
+            this.syncToReport();
+            this.showToast('✅ 已重新分析');
+          } catch (e) {
+            this.showToast('❌ 识别失败：' + e.message, 'error');
+          } finally {
+            img.analyzing = false;
+          }
+        },
+
+        async analyzeImage(img) {
+          const prompt = this.buildAnalysisPrompt();
+
+          // ─── 三阶段校验流程 ───
+          // ① 多模型并行投票（每个模型跑一次，结果合并）
+          // ② 客户端图片特征二次校验（拿 base64 解析像素，强制玻璃检测）
+          // ③ 不一致时强制纠正 + 落库
+
+          // 投票配置：通义走 3 个模型，OpenAI 走 1 个（GPT-4o 已经很准）
+          const models = this.apiProvider === 'openai'
+            ? ['gpt-4o-mini']
+            : ['qwen-vl-plus', 'qwen3-vl-plus', 'qwen-vl-max'];
+
+          const votes = await this.callVisionAPIVoting(img.dataUrl, prompt, models);
+
+          // 类别投票：得票最多的获胜（如果同票，优先级：成品保护 > 玻扇 > 五金 > 密封 > 框架）
+          const PRIORITY = ['成品保护', '玻扇施工', '五金安装', '密封收口', '框架施工'];
+          const counts = {};
+          votes.forEach(v => { counts[v.category] = (counts[v.category] || 0) + 1; });
+          const maxCount = Math.max(...Object.values(counts));
+          const topCandidates = Object.keys(counts).filter(c => counts[c] === maxCount);
+          let finalCategory = topCandidates.sort((a, b) =>
+            PRIORITY.indexOf(a) - PRIORITY.indexOf(b)
+          )[0];
+
+          // ② 客户端图片特征二次校验：检测玻璃反光（如果有玻璃却归到「框架」，强制纠正）
+          const pixelFeatures = await this.detectImageFeatures(img.dataUrl);
+          const override = this.applyFeatureOverride(finalCategory, pixelFeatures);
+          if (override.changed) {
+            console.log(`🔧 客户端覆盖: ${finalCategory} → ${override.category}（${override.reason}）`);
+            finalCategory = override.category;
+          }
+
+          // 合并字段：标题/desc/highlights 取票数最多的版本，stage 取最长的
+          const winner = votes.find(v => v.category === finalCategory) || votes[0];
+          const longestStage = votes.map(v => v.stage || '').sort((a, b) => b.length - a.length)[0];
+
+          img.title = winner.title || '施工节点';
+          img.category = finalCategory;
+          img.stage = longestStage || '';
+          img.desc = winner.desc || '';
+          img.highlights = Array.isArray(winner.highlights) ? winner.highlights : [];
+          img.aiConfidence = {
+            votes: counts,
+            pixelFeatures: pixelFeatures,
+            overrides: override.changed ? [override] : []
+          };
+        },
+
+        buildAnalysisPrompt() {
+          return `你是一位拥有 10 年经验的门窗安装高级项目经理，正在为业主整理施工档案。
+
+请**先判断施工阶段**，再按 JSON 输出（严格 JSON，不要 markdown）：
+
+━━━━━━ 阶段判断要点 ━━━━━━
+1. **框架施工**：现场只有铝合金框体立在洞口里，**没有任何窗扇 / 玻璃**，通常在打膨胀螺丝 / 注胶 / 校水平阶段
+2. **玻扇施工**：**玻璃已经装上框体**（合片完成），或正在装玻璃 / 装窗扇，可能看到玻璃反光 / 中空玻璃的铝隔条 / 玻扇打开状态
+3. **五金安装**：可以清楚看到把手 / 锁具 / 铰链 / 风撑 / 滑撑等金属件被安装或调整
+4. **密封收口**：框体与墙体之间正在打胶 / 塞泡沫棒 / 贴美纹纸
+5. **成品保护**：框体上贴了保护膜 / 工地打扫干净 / 整扇门窗处于完工状态但保护膜还没撕
+
+⚠️ **最容易判断错的场景（请反复对照）**：
+- 看到**已装好的玻璃窗扇 + 室内视角** + 保护膜 → 这是「成品保护」或「玻扇施工」**完工节点**，**绝对不是「框架施工」**
+- 看到**框体 + 保护膜 + 推拉窗打开 + 能看到窗外风景** → 优先归「成品保护」
+- 看到**框体立着、洞口里没有玻璃** → 才是「框架施工」
+- **核心铁律**：能清楚看到中空玻璃的反光或铝隔条 → 必归「玻扇施工」
+
+━━━━━━ 输出格式 ━━━━━━
+
+{
+  "title": "本节点标题（8-15字，行业专业术语）",
+  "category": "归类（只能是：框架施工/玻扇施工/五金安装/密封收口/成品保护 中之一）",
+  "stage": "进度阶段描述（10-20字，例如：框体已就位待注胶 / 玻璃合片已完成 / 整窗安装完毕待验收）",
+  "desc": "工艺说明（40-80字，专业、客观、突出动作和工艺对位，不要口语化）",
+  "highlights": ["工艺亮点1（5-10字）", "工艺亮点2", "工艺亮点3", "工艺亮点4"]
+}
+
+━━━━━━ 要求 ━━━━━━
+1. **第一步**：明确回答「照片里能看到玻璃吗？」如果能，category 不能是「框架施工」
+2. 标题用行业标准术语，例如「框架就位与水平校准」「中空玻璃合片工艺」「门窗系统完工自检」
+3. desc 体现「施工动作 + 工艺标准」，例如「采用 M10 化学锚栓固定立柱，激光水平仪校准垂直度偏差 ≤ 2mm」
+4. highlights 突出差异化亮点（精工艺、严标准、留凭证），不要提"问题/隐患/异常/返工/不合格"
+5. 视角面向业主——业主看到的是「专业团队的精湛工艺」，不是「质量瑕疵清单」`;
+        },
+
+        // ─── 客户端图片特征检测 ───
+        // 简单的像素统计：检测玻璃反光（高亮像素比例）、深色框体像素、暖色（室内）冷色（室外）
+        async detectImageFeatures(dataUrl) {
+          return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+              try {
+                const canvas = document.createElement('canvas');
+                const size = 64; // 缩到 64×64，足够统计
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, size, size);
+                const data = ctx.getImageData(0, 0, size, size).data;
+
+                let brightPixels = 0;     // 高亮像素（玻璃反光嫌疑）
+                let darkPixels = 0;      // 暗色像素（框体/阴影）
+                let warmPixels = 0;      // 暖色（室内灯光/木质）
+                let coolPixels = 0;      // 冷色（室外天空/玻璃）
+                let greenPixels = 0;     // 绿色（窗外植物/草地，强烈提示「能看到窗外」）
+
+                for (let i = 0; i < data.length; i += 4) {
+                  const r = data[i], g = data[i + 1], b = data[i + 2];
+                  const bright = (r + g + b) / 3 > 200;
+                  const dark = (r + g + b) / 3 < 60;
+                  const warm = r > 180 && g > 140 && b < 120;
+                  const cool = b > 180 && r < 150;
+                  const green = g > 130 && g > r + 20 && g > b + 20;
+                  if (bright) brightPixels++;
+                  if (dark) darkPixels++;
+                  if (warm) warmPixels++;
+                  if (cool) coolPixels++;
+                  if (green) greenPixels++;
+                }
+
+                const total = size * size;
+                const features = {
+                  brightRatio: brightPixels / total,
+                  darkRatio: darkPixels / total,
+                  warmRatio: warmPixels / total,
+                  coolRatio: coolPixels / total,
+                  greenRatio: greenPixels / total,
+                  hasGlassReflection: brightPixels / total > 0.15,  // 15% 以上高亮像素 → 大概率有玻璃反光
+                  hasOutdoorView: greenPixels / total > 0.05,       // 5% 以上绿色 → 窗外有植物
+                  isMostlyDark: darkPixels / total > 0.4            // 40% 以上暗色 → 没装玻璃时通常画面较暗
+                };
+                resolve(features);
+              } catch (e) {
+                console.warn('图片特征检测失败', e);
+                resolve({});
+              }
+            };
+            img.onerror = () => resolve({});
+            img.src = dataUrl;
+          });
+        },
+
+        // ─── 客户端强制覆盖：基于像素特征纠正 AI 错误判断 ───
+        applyFeatureOverride(category, features) {
+          if (!features || Object.keys(features).length === 0) {
+            return { changed: false, category, reason: '特征检测失败，跳过校验' };
+          }
+
+          // 规则 1：如果 AI 说「框架」但有玻璃反光 + 室外视角 → 强制改「成品保护」
+          if (category === '框架施工' && features.hasGlassReflection && features.hasOutdoorView) {
+            return {
+              changed: true,
+              category: '成品保护',
+              reason: `检测到玻璃反光(${Math.round(features.brightRatio * 100)}%) + 室外视角(绿色${Math.round(features.greenRatio * 100)}%)，与「框架施工」矛盾，应为成品保护`
+            };
+          }
+
+          // 规则 2：如果 AI 说「框架」但有玻璃反光 → 强制改「玻扇施工」
+          if (category === '框架施工' && features.hasGlassReflection) {
+            return {
+              changed: true,
+              category: '玻扇施工',
+              reason: `检测到玻璃反光(${Math.round(features.brightRatio * 100)}%)，与「框架施工」矛盾，应为玻扇施工`
+            };
+          }
+
+          // 规则 3：如果 AI 说「玻扇」但完全没有玻璃反光、画面很暗 → 降级为「框架施工」
+          if (category === '玻扇施工' && !features.hasGlassReflection && features.isMostlyDark) {
+            return {
+              changed: true,
+              category: '框架施工',
+              reason: `未检测到玻璃反光且画面较暗（暗色${Math.round(features.darkRatio * 100)}%），更接近框架施工阶段`
+            };
+          }
+
+          return { changed: false, category, reason: '特征与判断一致，无需覆盖' };
+        },
+
+        // ─── 多模型并行投票 ───
+        async callVisionAPIVoting(imageDataUrl, prompt, models) {
+          const tasks = models.map(model => this.callVisionAPI(imageDataUrl, prompt, model));
+          const settled = await Promise.allSettled(tasks);
+
+          const valid = settled
+            .filter(s => s.status === 'fulfilled')
+            .map(s => s.value);
+
+          // 如果全部失败，至少返回一个兜底（避免抛错）
+          if (valid.length === 0) {
+            console.error('所有模型都识别失败');
+            throw new Error('所有模型都识别失败，请检查网络或 Key');
+          }
+
+          // 记录失败的模型
+          settled.forEach((s, i) => {
+            if (s.status === 'rejected') {
+              console.warn(`⚠️ 模型 ${models[i]} 识别失败：${s.reason.message}`);
+            }
+          });
+
+          console.log(`🗳️ 多模型投票完成：${valid.length}/${models.length} 成功`);
+          valid.forEach((v, i) => {
+            console.log(`   ${models[i]} → ${v.category} / ${v.title}`);
+          });
+
+          return valid;
+        },
+
+        async callVisionAPI(imageDataUrl, prompt, modelOverride) {
+          const baseConfig = this.apiProvider === 'openai'
+            ? {
+                url: 'https://api.openai.com/v1/chat/completions',
+                authHeader: 'Bearer ' + this.apiKey,
+                useProxy: false,
+                defaultModel: 'gpt-4o-mini'
+              }
+            : {
+                url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+                authHeader: 'Bearer ' + this.apiKey,
+                useProxy: false,
+                defaultModel: 'qwen-vl-plus'
+              };
+
+          const config = Object.assign({}, baseConfig);
+          config.model = modelOverride || baseConfig.defaultModel;
+
+          // ─── 方案 A：检测到 Key 是「自动注入」的，走本地代理 ───
+          const isInjectedKey = localStorage.getItem('sitelog_api_injected') === '1';
+          if (this.apiProvider === 'qwen' && isInjectedKey) {
+            try {
+              const healthResp = await fetch('/api/health', { cache: 'no-store' });
+              if (healthResp.ok) {
+                const health = await healthResp.json();
+                if (health.key_configured) {
+                  config.url = '/api/qwen';
+                  config.authHeader = '';
+                  config.useProxy = true;
+                }
+              }
+            } catch (e) {
+              console.warn('⚠️ sitelog-ai: 局域网代理不可用，回退到直连模式', e);
+            }
+          }
+
+          const headers = { 'Content-Type': 'application/json' };
+          if (!config.useProxy && config.authHeader) {
+            headers['Authorization'] = config.authHeader;
+          }
+
+          const response = await fetch(config.url, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({
+              model: config.model,
+              messages: [{
+                role: 'user',
+                content: [
+                  { type: 'image_url', image_url: { url: imageDataUrl } },
+                  { type: 'text', text: prompt }
+                ]
+              }],
+              response_format: { type: 'json_object' }
+            })
+          });
+
+          if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`HTTP ${response.status}: ${err.slice(0, 200)}`);
+          }
+
+          const data = await response.json();
+          const content = data.choices[0].message.content;
+          const parsed = JSON.parse(content);
+          // 归一化 category：去掉空格/全角
+          if (parsed.category) {
+            parsed.category = parsed.category.trim();
+          }
+          return parsed;
+        },
+
+        async testConnection() {
+          this.testing = true;
+          this.testResult = '';
+          try {
+            // 用一张 1x1 透明 PNG 测试
+            const testImg = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+            const result = await this.callVisionAPI(testImg, '请回复 JSON: {"ok": true, "msg": "连接正常"}');
+            this.testResult = '<div class="p-2 bg-green-50 text-green-800 rounded">✅ 连接正常！模型已就绪。</div>';
+          } catch (e) {
+            this.testResult = `<div class="p-2 bg-red-50 text-red-800 rounded">❌ 连接失败：${e.message}</div>`;
+          } finally {
+            this.testing = false;
+          }
+        },
+
+        // ===== 报告渲染 =====
+        syncToReport() {
+          // 把图片数据同步到报告 DOM
+          const container = document.getElementById('images-container');
+          if (!container) return;
+
+          if (this.images.length === 0) {
+            container.innerHTML = `
+              <div class="text-center py-12 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg">
+                <div class="text-5xl mb-3">📷</div>
+                <p>从左侧拖入现场照片</p>
+                <p class="text-xs mt-1">或点「📂 示例」查看效果</p>
+              </div>
+            `;
+            return;
+          }
+
+          let html = '<div class="space-y-8">';
+          this.images.forEach((img, idx) => {
+            const highlightsHtml = (img.highlights || [])
+              .map(h => `<span class="highlight-badge">✦ ${h}</span>`)
+              .join('');
+
+            html += `
+              <div class="node-block group" data-img-id="${img.id}">
+                <div class="flex items-baseline gap-2 mb-3">
+                  <span class="text-sm font-bold text-blue-600">节点 ${String(idx + 1).padStart(2, '0')}</span>
+                  <span class="text-xs text-slate-400">·</span>
+                  <span class="text-xs text-slate-500">${img.category}</span>
+                  <span class="text-xs text-slate-400">·</span>
+                  <span class="text-xs text-slate-400">${img.time}</span>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900 mb-3 editable-block" contenteditable="true">${img.title || '未命名节点'}</h3>
+                ${img.stage ? `<p class="text-xs text-blue-700 bg-blue-50 inline-block px-2 py-0.5 rounded mb-3">📍 ${img.stage}</p>` : ''}
+                <div class="grid grid-cols-5 gap-4">
+                  <div class="col-span-2">
+                    <img src="${img.dataUrl}" class="w-full rounded shadow-sm" alt="${img.title}">
+                  </div>
+                  <div class="col-span-3">
+                    <p class="text-slate-700 leading-relaxed mb-3 editable-block" contenteditable="true">${img.desc || '<span class="text-slate-400">[请填写工艺说明]</span>'}</p>
+                    <div class="pt-2 border-t border-slate-100">
+                      <p class="text-xs text-slate-500 mb-1.5">🌟 工艺亮点</p>
+                      <div class="editable-block" contenteditable="true">${highlightsHtml || '<span class="text-slate-400 text-xs">[请填写亮点]</span>'}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `;
+          });
+          html += '</div>';
+          container.innerHTML = html;
+        },
+
+        // ===== PDF 导出（方案2：html2pdf.js 直接下载）=====
+        // 用户点击 → 弹「导出指引」弹窗 → 用户点「立即下载 PDF」→ 直接生成并下载 PDF 文件
+        exportPDF() {
+          if (this.images.length === 0) {
+            if (!confirm('当前报告暂无照片，是否仍要导出空白模板？')) return;
+          }
+          // 每次打开弹窗时，根据 h1 给出默认建议名（用户没改过才覆盖）
+          const h1 = document.querySelector('#report-content h1');
+          const suggested = (h1 && h1.innerText.trim()) ? h1.innerText.trim() : (this.templateType + '归档');
+          if (!this.pdfFilenameTouched || !this.pdfFilename) {
+            this.pdfFilename = suggested;
+            this.pdfFilenameTouched = false;
+          }
+          // 先弹导出指引（独立弹窗，不与设置弹窗混淆）
+          this.exportGuideOpen = true;
+        },
+
+        // 导出指引确认 → 直接下载 PDF
+        async generatePDF() {
+          // 同步最后一次编辑到 reportHtml
+          this.syncToReport();
+
+          const element = document.getElementById('report-content');
+          if (!element) {
+            this.showToast('❌ 未找到报告内容，请刷新后重试', 'error');
+            return;
+          }
+
+          // 优先用用户输入的文件名，否则从 h1 取，再否则用 reportTitle
+          let baseName = '';
+          if (this.pdfFilename && this.pdfFilename.trim()) {
+            baseName = this.pdfFilename.trim();
+          } else {
+            const h1 = element.querySelector('h1');
+            if (h1 && h1.innerText.trim()) {
+              baseName = h1.innerText.trim();
+            } else {
+              baseName = this.reportTitle || '施工归档';
+            }
+          }
+          // 清理 Windows / macOS 文件名非法字符，并去掉结尾的 .pdf（防止用户重复加）
+          const cleanName = baseName.replace(/\.pdf$/i, '').replace(/[\\/:*?"<>|]/g, '_').trim();
+          const filename = (cleanName || '施工归档') + '.pdf';
+
+          // 关闭弹窗
+          this.exportGuideOpen = false;
+          this.showToast('📄 正在生成 PDF，请稍候...');
+
+          try {
+            const opt = {
+              margin:       [12, 12, 12, 12],
+              filename:     filename,
+              image:        { type: 'jpeg', quality: 0.98 },
+              html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+              pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+            };
+            await html2pdf().set(opt).from(element).save();
+            this.showToast('✅ PDF 已下载：' + filename);
+          } catch (err) {
+            console.error('PDF 生成失败:', err);
+            this.showToast('❌ PDF 生成失败，请检查浏览器控制台', 'error');
+          }
+        },
+
+        // 关闭导出指引
+        closeExportGuide() {
+          this.exportGuideOpen = false;
+        },
+
+        // ===== 示例数据 =====
+        loadSampleData() {
+          if (this.images.length > 0 && !confirm('载入示例会覆盖当前图片，是否继续？')) return;
+          this.templateType = '框架施工';
+          this.images = [
+            {
+              id: 'sample1',
+              dataUrl: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect fill="#e2e8f0" width="400" height="300"/><text x="200" y="150" text-anchor="middle" fill="#64748b" font-size="20">工具清点</text><text x="200" y="180" text-anchor="middle" fill="#94a3b8" font-size="12">电钻 · 水平仪 · 羊角锤</text></svg>`),
+              category: '框架施工',
+              time: '2026-06-23 14:00',
+              title: '工具准备与定位放线',
+              desc: '班组入场后第一项工作：工具清点 + 定位放线。激光水平仪校准洞口水平度偏差 ≤ 1.5mm，确保后续框体就位基准准确。',
+              highlights: ['激光水平仪校准', '工具整齐铺放', '基准线清晰', '安全帽规范佩戴']
+            },
+            {
+              id: 'sample2',
+              dataUrl: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect fill="#dbeafe" width="400" height="300"/><text x="200" y="150" text-anchor="middle" fill="#1e40af" font-size="20">框体就位</text><text x="200" y="180" text-anchor="middle" fill="#3b82f6" font-size="12">化学锚栓 · 激光校准</text></svg>`),
+              category: '框架施工',
+              time: '2026-06-23 15:30',
+              title: '框体就位与化学锚栓固定',
+              desc: '采用 M10×130 化学锚栓将框体固定于结构墙体，固化 24h 后进入下一道工序。框体四周预留 15mm 注胶间隙，激光水平仪复核垂直度偏差 ≤ 2mm。',
+              highlights: ['M10 化学锚栓', '24h 固化标准', '15mm 注胶间隙', '垂直度 ≤ 2mm']
+            },
+            {
+              id: 'sample3',
+              dataUrl: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect fill="#dcfce7" width="400" height="300"/><text x="200" y="150" text-anchor="middle" fill="#166534" font-size="20">注胶密封</text><text x="200" y="180" text-anchor="middle" fill="#16a34a" font-size="12">硅酮结构胶</text></svg>`),
+              category: '密封收口',
+              time: '2026-06-24 13:53',
+              title: '框墙接缝注胶密封',
+              desc: '框体与结构墙体之间 15mm 缝隙，采用硅酮结构胶（GB/T 14683-2017）双道密封：内层结构胶 + 外层耐候胶，48h 完全固化后形成柔性防水屏障。',
+              highlights: ['硅酮结构胶', '双道密封工艺', '48h 固化', '柔性防水屏障']
+            }
+          ];
+          this.syncToReport();
+          this.reportTitle = '框架施工归档（示例）';
+          this.showToast('✅ 已载入示例数据，点「导出 PDF」可查看效果');
+        },
+
+        // ===== 工具 =====
+        showToast(msg, type = 'info') {
+          this.toast = { show: true, msg, type };
+          setTimeout(() => this.toast.show = false, 3000);
+        }
+      };
+    }
+
+
+    // ====== 模板定义 ======
+    const TEMPLATES = {
+      frame: () => `
+        <div class="text-center mb-10 pb-8 border-b-2 border-slate-200">
+          <p class="text-xs text-slate-500 tracking-[0.3em]">CHU JIANG · MEN & WINDOW</p>
+          <h1 class="text-4xl font-bold text-slate-900 mt-3">框架施工归档</h1>
+          <p class="text-slate-600 mt-3 text-sm">—— 精工艺 · 守标准 · 留凭证 ——</p>
+          <p class="text-xs text-slate-400 mt-4">本档案作为施工过程追溯凭证，交付业主保存</p>
+        </div>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">一、</span>阶段实施概况
+          </h2>
+          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+            [请编辑：本次框架施工的整体进度总结，包括入场时间、施工范围、班组配置、材料品牌等关键信息。建议 100-200 字。]
+          </div>
+        </section>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">二、</span>现场工艺与进度详解
+          </h2>
+          <div id="images-container"></div>
+        </section>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">三、</span>工艺亮点与品质承诺
+          </h2>
+          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+            [请编辑：本项目的差异化工艺亮点。例如：化学锚栓固定 / 硅酮结构胶双道密封 / 激光水平仪校准 / 框体保护膜全程保留 等。每条亮点建议 20-30 字，3-5 条为宜。]
+          </div>
+        </section>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">四、</span>影像追溯体系
+          </h2>
+          <ul class="text-slate-700 space-y-2 leading-relaxed">
+            <li>📸 <strong>影像数量</strong>：本次归档覆盖全部关键工序，每张实拍照片均含拍摄人、拍摄时间、定位水印</li>
+            <li>🔍 <strong>影像要素</strong>：照片水印可作为业主第三方追溯凭证</li>
+            <li>📦 <strong>影像归档</strong>：原图随本档案一并交付业主保存</li>
+          </ul>
+        </section>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">五、</span>班组离场 SOP
+          </h2>
+          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+            「关水、关电、关门！—— 树立门窗最后一道防火墙」是初匠门窗的标准离场 SOP。
+            班组在门窗工序全部完工后，按 SOP 进入离场阶段，与下一道工序（泥工 / 漆工等）柔性交接水电门的管理权限，确保整体工程节奏顺畅。
+          </div>
+        </section>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">六、</span>业主使用与维护建议
+          </h2>
+          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+            [请编辑：<br>
+            1. 入住初期（移交后 7 日内）：胶体固化期注意事项<br>
+            2. 日常使用：开关窗扇的规范动作<br>
+            3. 定期检查：每年 1-2 次的五金保养、密封胶检查<br>
+            4. 应急联系：售后服务电话 / 微信]
+          </div>
+        </section>
+
+        <footer class="mt-16 pt-8 border-t-2 border-slate-200 text-center">
+          <p class="text-lg text-slate-700 italic font-medium">「用精工艺，给您一个可追溯的家」</p>
+          <p class="text-sm text-slate-500 mt-3 tracking-wider">初 匠 门 窗 服 务 · CHUJIANG</p>
+          <p class="text-xs text-slate-400 mt-1">施 格 归 档 · SITELOG AI 出品</p>
+        </footer>
+      `,
+
+      glass: () => `
+        <div class="text-center mb-10 pb-8 border-b-2 border-slate-200">
+          <p class="text-xs text-slate-500 tracking-[0.3em]">CHU JIANG · MEN & WINDOW</p>
+          <h1 class="text-4xl font-bold text-slate-900 mt-3">玻扇施工归档</h1>
+          <p class="text-slate-600 mt-3 text-sm">—— 精工艺 · 守标准 · 留凭证 ——</p>
+          <p class="text-xs text-slate-400 mt-4">本档案作为施工过程追溯凭证，交付业主保存</p>
+        </div>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">一、</span>阶段实施概况
+          </h2>
+          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+            [请编辑：本次玻扇施工的整体进度总结，包括玻璃品牌 / 规格 / 合片工艺 / 密封系统 / 五金配置等关键信息。]
+          </div>
+        </section>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">二、</span>玻扇工艺与进度详解
+          </h2>
+          <div id="images-container"></div>
+        </section>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">三、</span>玻璃配置与材料追溯
+          </h2>
+          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+            [请编辑：<br>
+            1. 玻璃品牌 / 型号（如南玻 5+12A+5 中空玻璃）<br>
+            2. 合片工艺（丁基胶 + 聚硫胶双道密封）<br>
+            3. 玻璃厚度 / 规格 / 单片面积<br>
+            4. Low-E 镀膜位置 / 透光率 / 遮阳系数]
+          </div>
+        </section>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">四、</span>五金系统配置
+          </h2>
+          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+            [请编辑：<br>
+            1. 把手 / 锁具品牌（如丝吉利娅 / 诺托）<br>
+            2. 铰链 / 风撑规格<br>
+            3. 开启方式（内开内倒 / 平开 / 推拉）<br>
+            4. 五金承重等级（如 130kg / 扇）]
+          </div>
+        </section>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">五、</span>业主使用与维护建议
+          </h2>
+          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+            [请编辑：玻扇的日常使用与维护建议，重点是五金保养和玻璃清洁。]
+          </div>
+        </section>
+
+        <footer class="mt-16 pt-8 border-t-2 border-slate-200 text-center">
+          <p class="text-lg text-slate-700 italic font-medium">「用精工艺，给您一个可追溯的家」</p>
+          <p class="text-sm text-slate-500 mt-3 tracking-wider">初 匠 门 窗 服 务 · CHUJIANG</p>
+          <p class="text-xs text-slate-400 mt-1">施 格 归 档 · SITELOG AI 出品</p>
+        </footer>
+      `,
+
+      hardware: () => `
+        <div class="text-center mb-10 pb-8 border-b-2 border-slate-200">
+          <p class="text-xs text-slate-500 tracking-[0.3em]">CHU JIANG · MEN & WINDOW</p>
+          <h1 class="text-4xl font-bold text-slate-900 mt-3">五金安装归档</h1>
+          <p class="text-slate-600 mt-3 text-sm">—— 精工艺 · 守标准 · 留凭证 ——</p>
+        </div>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">一、</span>阶段实施概况
+          </h2>
+          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+            [请编辑：本次五金安装的整体进度。]
+          </div>
+        </section>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">二、</span>五金安装工艺详解
+          </h2>
+          <div id="images-container"></div>
+        </section>
+
+        <footer class="mt-16 pt-8 border-t-2 border-slate-200 text-center">
+          <p class="text-lg text-slate-700 italic font-medium">「用精工艺，给您一个可追溯的家」</p>
+          <p class="text-sm text-slate-500 mt-3 tracking-wider">初 匠 门 窗 服 务 · CHUJIANG</p>
+        </footer>
+      `
+    };
+  </script>
+
+</body>
+</html>
