@@ -927,8 +927,13 @@
             headers['Authorization'] = config.authHeader;
           }
 
-          const response = await fetch(config.url, {
+          // 注意：必须用 mode: 'cors' + credentials: 'omit'，
+          // 避免某些浏览器在 CORS 预检时返回 "Failed to fetch"
+          const fetchOptions = {
             method: 'POST',
+            mode: 'cors',
+            credentials: 'omit',
+            cache: 'no-store',
             headers: headers,
             body: JSON.stringify({
               model: config.model,
@@ -941,7 +946,15 @@
               }],
               response_format: { type: 'json_object' }
             })
-          });
+          };
+
+          let response;
+          try {
+            response = await fetch(config.url, fetchOptions);
+          } catch (networkErr) {
+            // "Failed to fetch" 在浏览器里通常意味着 CORS / 网络 / 预检失败
+            throw new Error(`网络层失败（Failed to fetch）：${networkErr.message || '可能原因：1) dashscope 临时限流 2) 公司网络代理拦截 3) 浏览器扩展拦截'}`);
+          }
 
           if (!response.ok) {
             const err = await response.text();
