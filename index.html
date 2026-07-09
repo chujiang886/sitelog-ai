@@ -603,6 +603,7 @@
           }
           this.processing = true;
           this.processedCount = 0;
+          const failures = [];
           try {
             for (const img of this.images) {
               if (!img.title) {
@@ -612,14 +613,23 @@
                 } catch (e) {
                   console.error('分析失败', img.file.name, e);
                   img.title = `施工节点 ${this.images.indexOf(img) + 1}`;
-                  img.desc = '[AI 识别失败，请手动填写]';
+                  img.desc = `[AI 识别失败] ${e.message}\n\n请按 F12 打开浏览器控制台查看详细原因，或手动填写。`;
+                  img.aiError = e.message;
+                  failures.push({ name: img.file.name, error: e.message });
                 }
                 img.analyzing = false;
               }
               this.processedCount++;
               this.syncToReport();
             }
-            this.showToast(`✨ AI 整理完成，共 ${this.processedCount} 张`);
+            if (failures.length === 0) {
+              this.showToast(`✨ AI 整理完成，共 ${this.processedCount} 张`);
+            } else {
+              this.showToast(
+                `⚠️ ${failures.length} 张识别失败：${failures[0].error.slice(0, 80)}`,
+                'error'
+              );
+            }
           } finally {
             this.processing = false;
           }
@@ -829,18 +839,22 @@
             .filter(s => s.status === 'fulfilled')
             .map(s => s.value);
 
-          // 如果全部失败，至少返回一个兜底（避免抛错）
-          if (valid.length === 0) {
-            console.error('所有模型都识别失败');
-            throw new Error('所有模型都识别失败，请检查网络或 Key');
-          }
-
           // 记录失败的模型
           settled.forEach((s, i) => {
             if (s.status === 'rejected') {
               console.warn(`⚠️ 模型 ${models[i]} 识别失败：${s.reason.message}`);
             }
           });
+
+          // 如果全部失败，给出**具体**的错误信息（不再笼统）
+          if (valid.length === 0) {
+            const errors = settled
+              .filter(s => s.status === 'rejected')
+              .map((s, i) => `${models[i]}: ${s.reason.message}`)
+              .join(' | ');
+            console.error('所有模型都识别失败', errors);
+            throw new Error(errors || '所有模型都识别失败');
+          }
 
           console.log(`🗳️ 多模型投票完成：${valid.length}/${models.length} 成功`);
           valid.forEach((v, i) => {
