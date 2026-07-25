@@ -1,0 +1,5 @@
+global:
+  scrape_interval: 15s # pending_verification: 部署前由运维负责人确认。
+
+# Phase 0 尚未提供 metrics 接口，因此不声明不存在的抓取目标。
+scrape_configs: []

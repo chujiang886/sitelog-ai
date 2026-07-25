@@ -1,0 +1,41 @@
+name: BOIP Documentation Check
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  changed-documents:
+    name: Require implementation log and changelog updates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify required documentation changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import os
+          import subprocess
+
+          changed = set(
+              subprocess.check_output(
+                  ["git", "diff", "--name-only", os.environ["BASE_SHA"], os.environ["HEAD_SHA"]],
+                  text=True,
+              ).splitlines()
+          )
+          required = {"docs/PHASE0_LOG.md", "docs/CHANGELOG.md"}
+          missing = sorted(required - changed)
+          if missing:
+              raise SystemExit(f"Documentation updates required: {', '.join(missing)}")
+          print("Required implementation documents were updated.")
+          PY

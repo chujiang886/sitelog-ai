@@ -1,0 +1,5 @@
+# llm mock config yaml for T06a orchestration testing
+ll_api_mock: True   
+ll_mock_response_status: ok  
+ll_mock_latency_ms: 15    
+orch_chat_router_enabled: true     # Placeholder;軒哥 must fill real API keys to enable

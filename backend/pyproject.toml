@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "boip-backend"
+version = "0.1.0"
+description = "BOIP FastAPI backend skeleton"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "alembic==1.14.0",
+  "fastapi==0.115.6",
+  "pydantic==2.10.4",
+  "pydantic-settings==2.7.1",
+  "pyyaml==6.0.2",
+  "sqlalchemy==2.0.36",
+  "uvicorn[standard]==0.34.0",
+]
+
+[project.optional-dependencies]
+test = [
+  "httpx==0.28.1",
+  "pytest==8.3.4",
+  "pytest-asyncio==0.25.2",
+  "pytest-cov==6.0.0",
+  "ruff==0.8.4",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = [".", "../"]
+testpaths = ["tests", "../tests/agents", "../tests/e2e"]
+markers = [
+  "e2e: starts a real service process and exercises its HTTP transport",
+]
+
+[tool.coverage.run]
+source = ["app", "agents"]
+
+[tool.coverage.report]
+fail_under = 60
+show_missing = true
+skip_covered = true
+exclude_lines = [
+  "pragma: no cover",
+  "if __name__ == .__main__.:",
+  "raise NotImplementedError",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]

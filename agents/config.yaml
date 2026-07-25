@@ -1,0 +1,68 @@
+# BOIP Agent 路由与运行时配置（Phase 0 占位）
+#
+# 本文件由 agents/loader.py 读取，描述：
+# - 哪些 Agent 被注册（name → fully-qualified class path）
+# - Agent 框架全局开关（LLM、超时、重试、并发）
+#
+# 任何工程数值仍保持 pending_verification；Phase 1+ 再接入真实 LLM。
+
+version: "0.1.0-phase0"
+description: "Phase 0 Agent 框架配置；不连接任何外部 LLM 或服务。"
+
+agents:
+  core:
+    class_path: agents.core.agent.CoreAgent
+    enabled: true
+    stage: orchestrator
+  environment:
+    class_path: agents.environment.agent.EnvironmentAgent
+    enabled: true
+    stage: context
+  vision:
+    class_path: agents.vision.agent.VisionAgent
+    enabled: true
+    stage: context
+  design:
+    class_path: agents.design.agent.DesignAgent
+    enabled: true
+    stage: candidate
+
+# 全局开关：Phase 0 强制 false，loader 启动时会校验
+llm_enabled: false
+llm_provider: ""  # Phase 1 决定 provider（GPT-4o / Claude 3.5 / 通义 / 自研）
+
+# Phase 1 / T07 双轨 LLM 配置
+#
+# T07 起接入真实 track_a：DashScope（OpenAI 兼容）qwen-max；
+# track_b 暂未选型，保持 mock 以避免空跑 / 占位错误。
+# 真实 API key 已在 .env（不入 git），本文件不再含具体 key。
+llm:
+  enabled: true  # T07 起 track_a 已接入真实 DashScope qwen-max；启用后由 DualTrackRouter 选择 track
+  track_a:
+    provider: openai_compat
+    base_url: ${LLM_A_BASE_URL:pending_verification}
+    api_key: ${LLM_A_API_KEY:pending_verification}
+    model: ${LLM_A_MODEL:pending_verification}
+  track_b:
+    provider: mock  # T07 track_b 未选型前保持 mock，避免 pending_verification 触发空跑
+    base_url: ${LLM_B_BASE_URL:pending_verification}
+    api_key: ${LLM_B_API_KEY:pending_verification}
+    model: ${LLM_B_MODEL:pending_verification}
+  router:
+    strategy: fastest  # T07 保持 fastest；选型评测由 TD-013 跟踪
+    timeout: 30
+
+# 占位超参数；Phase 1+ 由主理人评审后填实数
+runtime:
+  invoke_timeout_seconds: 30      # pending_verification
+  invoke_retries: 1              # pending_verification
+  max_concurrent_invocations: 4  # pending_verification
+
+# 编排管道：与 agents/core/orchestrator.py 的 DEFAULT_PIPELINE 保持一致
+orchestrator:
+  pipeline:
+    - environment
+    - vision
+    - design
+  # 第四步 engineering 留待 TD-005 偿还时再启用
+  engineering_enabled: false

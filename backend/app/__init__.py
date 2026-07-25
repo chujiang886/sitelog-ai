@@ -1,0 +1,1 @@
+"""BOIP backend application package."""
