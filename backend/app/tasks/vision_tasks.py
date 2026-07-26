@@ -10,6 +10,8 @@ Phase 2：替换为 ``@rq.job`` 装饰 + Redis broker，API 层只 ``enqueue`` �
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import sys
 import uuid
 from pathlib import Path
@@ -39,6 +41,29 @@ def _open_session(override: Session | None = None) -> Session:
     if override is not None:
         return override
     return SessionLocal()
+
+
+def _run_agent_coroutine(coro: Any) -> Any:
+    """在干净的独立事件循环中运行 Agent 协程，杜绝协程泄漏。
+
+    编排层可能在「已有运行中的事件循环」上下文中被调用（如 Starlette
+    TestClient 的 anyio portal、uvicorn 请求处理）。此时若用
+    ``new_event_loop().run_until_complete`` 嵌套启动 loop，会抛
+    ``Cannot run the event loop while another loop is running``，且传入的协程
+    因从未被 await 而在 GC 时触发 ``coroutine was never awaited`` 告警。
+
+    策略：
+    - 无运行中的 loop：直接 ``asyncio.run``（标准做法，自动关闭 loop）；
+    - 已有运行中的 loop：在独立线程中起新 loop 运行，避免嵌套。
+    两条路径都保证传入协程被完整 await。
+    """
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(lambda: asyncio.run(coro)).result()
 
 
 def process_image(*, image_id: uuid.UUID, db: Session | None = None) -> dict[str, Any]:
@@ -113,32 +138,6 @@ def process_image(*, image_id: uuid.UUID, db: Session | None = None) -> dict[str
                 "mime_type": processed.mime_type,
             },
         )
-
-        import asyncio  # noqa: PLC0415
-        import concurrent.futures  # noqa: PLC0415
-
-        def _run_agent_coroutine(coro: Any) -> Any:
-            """在干净的独立事件循环中运行 Agent 协程，杜绝协程泄漏。
-
-            编排层可能在「已有运行中的事件循环」上下文中被调用（如
-            Starlette TestClient 的 anyio portal、uvicorn 请求处理）。此时
-            若用 ``new_event_loop().run_until_complete`` 嵌套启动 loop，会抛
-            ``Cannot run the event loop while another loop is running``，且传入
-            的协程因从未被 await 而在 GC 时触发
-            ``coroutine was never awaited`` 告警。
-
-            策略：
-            - 无运行中的 loop：直接 ``asyncio.run``（标准做法，自动关闭 loop）；
-            - 已有运行中的 loop：在独立线程中起新 loop 运行，避免嵌套。
-            两条路径都保证传入协程被完整 await。
-            """
-
-            try:
-                asyncio.get_running_loop()
-            except RuntimeError:
-                return asyncio.run(coro)
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                return pool.submit(lambda: asyncio.run(coro)).result()
 
         try:
             result = _run_agent_coroutine(agent.invoke(ctx))
