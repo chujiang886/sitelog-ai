@@ -25,7 +25,7 @@ class LLMMessage:
     """单条对话消息；role + content 必备，name 等可选扩展字段放在 metadata。"""
 
     role: LLMRole
-    content: str
+    content: str | list[dict[str, Any]]
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -33,10 +33,14 @@ class LLMMessage:
 
         if not isinstance(self.role, LLMRole):
             raise TypeError(f"LLMMessage.role must be LLMRole, got {type(self.role).__name__}")
-        if not isinstance(self.content, str):
-            raise TypeError("LLMMessage.content must be str")
+        if not isinstance(self.content, (str, list)):
+            raise TypeError("LLMMessage.content must be str or list of content blocks")
         if not self.content:
             raise ValueError("LLMMessage.content must not be empty")
+        if isinstance(self.content, list):
+            if not all(isinstance(block, dict) for block in self.content):
+                raise TypeError("LLMMessage content blocks must be dictionaries")
+            object.__setattr__(self, "content", [dict(block) for block in self.content])
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 
     def to_dict(self) -> dict[str, Any]:

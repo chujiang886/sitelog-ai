@@ -184,11 +184,16 @@ class VisionAgent(BaseAgent):
         if not llm_cfg.get("enabled", False):
             return self._placeholder_payload("llm_disabled"), "mock", True
 
-        # 多模态消息：把图片以 markdown data url 注入（OpenAI 兼容多模态约定）。
-        user_content: str = (
-            f"![upload](data:{mime_type};base64,{image_b64})\n\n"
-            f"{USER_PROMPT_TEMPLATE}"
-        )
+        # OpenAI 标准多模态消息：文本与图片分别使用 content block。
+        user_content: list[dict[str, Any]] = [
+            {"type": "text", "text": USER_PROMPT_TEMPLATE},
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{mime_type};base64,{image_b64}",
+                },
+            },
+        ]
         request = LLMRequest(
             messages=(
                 LLMMessage(role=LLMRole.SYSTEM, content=SYSTEM_PROMPT),
