@@ -1,9 +1,13 @@
 # Node.js
 node_modules/
 .next/
+.next.trash/
 dist/
 build/
 coverage/
+
+# Build / deliverable output (not version-controlled)
+deliverables/
 
 # Python
 __pycache__/
@@ -12,6 +16,10 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+coverage.xml
+
+# Runtime data (uploads, local object storage) — never version-controlled
+backend/storage/
 
 # Environment and secrets
 .env

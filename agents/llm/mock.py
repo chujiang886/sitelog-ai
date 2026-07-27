@@ -8,10 +8,9 @@
 
 from __future__ import annotations
 
-import asyncio
 
 from .base import LLMProvider, LLMProviderError
-from .types import LLMRequest, LLMResponse, LLMRole
+from .types import LLMRequest, LLMResponse
 
 
 DEFAULT_MODEL: str = "mock-llm-v0"

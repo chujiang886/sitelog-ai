@@ -8,15 +8,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.db import models as _models  # noqa: F401  - 触发 ORM 注册
 from app.db.base import Base
@@ -35,17 +36,30 @@ def storage_tmp(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 
 
 @pytest.fixture()
-def vision_db(storage_tmp: Path) -> Iterator[Session]:
-    engine: Engine = create_engine(
-        "sqlite+pysqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
+def vision_db(storage_tmp: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Session]:
+    """独立 SQLite 文件会话（sync），供断言；同一文件也供路由 async 引擎共享。
+
+    Phase 2.1.4 适配：``analyze_image`` 通过 ``asyncio.to_thread(process_image)`` 解耦，
+    不向同步 ``process_image`` 传递 AsyncSession。为让 process_image 写入对路由可见，
+    将其 ``SessionLocal`` monkeypatch 为连接同一文件库的同步 sessionmaker。
+    """
+
+    db_file = tmp_path / "vision.db"
+    sync_url = f"sqlite+pysqlite:///{db_file}"
+    async_url = f"sqlite+aiosqlite:///{db_file}"
+    sync_engine = create_engine(sync_url, connect_args={"check_same_thread": False})
+    async_engine = create_async_engine(async_url, connect_args={"check_same_thread": False})
+    Base.metadata.create_all(sync_engine)
+
+    # 让 process_image 使用与路由同一文件的同步 sessionmaker（跨引擎可见性）
+    from app.tasks import vision_tasks as vision_tasks_module
+
+    patched_factory = sessionmaker(
+        bind=sync_engine, autoflush=False, autocommit=False, expire_on_commit=False, class_=Session
     )
-    Base.metadata.create_all(engine)
-    session_factory = sessionmaker(
-        bind=engine, autoflush=False, autocommit=False, expire_on_commit=False, class_=Session
-    )
-    session: Session = session_factory()
+    monkeypatch.setattr(vision_tasks_module, "SessionLocal", patched_factory)
+
+    session: Session = patched_factory()
     tenant_a = Tenant(name="Vision A", slug=f"va-{uuid.uuid4().hex}", status="active")
     tenant_b = Tenant(name="Vision B", slug=f"vb-{uuid.uuid4().hex}", status="active")
     session.add_all([tenant_a, tenant_b])
@@ -83,26 +97,29 @@ def vision_db(storage_tmp: Path) -> Iterator[Session]:
     session.add(image)
     session.commit()
 
+    session._async_engine = async_engine  # type: ignore[attr-defined]
     try:
         yield session
     finally:
-        session.rollback()
         session.close()
-        Base.metadata.drop_all(engine)
-        engine.dispose()
+        Base.metadata.drop_all(sync_engine)
+        sync_engine.dispose()
+        asyncio.run(async_engine.dispose())
 
 
 @pytest.fixture()
 def vision_client(vision_db: Session) -> Iterator[TestClient]:
     from app.api import vision as vision_module
 
-    def _override_get_db() -> Iterator[Session]:
-        try:
-            yield vision_db
-        finally:
-            pass
+    async_engine = vision_db._async_engine  # type: ignore[attr-defined]
 
-    app.dependency_overrides[vision_module.get_db] = _override_get_db
+    async def _override_get_db() -> AsyncIterator[AsyncSession]:
+        async with AsyncSession(
+            async_engine, autoflush=False, autocommit=False, expire_on_commit=False
+        ) as s:
+            yield s
+
+    app.dependency_overrides[vision_module.async_get_db] = _override_get_db
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

@@ -1,9 +1,15 @@
 """Environment-based application configuration."""
 
 from functools import lru_cache
+from pathlib import Path
 
+from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# 加载 BOIP 根目录 .env（含 LLM_A_* 真实 key 等），确保在任何 Agent 运行时读取
+# os.environ 之前注入环境变量。本模块在 app 启动时即被导入，早于请求处理。
+load_dotenv(Path(__file__).resolve().parent.parent.parent.parent / ".env")
 
 
 class Settings(BaseSettings):

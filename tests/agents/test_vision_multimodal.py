@@ -56,7 +56,7 @@ def test_call_llm_uses_openai_multimodal_content_blocks(
 
     monkeypatch.setattr(
         "agents.llm.router.build_router_from_config",
-        lambda _config: FakeRouter(),
+        lambda _config, **_kw: FakeRouter(),
     )
 
     payload, provider, pending = asyncio.run(

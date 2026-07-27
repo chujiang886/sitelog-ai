@@ -50,9 +50,15 @@ class OrchestratorChatService:
         if self._initialized:
             return
         try:
-            from agents.llm.router import build_router_from_config
+            from agents.config_loader import load_llm_config
+            from agents.llm.router import ProviderRole, build_router_from_config
 
-            self._router = build_router_from_config(self.config_path)
+            # 修复 P2：先前误把 config_path（str）当 Mapping 传入，导致
+            # config.get(...) 在 str 上抛 AttributeError 被 except 吞掉，
+            # router 永远为 None，聊天真实 LLM 增强从未生效。此处改为
+            # 先 load_llm_config 得到 llm dict，再以 role=TEXT 构造路由。
+            llm_cfg = load_llm_config(self.config_path)
+            self._router = build_router_from_config(llm_cfg, role=ProviderRole.TEXT)
             self._llm_enabled = self._router is not None
         except Exception:  # noqa: BLE001
             self._router = None
@@ -86,7 +92,7 @@ class OrchestratorChatService:
                 history_len=len(history),
                 placeholder_reply=(
                     "BOIP 智能助手：当前未接入真实 LLM（pending_verification）。"
-                    "请在 .env 中填入 LLM_A_API_KEY / LLM_B_API_KEY 后"
+                    "请在 .env 中填入 LLM_A_API_KEY 后"
                     "将 agents/config.yaml::llm.enabled 改为 true。"
                 ),
             )

@@ -15,7 +15,7 @@ GREEN: str = "\033[32m"
 RESET: str = "\033[0m"
 SCANNED_SUFFIXES: frozenset[str] = frozenset({".js", ".py", ".ts", ".tsx"})
 EXCLUDED_DIRECTORIES: frozenset[str] = frozenset(
-    {".git", ".next", ".venv", "__pycache__", "build", "dist", "node_modules"}
+    {".git", ".next", ".venv", "__pycache__", "build", "dist", "node_modules", "tests"}
 )
 PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (

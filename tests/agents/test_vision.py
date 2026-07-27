@@ -114,7 +114,7 @@ def test_vision_agent_returns_failed_envelope_on_llm_error(
     fake_router = SimpleNamespace(route=_fake_route, aclose=lambda: asyncio.sleep(0))
     monkeypatch.setattr(
         "agents.llm.router.build_router_from_config",
-        lambda _cfg: fake_router,
+        lambda _cfg, **_kw: fake_router,
     )
 
     agent = VisionAgent()
@@ -165,7 +165,7 @@ def test_vision_agent_parses_valid_json_response(
     fake_router = SimpleNamespace(route=_fake_route, aclose=lambda: asyncio.sleep(0))
     monkeypatch.setattr(
         "agents.llm.router.build_router_from_config",
-        lambda _cfg: fake_router,
+        lambda _cfg, **_kw: fake_router,
     )
 
     agent = VisionAgent()

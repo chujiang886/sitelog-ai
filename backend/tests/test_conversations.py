@@ -9,14 +9,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.db import models as _models  # noqa: F401  - 触发 ORM 注册
 from app.db.base import Base
@@ -31,17 +33,22 @@ from app.main import app
 
 
 @pytest.fixture()
-def conversation_db() -> Iterator[Session]:
-    """独立 in-memory SQLite 会话，含 conversations/messages 表。"""
+def conversation_db(tmp_path: Path) -> Iterator[Session]:
+    """独立 SQLite 文件会话（sync），供断言；同一文件也供路由 async 引擎共享。
 
-    engine: Engine = create_engine(
-        "sqlite+pysqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
+    Phase 2.1.4：路由改用 async_get_db（AsyncSession）。为避免 :memory: 下
+    async/sync 引擎各自独立库导致断言不可见，测试改走临时文件库——sync 会话
+    用于断言，路由 override 的 async 引擎连同一文件，数据可见。
+    """
+
+    db_file = tmp_path / "conversations.db"
+    sync_url = f"sqlite+pysqlite:///{db_file}"
+    async_url = f"sqlite+aiosqlite:///{db_file}"
+    sync_engine = create_engine(sync_url, connect_args={"check_same_thread": False})
+    async_engine = create_async_engine(async_url, connect_args={"check_same_thread": False})
+    Base.metadata.create_all(sync_engine)
     session_factory = sessionmaker(
-        bind=engine, autoflush=False, autocommit=False, expire_on_commit=False, class_=Session
+        bind=sync_engine, autoflush=False, autocommit=False, expire_on_commit=False, class_=Session
     )
     session: Session = session_factory()
     tenant = Tenant(name="T06 Tenant", slug=f"t06-{uuid.uuid4().hex}", status="active")
@@ -56,30 +63,34 @@ def conversation_db() -> Iterator[Session]:
     )
     session.add(user)
     session.flush()
+    session.commit()
     session._tenant_id = tenant.id  # type: ignore[attr-defined]
     session._user_id = user.id  # type: ignore[attr-defined]
+    session._async_engine = async_engine  # type: ignore[attr-defined]
     try:
         yield session
     finally:
-        session.rollback()
         session.close()
-        Base.metadata.drop_all(engine)
-        engine.dispose()
+        Base.metadata.drop_all(sync_engine)
+        sync_engine.dispose()
+        asyncio.run(async_engine.dispose())
 
 
 @pytest.fixture()
 def conversation_client(conversation_db: Session) -> Iterator[TestClient]:
-    """FastAPI TestClient；用 ``conversation_db`` 替换 ``get_db`` 依赖。"""
+    """FastAPI TestClient；用 ``conversation_db`` 同文件的 async 引擎替换 ``async_get_db`` 依赖。"""
 
     from app.api import conversations as conversations_module
 
-    def _override_get_db() -> Iterator[Session]:
-        try:
-            yield conversation_db
-        finally:
-            pass  # 关闭交给 fixture
+    async_engine = conversation_db._async_engine  # type: ignore[attr-defined]
 
-    app.dependency_overrides[conversations_module.get_db] = _override_get_db
+    async def _override_get_db() -> AsyncIterator[AsyncSession]:
+        async with AsyncSession(
+            async_engine, autoflush=False, autocommit=False, expire_on_commit=False
+        ) as s:
+            yield s
+
+    app.dependency_overrides[conversations_module.async_get_db] = _override_get_db
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

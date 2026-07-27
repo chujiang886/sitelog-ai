@@ -1,12 +1,13 @@
-alembic==1.14.0
-fastapi==0.115.6
-httpx==0.28.1
-pydantic==2.10.4
-pydantic-settings==2.7.1
-pytest==8.3.4
-pytest-asyncio==0.25.2
-pytest-cov==6.0.0
-pyyaml==6.0.2
-ruff==0.8.4
-sqlalchemy==2.0.36
-uvicorn[standard]==0.34.0
+# BOIP backend 运行时依赖声明
+#
+# 本项目 backend 运行时依赖由 backend/.venv 预装提供（历史无统一依赖清单）。
+# 本文件登记 Phase 2 新增的显式依赖：
+#   - aiosqlite：SQLite 异步驱动（2.1.4 AsyncSession 引入，create_async_engine
+#     默认回落 "sqlite+aiosqlite:///:memory:" 所必需）。
+#   - greenlet：SQLAlchemy 异步引擎（AsyncSession/async_engine）运行所必需，
+#     协程与同步 Session 切换的核心依赖；venv 预装缺失时需显式安装。
+#
+# 安装：
+#   backend/.venv/bin/python -m pip install -r backend/requirements.txt
+aiosqlite>=0.19
+greenlet>=3.0

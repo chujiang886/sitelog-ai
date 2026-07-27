@@ -13,7 +13,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -174,7 +173,7 @@ class VisionAgent(BaseAgent):
         LLM 未启用 / Provider 抛错 / 响应非 JSON 时，统一返回占位结构。
         """
 
-        from agents.llm.router import build_router_from_config  # noqa: PLC0415
+        from agents.llm.router import ProviderRole, build_router_from_config  # noqa: PLC0415
         from agents.llm.types import LLMMessage, LLMRequest, LLMRole  # noqa: PLC0415
         from agents.config_loader import load_llm_config  # noqa: PLC0415
         from agents.llm.jsonutil import extract_json  # noqa: PLC0415
@@ -203,7 +202,7 @@ class VisionAgent(BaseAgent):
             max_tokens=512,
         )
 
-        router = build_router_from_config(llm_cfg)
+        router = build_router_from_config(llm_cfg, role=ProviderRole.VISION)
         try:
             response, _ = await router.route(request)
         except LLMRouterError:

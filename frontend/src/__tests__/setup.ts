@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom";
+import { Blob as NodeBlob } from "node:buffer";
 
 /**
  * Phase 0 MSW contract placeholder.
@@ -38,8 +39,6 @@ jest.mock("next/navigation", () => ({
  * 生产环境（浏览器 / Node 18+）天然具备 Blob，这里仅补全测试运行时。
  */
 if (typeof (globalThis as { Blob?: unknown }).Blob === "undefined") {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { Blob: NodeBlob } = require("node:buffer");
   (globalThis as { Blob?: unknown }).Blob = NodeBlob;
 }
 

@@ -7,7 +7,10 @@ from sqlalchemy.orm import Session
 from app.db.models.project import Project
 from app.db.models.tenant import Tenant
 from app.db.models.user import User
-from tests.factories import create_project, create_tenant, create_user
+try:
+    from .factories import create_project, create_tenant, create_user
+except ImportError:  # 兼容以顶层模块方式收集（如 pytest backend/tests/test_factories.py）
+    from tests.factories import create_project, create_tenant, create_user
 
 
 def test_factories_create_related_models(db_session: Session) -> None:

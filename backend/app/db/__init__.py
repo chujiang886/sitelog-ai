@@ -9,12 +9,22 @@ Phase 0 范围内：仅 PG/SQLite 兼容的同步 ORM 骨架；Phase 1+ 再补�
 """
 
 from app.db.base import Base, naming_convention
-from app.db.session import SessionLocal, engine, get_db
+from app.db.session import (
+    SessionLocal,
+    engine,
+    get_db,
+    async_engine,
+    AsyncSessionLocal,
+    async_get_db,
+)
 
 __all__ = [
     "Base",
     "SessionLocal",
     "engine",
     "get_db",
+    "async_engine",
+    "AsyncSessionLocal",
+    "async_get_db",
     "naming_convention",
 ]

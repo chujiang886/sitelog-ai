@@ -28,6 +28,24 @@ class RouterStrategy(str, Enum):
     FALLBACK = "fallback"    # track_a 失败时用 track_b
 
 
+class ProviderRole(str, Enum):
+    """LLM provider 语义角色（Phase 2.1.6 provider 解耦）。
+
+    - ``TEXT``：文本推理主轨；
+    - ``VISION``：视觉推理主轨（多模态）；
+    - ``EMBEDDING``：向量/检索预留角色（不进入 DualTrackRouter，当前 disabled）；
+    - ``FALLBACK``：文本/视觉共用的容灾副轨；
+    - ``UNKNOWN``：防御状态。传入非法/未知角色字符串时不抛异常，安全回落
+      ``FALLBACK``（mock 容灾），避免配置错误导致路由构造崩溃。
+    """
+
+    TEXT = "text"
+    VISION = "vision"
+    EMBEDDING = "embedding"
+    FALLBACK = "fallback"
+    UNKNOWN = "unknown"
+
+
 def _now_ms() -> int:
     """单调时钟当前毫秒数。"""
 
@@ -181,28 +199,166 @@ class DualTrackRouter:
         await self._track_b.aclose()
 
 
-def build_router_from_config(config: Mapping[str, object]) -> DualTrackRouter:
+def build_router_from_config(
+    config: Mapping[str, object],
+    role: "ProviderRole | str" = ProviderRole.TEXT,
+    modality: str | None = None,
+) -> DualTrackRouter:
     """根据 ``agents/config.yaml::llm`` 节构造双轨路由器。
 
     任何一条 track 缺 API key 时自动替换为 ``MockProvider``，
     满足 16 第五章 "未连接真实 LLM 时不崩溃" 要求。
+
+    Phase 2.1.6 provider 解耦：
+    - ``role``：语义角色，取值 ``ProviderRole.TEXT / VISION / FALLBACK``
+      （embedding 不进入 DualTrackRouter）。主轨 = role 对应 provider，
+      副轨恒为 ``ProviderRole.FALLBACK``（mock 容灾）。
+    - ``modality``：**已弃用兼容参数**，仅保留向后兼容；``"vision"`` 映射
+      到 ``VISION`` 角色，其余映射 ``TEXT``。新代码请使用 ``role=``。
     """
 
-    strategy_raw = str(config.get("strategy", RouterStrategy.FASTEST.value))
-    timeout_raw = config.get("timeout", DualTrackRouter.DEFAULT_TIMEOUT_SECONDS)
+    # 兼容旧 modality= 软开关（deprecated since 2.1.6）。
+    if modality is not None:
+        role = _modality_to_role(modality)
+    if not isinstance(role, ProviderRole):
+        try:
+            role = ProviderRole(str(role).strip().lower())
+        except ValueError:
+            # 非法/未知角色字符串：防御性回落 UNKNOWN，绝不抛异常。
+            role = ProviderRole.UNKNOWN
+
+    router_cfg = config.get("router", {})
+    if not isinstance(router_cfg, Mapping):
+        router_cfg = {}
+    strategy_raw = str(router_cfg.get("strategy", RouterStrategy.FASTEST.value))
+    timeout_raw = router_cfg.get("timeout", DualTrackRouter.DEFAULT_TIMEOUT_SECONDS)
     try:
         timeout = float(timeout_raw)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"llm.router.timeout 非法：{timeout_raw!r}") from exc
 
-    track_a = _build_provider(config.get("track_a", {}), default_name="track_a")
-    track_b = _build_provider(config.get("track_b", {}), default_name="track_b")
+    primary = resolve_provider(config, role)
+    fallback = resolve_provider(config, ProviderRole.FALLBACK)
     return DualTrackRouter(
-        track_a_provider=track_a,
-        track_b_provider=track_b,
+        track_a_provider=primary,  # type: ignore[arg-type]
+        track_b_provider=fallback,  # type: ignore[arg-type]
         strategy=RouterStrategy(strategy_raw),
         timeout=timeout,
     )
+
+
+def _modality_to_role(modality: str) -> ProviderRole:
+    """把旧 ``modality=`` 软开关映射为 ``ProviderRole``（deprecated）。"""
+
+    return ProviderRole.VISION if str(modality).strip().lower() == "vision" else ProviderRole.TEXT
+
+
+def resolve_provider(config: Mapping[str, object], role: ProviderRole) -> object:
+    """解析某角色的 provider。
+
+    回落规则（语义化 ``providers`` 块与旧 ``track_a``/``track_b`` 键并存）：
+    - ``VISION`` 缺块 → 回落 ``TEXT`` 块；
+    - 新 ``providers`` 块缺配置时，回落旧 ``track_a`` / ``track_b`` 键；
+    - 仍无配置 → ``MockProvider``（不崩溃）；
+    - ``EMBEDDING`` 且 ``provider=disabled`` → 返回 ``None``（无消费者）。
+    """
+
+    providers = config.get("providers") or {}
+    if not isinstance(providers, Mapping):
+        providers = {}
+
+    # 防御：UNKNOWN 角色安全回落 FALLBACK，绝不抛异常。
+    if role is ProviderRole.UNKNOWN:
+        return resolve_provider(config, ProviderRole.FALLBACK)
+
+    block = providers.get(role.value) or {}
+    if not isinstance(block, Mapping):
+        block = {}
+
+    # VISION 缺块 → 回落 TEXT 块（保持视觉/文本同源的向后兼容）。
+    if role is ProviderRole.VISION and not block:
+        block = providers.get("text") or {}
+        if not isinstance(block, Mapping):
+            block = {}
+
+    # 新 providers 块缺失时，回落旧 track_a / track_b 键（兼容解析，不作新入口）。
+    if not block:
+        if role in (ProviderRole.TEXT, ProviderRole.VISION):
+            block = config.get("track_a") or {}
+        elif role is ProviderRole.FALLBACK:
+            block = config.get("track_b") or {}
+        if not isinstance(block, Mapping):
+            block = {}
+
+    # EMBEDDING 为预留角色：disabled → None；未来接具体向量服务时在此构造。
+    if role is ProviderRole.EMBEDDING:
+        provider_kind = str(block.get("provider", "disabled")).strip().lower()
+        if provider_kind in ("disabled", ""):
+            return None
+        return _build_provider(block, default_name="embedding")
+
+    if not block:
+        model = str(block.get("model", "")).strip()
+        return MockProvider(model=model or "mock-llm-v0")
+
+    return _build_provider(block, default_name=role.value)
+
+
+def build_embedding_provider(config: Mapping[str, object]):
+    """构建 embedding provider（Phase 2.2 / 2.2.5，复用 ``ProviderRole.EMBEDDING``）。
+
+    - ``provider: disabled`` / 缺省 → 返回 ``None``（无消费者，保持旧行为）；
+    - ``provider: mock`` → ``MockEmbeddingProvider``（确定性、零依赖）；
+    - ``provider: openai_compat`` 且凭据已解析 → ``OpenAICompatEmbeddingProvider``；
+      凭据缺失（``${VAR}`` 占位 / ``pending_verification`` / 空）→ 回落 mock（不崩溃）。
+    """
+
+    from .embedding import (  # noqa: PLC0415 - 懒加载，避免未用时引入
+        EmbeddingConfigError,
+        MockEmbeddingProvider,
+        OpenAICompatEmbeddingProvider,
+    )
+
+    providers = config.get("providers") or {}
+    if not isinstance(providers, Mapping):
+        providers = {}
+    block = providers.get("embedding") or {}
+    if not isinstance(block, Mapping):
+        block = {}
+    provider_kind = str(block.get("provider", "disabled")).strip().lower()
+    if provider_kind in ("disabled", ""):
+        return None
+
+    try:
+        dim = int(str(block.get("dim", 64)).strip() or 64)
+    except (TypeError, ValueError):
+        dim = 64
+
+    if provider_kind == "mock":
+        return MockEmbeddingProvider(dim=dim)
+
+    if provider_kind == "openai_compat":
+        base_url = str(block.get("base_url", "")).strip()
+        api_key = str(block.get("api_key", "")).strip()
+        model = str(block.get("model", "")).strip()
+        is_unresolved = (
+            base_url.startswith("${")
+            or api_key.startswith("${")
+            or base_url in ("", "pending_verification")
+            or api_key in ("", "pending_verification")
+            or model in ("", "pending_verification")
+        )
+        if is_unresolved:
+            return MockEmbeddingProvider(dim=dim)
+        try:
+            return OpenAICompatEmbeddingProvider(
+                base_url=base_url, api_key=api_key, model=model
+            )
+        except EmbeddingConfigError:
+            return MockEmbeddingProvider(dim=dim)
+
+    # 未知 provider：安全回落 mock，绝不抛异常。
+    return MockEmbeddingProvider(dim=dim)
 
 
 def _build_provider(track_cfg: Mapping[str, object], *, default_name: str):
@@ -241,4 +397,12 @@ def _build_provider(track_cfg: Mapping[str, object], *, default_name: str):
     raise ValueError(f"未知 llm.provider：{provider_kind}")
 
 
-__all__ = ["DualTrackRouter", "RouterStrategy", "build_router_from_config"]
+__all__ = [
+    "DualTrackRouter",
+    "RouterStrategy",
+    "ProviderRole",
+    "build_router_from_config",
+    "resolve_provider",
+    "build_embedding_provider",
+    "build_embedding_provider",
+]

@@ -11,6 +11,9 @@
 - 最小正确实现：所有业务字段保持 pending_verification；
 - 任何 LLM 接入失败、provider 缺失或 None 输入均降级到 placeholder，不让对话 API 崩溃；
 - tenant 隔离：以请求头 ``X-Tenant-Id`` 标识租户，未传则强制返回 400。
+
+Phase 2.1.4：DB 会话由同步 ``get_db`` 切换为 ``async_get_db``（AsyncSession），
+``db.*`` 调用改为 ``await`` 风格，HTTP 契约与响应结构保持不变。
 """
 
 from __future__ import annotations
@@ -21,7 +24,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # 让 uvicorn 从 backend/ 运行时也能 ``import agents``
 _REPO_ROOT: Path = Path(__file__).resolve().parents[3]
@@ -32,7 +36,7 @@ from app.core.exceptions import NotFoundError  # noqa: E402
 from app.db.models.conversation import Conversation  # noqa: E402
 from app.db.models.message import Message  # noqa: E402
 from app.db.models.project import Project  # noqa: E402
-from app.db.session import get_db  # noqa: E402
+from app.db.session import async_get_db  # noqa: E402
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
 
@@ -107,18 +111,18 @@ def _message_to_dict(msg: Message) -> dict[str, object]:
     }
 
 
-def _require_conversation(
-    db: Session,
+async def _require_conversation(
+    db: AsyncSession,
     conversation_id: uuid.UUID,
     tenant_id: uuid.UUID,
 ) -> Conversation:
     """根据 tenant 隔离查找会话；找不到则抛 404。"""
 
     conv: Conversation | None = (
-        db.query(Conversation)
-        .filter_by(id=conversation_id, tenant_id=tenant_id)
-        .one_or_none()
-    )
+        await db.scalars(
+            select(Conversation).filter_by(id=conversation_id, tenant_id=tenant_id)
+        )
+    ).one_or_none()
     if conv is None:
         raise NotFoundError(f"Conversation not found: {conversation_id}")
     return conv
@@ -154,7 +158,7 @@ class AppendMessageBody(BaseModel):
 @router.post("")
 async def create_conversation(
     body: CreateConversationBody,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(async_get_db),
     x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id"),
     x_user_id: str | None = Header(default=None, alias="X-User-Id"),
 ) -> dict[str, object]:
@@ -173,10 +177,10 @@ async def create_conversation(
                 detail=f"Invalid project_id: {body.project_id}",
             ) from exc
         project: Project | None = (
-            db.query(Project)
-            .filter_by(id=project_id, tenant_id=tenant_id)
-            .one_or_none()
-        )
+            await db.scalars(
+                select(Project).filter_by(id=project_id, tenant_id=tenant_id)
+            )
+        ).one_or_none()
         if project is None:
             raise HTTPException(
                 status_code=404,
@@ -192,8 +196,8 @@ async def create_conversation(
         state="Active",
     )
     db.add(conv)
-    db.commit()
-    db.refresh(conv)
+    await db.commit()
+    await db.refresh(conv)
 
     return {
         "success": True,
@@ -204,7 +208,7 @@ async def create_conversation(
 @router.get("/{conversation_id}")
 async def get_conversation(
     conversation_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(async_get_db),
     x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id"),
 ) -> dict[str, object]:
     """获取单个会话 + 其全部消息（按 created_at 升序）。"""
@@ -215,13 +219,14 @@ async def get_conversation(
     except (TypeError, ValueError):
         raise NotFoundError(f"Conversation not found: {conversation_id}")
 
-    conv: Conversation = _require_conversation(db, conv_uuid, tenant_id)
+    conv: Conversation = await _require_conversation(db, conv_uuid, tenant_id)
     messages: list[Message] = (
-        db.query(Message)
-        .filter_by(conversation_id=conv.id, tenant_id=tenant_id)
-        .order_by(Message.created_at.asc(), Message.id.asc())
-        .all()
-    )
+        await db.scalars(
+            select(Message)
+            .filter_by(conversation_id=conv.id, tenant_id=tenant_id)
+            .order_by(Message.created_at.asc(), Message.id.asc())
+        )
+    ).all()
 
     return {
         "success": True,
@@ -236,7 +241,7 @@ async def get_conversation(
 async def append_message(
     conversation_id: str,
     body: AppendMessageBody,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(async_get_db),
     x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id"),
     x_user_id: str | None = Header(default=None, alias="X-User-Id"),
 ) -> dict[str, object]:
@@ -253,7 +258,7 @@ async def append_message(
     except (TypeError, ValueError):
         raise NotFoundError(f"Conversation not found: {conversation_id}")
 
-    conv: Conversation = _require_conversation(db, conv_uuid, tenant_id)
+    conv: Conversation = await _require_conversation(db, conv_uuid, tenant_id)
 
     role: str = body.role.strip().lower() or "user"
     if role not in {"user", "assistant", "system"}:
@@ -272,16 +277,17 @@ async def append_message(
         evidence={"source": "phase1_t06b_append_message"},
     )
     db.add(user_msg)
-    db.flush()
+    await db.flush()
 
     # 2) 加载最近 20 条历史作为编排器上下文（避免长会话爆栈）
     history_rows: list[Message] = (
-        db.query(Message)
-        .filter_by(conversation_id=conv.id, tenant_id=tenant_id)
-        .order_by(Message.created_at.desc(), Message.id.desc())
-        .limit(20)
-        .all()
-    )
+        await db.scalars(
+            select(Message)
+            .filter_by(conversation_id=conv.id, tenant_id=tenant_id)
+            .order_by(Message.created_at.desc(), Message.id.desc())
+            .limit(20)
+        )
+    ).all()
     history_payload: list[dict[str, object]] = [
         {"role": m.role, "content": m.content} for m in reversed(history_rows)
     ]
@@ -337,8 +343,8 @@ async def append_message(
     if conv.user_id is None or conv.user_id == uuid.UUID(int=0):
         conv.user_id = user_id
 
-    db.commit()
-    db.refresh(assistant_msg)
+    await db.commit()
+    await db.refresh(assistant_msg)
 
     pending_verification = bool(
         (assistant_msg.evidence or {}).get("pending_verification", True)
@@ -360,7 +366,7 @@ async def append_message(
 @router.get("/{conversation_id}/messages")
 async def list_messages(
     conversation_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(async_get_db),
     x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=200),
@@ -376,16 +382,20 @@ async def list_messages(
             detail=f"Invalid conversation_id: {conversation_id}",
         ) from exc
 
-    conv: Conversation = _require_conversation(db, conv_uuid, tenant_id)
+    conv: Conversation = await _require_conversation(db, conv_uuid, tenant_id)
     offset: int = (page - 1) * page_size
 
-    query = (
-        db.query(Message)
+    stmt = (
+        select(Message)
         .filter_by(conversation_id=conv.id, tenant_id=tenant_id)
         .order_by(Message.created_at.asc(), Message.id.asc())
     )
-    total: int = query.count()
-    rows: list[Message] = query.offset(offset).limit(page_size).all()
+    total: int = await db.scalar(
+        select(func.count())
+        .select_from(Message)
+        .filter_by(conversation_id=conv.id, tenant_id=tenant_id)
+    )
+    rows: list[Message] = (await db.scalars(stmt.offset(offset).limit(page_size))).all()
 
     return {
         "success": True,

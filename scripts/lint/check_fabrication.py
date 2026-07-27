@@ -68,6 +68,11 @@ DOCUMENT_REFERENCE_PATTERN: re.Pattern[str] = re.compile(
     r"`\d{2}_[A-Z0-9_]+\.md`",
     re.IGNORECASE,
 )
+# 大纲 / 章节 / 列表 / 表格单元格编号（如 2.1.2、3.1、1.、`| 2.1.2 |`）并非业务数值，
+# 但常与领域词共现，用于排除此类误报。判定规则：编号必在**行首**（可带
+# # / - / * / 空格 / | 前缀），而真实业务数值（风压 1200 Pa、风压阈值 2.5）
+# 不会出现在行首，故不会被误吞。
+OUTLINE_SECTION_PREFIX_RE: re.Pattern[str] = re.compile(r"[#\s\-\*>|]*")
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +127,38 @@ def iter_markdown_files(root: Path) -> Iterable[Path]:
         yield path
 
 
+def _has_business_number(line: str) -> bool:
+    """Return True if ``line`` contains a number that is NOT merely an outline /
+    section / list marker (e.g. ``2.1.2``, ``3.1``, ``1.``).
+
+    大纲 / 章节 / 列表编号必在**行首**（可带 # / - / * / 空格前缀），常与领域词
+    共现于路线图与 prompt，并非伪造的业务 *数值*；真实数值（风压 1200 Pa、
+    风压阈值 2.5）不会出现在行首，因此仍会被判定为业务数字。
+    """
+
+    for match in NUMBER_PATTERN.finditer(line):
+        num: str = match.group(0)
+        start: int = match.start()
+        # 行首编号（# / - / * / 空格 / | 前缀或无前缀）：视为大纲/章节/列表/表格单元格编号，非数值。
+        if OUTLINE_SECTION_PREFIX_RE.fullmatch(line[:start]):
+            continue
+        # 字母紧邻的编号（如 P0 / R4 / model2）是标识符，非业务数值。
+        if start > 0 and line[start - 1].isascii() and line[start - 1].isalpha():
+            continue
+        if (
+            start > 1
+            and line[start - 1] == "-"
+            and line[start - 2].isascii()
+            and line[start - 2].isalnum()
+        ):
+            continue  # 标识符中的连字符编号，如 TD-002（CJK 前的连字符不在此列，保留 风压-1200 检测）
+        after: str = line[match.end():match.end() + 1]
+        if re.fullmatch(r"\d+", num) and after in (".", ")"):
+            continue
+        return True
+    return False
+
+
 def scan_file(path: Path) -> list[Finding]:
     """Return unverified business-number findings from a UTF-8 text file."""
 
@@ -135,8 +172,11 @@ def scan_file(path: Path) -> list[Finding]:
         if PENDING_MARKER in line.lower():
             continue
         scan_line: str = DOCUMENT_REFERENCE_PATTERN.sub("", line)
-        if TERM_PATTERN.search(scan_line) and NUMBER_PATTERN.search(scan_line):
-            findings.append(Finding(path=path, line_number=line_number, line=line.strip()))
+        if not TERM_PATTERN.search(scan_line):
+            continue
+        if not _has_business_number(scan_line):
+            continue
+        findings.append(Finding(path=path, line_number=line_number, line=line.strip()))
     return findings
 
 
