@@ -41,6 +41,11 @@ from app.db.models.tenant import Tenant  # noqa: E402
 from app.db.models.threshold import ThresholdConfig  # noqa: E402
 from app.db.models.user import User  # noqa: E402
 from app.db.base import Base  # noqa: E402
+from app.core.security import (  # noqa: E402
+    assign_user_role,
+    hash_password,
+    seed_rbac_catalog,
+)
 
 
 PENDING_SOURCE = "pending_verification"
@@ -77,21 +82,56 @@ def seed_tenant(db: Session) -> Tenant:
 
 
 def seed_user(db: Session, tenant_id) -> User:
-    """获取或创建测试用户（admin）。"""
+    """获取或创建测试用户（admin），并写入可登录的哈希密码。"""
 
     user = db.query(User).filter_by(email="test@boip.local").one_or_none()
     if user is not None:
         return user
+    # 密码来自环境变量，缺省开发占位；生产必须覆盖 BOIP_SEED_ADMIN_PASSWORD。
+    admin_pw = os.getenv("BOIP_SEED_ADMIN_PASSWORD", "changeme-dev")  # infrastructure-config
     user = User(
         tenant_id=tenant_id,
         email="test@boip.local",
-        hashed_password="pending_verification",  # Phase 0 占位，Phase 1+ 接 bcrypt
+        hashed_password=hash_password(admin_pw),
         role="admin",
         status="active",
     )
     db.add(user)
     db.flush()
     return user
+
+
+def seed_rbac_roles(db: Session, tenant: Tenant, admin: User) -> dict[str, int]:
+    """幂等种入 RBAC 目录，并将 admin/designer/viewer 演示用户关联角色。
+
+    返回新增的角色关联计数（用于 seed 输出）。链接计数。
+    """
+
+    seed_rbac_catalog(db)
+    assign_user_role(db, admin, "admin", tenant.id)
+
+    # 演示用户（designer / viewer），便于直接体验 RBAC 三角色。
+    demo_pw = os.getenv("BOIP_SEED_DEMO_PASSWORD", "changeme-dev")  # infrastructure-config
+    demo_specs = [
+        ("designer", "designer@boip.local", "designer"),
+        ("viewer", "viewer@boip.local", "customer"),  # legacy role 用合法值，RBAC 角色取 viewer
+    ]
+    linked = 1  # admin 已关联
+    for role_name, email, legacy_role in demo_specs:
+        demo = db.query(User).filter_by(email=email).one_or_none()
+        if demo is None:
+            demo = User(
+                tenant_id=tenant.id,
+                email=email,
+                hashed_password=hash_password(demo_pw),
+                role=legacy_role,
+                status="active",
+            )
+            db.add(demo)
+            db.flush()
+        assign_user_role(db, demo, role_name, tenant.id)
+        linked += 1
+    return {"user_roles": linked}
 
 
 def seed_agents(db: Session, tenant_id) -> list[Agent]:
@@ -257,6 +297,7 @@ def run_seed(db_url: str) -> dict[str, int]:
             rules = seed_knowledge_rules(db, tenant.id)
             cases = seed_knowledge_cases(db, tenant.id)
             cfg = seed_threshold_config(db, tenant.id)
+            rbac = seed_rbac_roles(db, tenant, user)
 
             db.commit()
 
@@ -267,6 +308,7 @@ def run_seed(db_url: str) -> dict[str, int]:
                 "knowledge_rules": len(rules),
                 "knowledge_cases": len(cases),
                 "threshold_configs": 1 if cfg else 0,
+                "user_roles": rbac["user_roles"],
             }
         except Exception:
             db.rollback()

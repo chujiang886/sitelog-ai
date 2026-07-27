@@ -18,6 +18,7 @@ from app.db.models.image import (
 from app.db.models.knowledge import KnowledgeCase, KnowledgeRule
 from app.db.models.message import Message
 from app.db.models.project import Project
+from app.db.models.rbac import Permission, Role, RolePermission, UserRole
 from app.db.models.tenant import Tenant
 from app.db.models.threshold import ThresholdConfig
 from app.db.models.user import User
@@ -30,10 +31,14 @@ __all__ = [
     "KnowledgeCase",
     "KnowledgeRule",
     "Message",
+    "Permission",
     "Project",
+    "Role",
+    "RolePermission",
     "Tenant",
     "ThresholdConfig",
     "User",
+    "UserRole",
     "VISION_STATUS_DONE",
     "VISION_STATUS_FAILED",
     "VISION_STATUS_PENDING",

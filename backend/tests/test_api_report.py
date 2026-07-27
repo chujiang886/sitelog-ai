@@ -1,15 +1,21 @@
-"""T14-1：PDF 方案书生成端点测试。
+"""T14-1：PDF 方案书生成端点测试（RBAC 改造后）。
 
 验证 ``POST /api/report/generate``：
 - 正常 dossier → 200、Content-Type 含 application/pdf、body 以 b"%PDF" 开头；
-- 某段为 None（如 vision=None）→ 仍返回合法 PDF（generator 兜底）。
+- 某段为 None（如 vision=None）→ 仍返回合法 PDF（generator 兜底）；
+- 鉴权：无 token → 401；viewer 缺 report:create → 403 明确信息。
+
+鉴权改造（2.2.6）：端点受 ``require_permission("report:create")`` 保护，
+测试统一通过 ``rbac_env`` fixture 携带 JWT Bearer token。
 """
 
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from app.main import app
+
+def _headers(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
 
 
 def _mock_dossier() -> dict:
@@ -60,50 +66,91 @@ def _mock_dossier() -> dict:
     }
 
 
-client = TestClient(app)
-
-
-def test_generate_report_returns_valid_pdf() -> None:
+def test_generate_report_returns_valid_pdf(rbac_env) -> None:
     """正常 dossier 返回合法 PDF 字节流。"""
 
-    resp = client.post("/api/report/generate", json=_mock_dossier())
+    client: TestClient = rbac_env["client"]
+    resp = client.post(
+        "/api/report/generate",
+        json=_mock_dossier(),
+        headers=_headers(rbac_env["admin_a_token"]),
+    )
     assert resp.status_code == 200
     assert "application/pdf" in resp.headers.get("content-type", "")
     assert resp.content.startswith(b"%PDF")
     assert len(resp.content) > 200
 
 
-def test_generate_report_with_none_section_still_valid() -> None:
+def test_generate_report_with_none_section_still_valid(rbac_env) -> None:
     """vision=None 时仍返回合法 PDF（generator 兜底，不抛）。"""
 
+    client: TestClient = rbac_env["client"]
     dossier = _mock_dossier()
     dossier["vision"] = None
-    resp = client.post("/api/report/generate", json=dossier)
+    resp = client.post(
+        "/api/report/generate",
+        json=dossier,
+        headers=_headers(rbac_env["admin_a_token"]),
+    )
     assert resp.status_code == 200
     assert "application/pdf" in resp.headers.get("content-type", "")
     assert resp.content.startswith(b"%PDF")
 
 
-def test_generate_report_all_sections_none_still_valid() -> None:
+def test_generate_report_all_sections_none_still_valid(rbac_env) -> None:
     """三段全部为 None → 仍返回合法 PDF（generator 全段兜底，不抛）。"""
 
+    client: TestClient = rbac_env["client"]
     dossier = {
         "project": {"address": "广东省汕头市龙湖区某某小区 3 栋 1801"},
         "vision": None,
         "environment": None,
         "design": None,
     }
-    resp = client.post("/api/report/generate", json=dossier)
+    resp = client.post(
+        "/api/report/generate",
+        json=dossier,
+        headers=_headers(rbac_env["admin_a_token"]),
+    )
     assert resp.status_code == 200
     assert "application/pdf" in resp.headers.get("content-type", "")
     assert resp.content.startswith(b"%PDF")
     assert len(resp.content) > 200
 
 
-def test_generate_report_minimal_empty_body_still_valid() -> None:
+def test_generate_report_minimal_empty_body_still_valid(rbac_env) -> None:
     """请求体为空 dict（缺省 project={} 且三段 None）→ 仍返回合法 PDF。"""
 
-    resp = client.post("/api/report/generate", json={})
+    client: TestClient = rbac_env["client"]
+    resp = client.post(
+        "/api/report/generate",
+        json={},
+        headers=_headers(rbac_env["designer_a_token"]),
+    )
     assert resp.status_code == 200
     assert "application/pdf" in resp.headers.get("content-type", "")
     assert resp.content.startswith(b"%PDF")
+
+
+def test_generate_report_without_token_rejected(rbac_env) -> None:
+    """未携带 token → 401（受保护 API 必须失败）。"""
+
+    client: TestClient = rbac_env["client"]
+    resp = client.post("/api/report/generate", json={})
+    assert resp.status_code == 401
+
+
+def test_generate_report_viewer_forbidden(rbac_env) -> None:
+    """viewer 缺 report:create → 403 明确信息（权限不足必须明确返回）。"""
+
+    client: TestClient = rbac_env["client"]
+    resp = client.post(
+        "/api/report/generate",
+        json={},
+        headers=_headers(rbac_env["viewer_a_token"]),
+    )
+    assert resp.status_code == 403
+    assert (
+        "Permission denied: requires 'report:create'"
+        in resp.json()["error"]["message"]
+    )

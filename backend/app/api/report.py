@@ -19,9 +19,9 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
@@ -31,6 +31,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from agents.report.generator import generate_project_report  # noqa: E402
+from app.core.security import CurrentUser, require_permission  # noqa: E402
 
 
 router = APIRouter(prefix="/api/report", tags=["report"])
@@ -58,8 +59,11 @@ class ReportRequest(BaseModel):
 
 
 @router.post("/generate")
-async def generate_report(body: ReportRequest) -> Response:
-    """聚合三 Agent 输出，生成并返回方案书 PDF 字节流。
+async def generate_report(
+    body: ReportRequest,
+    current_user: CurrentUser = Depends(require_permission("report:create")),
+) -> Response:
+    """聚合三 Agent 输出，生成并返回方案书 PDF 字节流（需 report:create）。
 
     返回 ``application/pdf`` 二进制流；dossier 任意段为 None / 字段缺失时
     generator 会渲染占位章节，不抛异常。仅当发生未预期异常时回落到 500。

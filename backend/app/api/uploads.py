@@ -10,20 +10,26 @@
 
 设计原则：
 - 仅接收 ``image/jpeg | image/png | image/webp``，单文件 ≤ 10 MB；
-- tenant 隔离通过 ``X-Tenant-Id`` 头强制；
+- 端点受 RBAC 保护（upload:create / upload:read），tenant 隔离取自 JWT 的
+  ``tenant_id``（服务端签名可信，不再信任客户端 X-Tenant-Id 头）；
 - 落盘到本地 ``backend/storage/uploads/{tenant_id}/{sha256}.{ext}``（TD-015）；
 - Vision 分析由 ``backend/app/tasks/vision_tasks.process_image`` 异步触发。
+
+Phase 2.1.4：DB 会话切换为 ``async_get_db``（AsyncSession）；``process_image`` 同步阻塞调用
+经 ``asyncio.to_thread`` 卸载到线程池，避免阻塞事件循环（不修改其内部业务逻辑）。
 """
 
 from __future__ import annotations
 
+import asyncio
 import sys
 import uuid
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 # 让 uvicorn 从 backend/ 运行时也能 ``import agents``
 _REPO_ROOT: Path = Path(__file__).resolve().parents[3]
@@ -34,13 +40,14 @@ from agents.vision.image_processor import (  # noqa: E402
     ImageValidationError,
     process_image,
 )
-from app.core.storage import build_image_path  # noqa: E402
+from app.core.security import CurrentUser, require_permission  # noqa: E402
+from app.db.session import async_get_db  # noqa: E402
+from app.core.storage_backends import get_storage_backend  # noqa: E402
 from app.db.models.image import (  # noqa: E402
     Image,
     VISION_STATUS_PENDING,
 )
 from app.db.models.project import Project  # noqa: E402
-from app.db.session import get_db  # noqa: E402
 
 
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])
@@ -49,34 +56,6 @@ router = APIRouter(prefix="/api/uploads", tags=["uploads"])
 # --------------------------------------------------------------------------- #
 # helpers                                                                      #
 # --------------------------------------------------------------------------- #
-
-
-def _resolve_tenant_id(x_tenant_id: str | None) -> uuid.UUID:
-    """解析租户 ID：要求 ``X-Tenant-Id`` 头存在且为合法 UUID。"""
-
-    if not x_tenant_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Missing X-Tenant-Id header",
-        )
-    try:
-        return uuid.UUID(x_tenant_id)
-    except (TypeError, ValueError) as exc:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid X-Tenant-Id header: {x_tenant_id}",
-        ) from exc
-
-
-def _resolve_user_id(x_user_id: str | None) -> uuid.UUID | None:
-    """解析用户 ID：可选（前端可匿名上传待 Phase 2 实名接入）。"""
-
-    if not x_user_id:
-        return None
-    try:
-        return uuid.UUID(x_user_id)
-    except (TypeError, ValueError):
-        return None
 
 
 def _image_to_dict(image: Image) -> dict[str, object]:
@@ -98,15 +77,16 @@ def _image_to_dict(image: Image) -> dict[str, object]:
     }
 
 
-def _trigger_vision_task(image_id: uuid.UUID) -> None:
+async def _trigger_vision_task(image_id: uuid.UUID) -> None:
     """触发 Vision 异步任务（Phase 1 同步调用；Phase 2 切 RQ）。
 
     同步调用失败时不影响图片上传本身，仅记录到 ``pending_verification`` 标记。
+    经 ``asyncio.to_thread`` 卸载阻塞（2.1.4），避免阻塞事件循环。
     """
 
     try:
         from app.tasks.vision_tasks import process_image  # noqa: PLC0415
-        process_image(image_id=image_id)
+        await asyncio.to_thread(process_image, image_id=image_id)
     except Exception as exc:  # noqa: BLE001 - 异步触发失败不影响上传主路径
         # 上传本身已成功；Vision 失败由后续 GET /analyze 重试。
         import logging  # noqa: PLC0415
@@ -127,22 +107,22 @@ def _trigger_vision_task(image_id: uuid.UUID) -> None:
 async def upload_image(
     file: Annotated[UploadFile, File(description="图片文件（jpg/jpeg/png/webp）")],
     project_id: Annotated[str | None, Form()] = None,
-    db: Session = Depends(get_db),
-    x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id"),
-    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+    current_user: CurrentUser = Depends(require_permission("upload:create")),
+    db: AsyncSession = Depends(async_get_db),
 ) -> dict[str, object]:
-    """上传图片：本地落盘 + 写 images 表 + 触发 Vision 任务。"""
+    """上传图片：本地落盘 + 写 images 表 + 触发 Vision 任务（需 upload:create）。"""
 
-    tenant_id: uuid.UUID = _resolve_tenant_id(x_tenant_id)
-    owner_id: uuid.UUID | None = _resolve_user_id(x_user_id)
+    tenant_id: uuid.UUID = current_user.tenant_id
+    owner_id: uuid.UUID | None = current_user.id
 
     content: bytes = await file.read()
     mime_type: str = (file.content_type or "").strip().lower() or "application/octet-stream"
     filename: str = file.filename or "upload.bin"
 
-    # 1) 预处理（校验 + base64 + sha256）
+    # 1) 预处理（校验 + base64 + sha256）—— 经 to_thread 卸载阻塞（2.1.4）
     try:
-        processed = process_image(
+        processed = await asyncio.to_thread(
+            process_image,
             content=content,
             filename=filename,
             mime_type=mime_type,
@@ -161,31 +141,35 @@ async def upload_image(
                 detail=f"Invalid project_id: {project_id}",
             ) from exc
         project: Project | None = (
-            db.query(Project)
-            .filter_by(id=project_uuid, tenant_id=tenant_id)
-            .one_or_none()
-        )
+            await db.scalars(
+                select(Project).filter_by(id=project_uuid, tenant_id=tenant_id)
+            )
+        ).one_or_none()
         if project is None:
             raise HTTPException(
                 status_code=404,
                 detail=f"Project not found: {project_uuid}",
             )
 
-    # 3) 写本地存储
-    storage_path: Path = build_image_path(
+    # 3) 写存储后端（LocalStorage / MinIOStorage / MemoryStorage，按配置切换）
+    backend = get_storage_backend()
+    storage_path: str = backend.save(
+        key=backend.resolve_key(
+            tenant_id=str(tenant_id),
+            sha256=processed.sha256,
+            extension=processed.extension,
+        ),
+        content=processed.content,
         tenant_id=str(tenant_id),
-        sha256=processed.sha256,
-        extension=processed.extension,
     )
-    if not storage_path.exists():
-        storage_path.write_bytes(processed.content)
+    # 兼容 DB schema：storage_path 存逻辑 key（如 tenant_id/sha256.ext）。
 
     # 4) 写 DB（不重复 insert：sha256 + tenant_id 命中则复用）
     image: Image | None = (
-        db.query(Image)
-        .filter_by(tenant_id=tenant_id, sha256=processed.sha256)
-        .one_or_none()
-    )
+        await db.scalars(
+            select(Image).filter_by(tenant_id=tenant_id, sha256=processed.sha256)
+        )
+    ).one_or_none()
     if image is None:
         image = Image(
             tenant_id=tenant_id,
@@ -200,16 +184,16 @@ async def upload_image(
             vision_result=None,
         )
         db.add(image)
-        db.commit()
-        db.refresh(image)
+        await db.commit()
+        await db.refresh(image)
         # 首次上传触发 Vision 任务；幂等：相同 sha256 不会重复触发。
-        _trigger_vision_task(image.id)
+        await _trigger_vision_task(image.id)
     else:
         # 已存在：仅在显式 project_id 缺省时保留；显式传入则允许覆盖挂载。
         if project_uuid is not None and image.project_id != project_uuid:
             image.project_id = project_uuid
-        db.commit()
-        db.refresh(image)
+        await db.commit()
+        await db.refresh(image)
 
     return {
         "success": True,
@@ -228,12 +212,12 @@ async def upload_image(
 @router.get("/{image_id}")
 async def get_image(
     image_id: str,
-    db: Session = Depends(get_db),
-    x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id"),
+    current_user: CurrentUser = Depends(require_permission("upload:read")),
+    db: AsyncSession = Depends(async_get_db),
 ) -> dict[str, object]:
-    """读取图片元数据 + Vision 结果。"""
+    """读取图片元数据 + Vision 结果（需 upload:read；按 token 租户隔离）。"""
 
-    tenant_id: uuid.UUID = _resolve_tenant_id(x_tenant_id)
+    tenant_id: uuid.UUID = current_user.tenant_id
     try:
         image_uuid: uuid.UUID = uuid.UUID(image_id)
     except (TypeError, ValueError) as exc:
@@ -243,10 +227,10 @@ async def get_image(
         ) from exc
 
     image: Image | None = (
-        db.query(Image)
-        .filter_by(id=image_uuid, tenant_id=tenant_id)
-        .one_or_none()
-    )
+        await db.scalars(
+            select(Image).filter_by(id=image_uuid, tenant_id=tenant_id)
+        )
+    ).one_or_none()
     if image is None:
         raise HTTPException(
             status_code=404,

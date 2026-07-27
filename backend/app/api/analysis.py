@@ -25,7 +25,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 # 让 uvicorn 从 backend/ 运行时也能 ``import agents``
@@ -37,6 +37,7 @@ from agents.base import AgentContext  # noqa: E402
 from agents.design.agent import DesignAgent  # noqa: E402
 from agents.environment.agent import EnvironmentAgent  # noqa: E402
 from agents.vision.agent import VisionAgent  # noqa: E402
+from app.core.security import CurrentUser, require_permission  # noqa: E402
 
 
 router = APIRouter(prefix="/api/analysis", tags=["analysis"])
@@ -90,8 +91,11 @@ async def _invoke_agent(agent: Any, ctx: AgentContext) -> dict[str, Any]:
 
 
 @router.post("/run")
-async def run_analysis(body: AnalysisRequest) -> dict[str, Any]:
-    """串联 Vision → Environment → Design，返回聚合分析结果。"""
+async def run_analysis(
+    body: AnalysisRequest,
+    current_user: CurrentUser = Depends(require_permission("analysis:create")),
+) -> dict[str, Any]:
+    """串联 Vision → Environment → Design，返回聚合分析结果（需 analysis:create）。"""
 
     request_id: str = str(uuid.uuid4())
     vision_agent = VisionAgent()
