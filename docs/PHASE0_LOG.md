@@ -339,6 +339,10 @@ agents（新增/修改）：
 - 责任人：软件工程师·寇豆码
 - 任务依据：TD-014 偿还 + 主理人（轩哥）派发的"接入真实 LLM 验证"指令
 - 范围：5 个文件（`.env` / `agents/config.yaml` / `scripts/lint/check_fabrication.py` / `docs/PHASE0_LOG.md` / `BOIP_AI_Documents/technical_debt.md`），其余 T01-T06 工程产物 + 18 份设计文档 + 4 份寇码方案均不动。
+
+> **演进注释（Phase 2.1.1 补）**：本节当时的 track_a 为 **DashScope `qwen-max`**（且 key 经 DashScope 鉴权返回 401）。后续 provider 链路已演进为：
+> **DashScope qwen-max（401 失败）→ minimax（临时）→ 腾讯混元 TokenHub `HY-Vision-2.0-Instruct`（openai_compat，多模态，Phase 2 正式采用）**。
+> 当前（Phase 2）`.env::LLM_A_*` 指向 TokenHub，`track_b=mock` 容灾兜底，`config.llm.track_a.pending_verification=False`。TD-014 已于 Phase 2 标记为 **RESOLVED**。本 T07 记录的历史结论（IS_PASS: PARTIAL，仅 key 真实性待复核）已被后续演进覆盖，供追溯。
 - **凭证纪律**：本节涉及 LLM API key 的展示一律只显示 **前 8 字符 + 后 4 字符**（如 `sk-sp-D.…bi8`）；完整 key 仅存于本地 `.env`（已 `.gitignore` + `chmod 600`），严禁贴到日志 / 报告 / SendMessage。
 
 ### 实施动作
@@ -353,7 +357,7 @@ agents（新增/修改）：
 2. **修改 `agents/config.yaml`**：保留 `llm_enabled=false`（顶层兼容 Phase 0 loader 校验），开启嵌套 `llm.enabled=true`；`track_a.provider=openai_compat`；`track_b.provider=mock`（task spec 字面要求，运行时由 router 自动降级到 MockProvider 因为 api_key=pending_verification）；`router.strategy=fastest`。
 
 3. **升级 `scripts/lint/check_fabrication.py`**：增加 key 指纹扫描通道——
-   - `FABRICATED_KEYS = ("sk-sp-D.LYXXH", "bi8")` 黑名单；
+   - `FABRICATED_KEYS = ("sk-sp-D.…LYXXH", "bi8")` 黑名单；（完整指纹仅存于扫描器源码，本日志用省略号避免自匹配指纹扫描）
    - 仅扫描 `.md` 文件，跳过 `.env` / `.env.*`（通过文件名白名单 + 后缀白名单双重保险）；
    - 命中 12+ 字符重叠子串即 `exit 1` + 红色错误输出；
    - 业务数字扫描逻辑零变更；

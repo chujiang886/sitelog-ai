@@ -1,17 +1,58 @@
 # BOIP 建筑开口智能设计平台
 
-BOIP（Building Opening Intelligence Platform）定位为面向建筑开口行业的 AI Native 智能设计基础设施。本仓库目前仅提供 Phase 0 工程骨架，不包含行业判断、真实模型调用或生产数据。
+BOIP（Building Opening Intelligence Platform）定位为面向建筑开口行业的 AI Native 智能设计基础设施。当前 **Phase 2.2（能力深化）已全部收口**：Environment 数据 Provider 抽象、Design 三方案专业化、PDF 可信交付、Storage 抽象（MinIO 可切换）、RAG 基础设施、RBAC 企业权限基础六大 Sprint 均已完成并通过 CI 门禁；行业工程参数在未经专家验证前一律以 `pending_verification` 标识。
 
 ## 当前阶段
 
-- **Phase 0 完成 / 进入 Phase 1**
-- Phase 0 / T01：项目结构（已完成）
-- Phase 0 / T02：前后端骨架（已完成）
-- Phase 0 / T03：数据库 + Migration（已完成）
-- Phase 0 / T04：Agent 框架（已完成）
-- Phase 0 / T05：测试体系 + CI（已完成）
-- Phase 0 整体验收：见 [`docs/PHASE0_DONE.md`](docs/PHASE0_DONE.md)
-- 实施日志：见 [`docs/PHASE0_LOG.md`](docs/PHASE0_LOG.md)
+- **当前真实阶段：Phase 2.2 = COMPLETED（2026-07-28 验收）**，当前处于 **Phase 3 planning**（未开始 Phase 3 开发）。
+- 单一事实来源（SSOT）：[`.ai/project_status.json`](.ai/project_status.json)；阶段总结：[`.ai/reviews/phase2.2_final_review.md`](.ai/reviews/phase2.2_final_review.md)；路线图：[`.ai/roadmap_v2.md`](.ai/roadmap_v2.md)。
+- 历史里程碑：Phase 0（T01–T05）✅ → Phase 1（T06–T08）✅ → Phase 2 早期（T12–T15）✅ → Phase 2.1 架构稳定（AsyncSession / Provider 解耦 / Engineering 骨架 / 测试基线）✅ → Phase 2.2 能力深化（2.2.1–2.2.6）✅。
+
+## Current Architecture Status
+
+> 机器可读单一事实来源：[`.ai/project_status.json`](.ai/project_status.json) ｜ 阶段验收：[`.ai/reviews/phase2.2_final_review.md`](.ai/reviews/phase2.2_final_review.md) ｜ Provider 状态：[`.ai/provider_status.md`](.ai/provider_status.md) ｜ 决策记录：[`.ai/decisions/`](.ai/decisions/)
+
+### 当前 Phase（Current Phase）
+
+- **Phase 2.2 COMPLETED — 能力深化六 Sprint 全部交付；Phase 3 planning**
+- LLM 真实接入：`llm.enabled = true`；`providers.text/vision` 指向 **腾讯混元 TokenHub `HY-Vision-2.0-Instruct`**（多模态），`fallback = mock`（容灾 / 离线兜底）；配置事实源为 `.env::LLM_A_*`。
+- 主干分支：`master`（远端 `github.com/chujiang886/sitelog-ai`）。
+- 最新权威绿灯（2026-07-27，`local_ci.sh` 8/8 全绿）：backend pytest **246 passed / 覆盖率 87.34%**（门槛 60%）+ 前端 Jest **29 passed / 6 suites / 覆盖率 93.15%**（门槛 50%）= **275 passed**。
+
+### 已完成模块（Completed Modules）
+
+**后端 API（11 个 router，FastAPI）**
+- `/health`、`/api/projects`、`/api/agents`（+`/{name}/invoke`）、`/api/knowledge/rules`
+- `/api/conversations`（+`/{id}/messages`）、`/api/uploads`、`/api/vision/analyze`
+- `/api/analysis/run`（串联 Environment / Vision / Design 三 Agent → 结构化 dossier）
+- `/api/report/generate`（PDF 方案书，可信徽标 + 溯源子表，流式 `application/pdf`）
+- `/api/rag/ingest|search|mode`（RAG 基础设施：入库强制三要素溯源）
+- `/api/auth/login|me`（JWT 认证；uploads / analysis / report 已接 RBAC 权限保护）
+
+**AI Agent 层**
+- 框架：BaseAgent / AgentRegistry / Loader / config（T04 稳定）
+- CoreAgent + CoreOrchestrator + NLU（IntentExtractor）
+- EnvironmentAgent（数据 Provider 抽象 + field_provenance 溯源）、VisionAgent（HY-Vision 多模态）、DesignAgent（经济 / 舒适 / 高性能三方案 + 阈值 verified 一票否决）
+- EngineeringAgent 骨架（`enabled:false` 不进管道，零真实工程计算）
+- ReportGenerator（→ 可信 PDF）、LLM 抽象（ProviderRole 语义枚举 + OpenAICompat / AnthropicCompat / Mock / DualTrackRouter + EmbeddingProvider）
+
+**前端（Next.js 14）**：8 个页面（home / consult / result / upload / agents / projects / knowledge / login）、ChatMessage / IntentBadge / ImageDropzone / VisionResultCard 组件、analysis / chat / upload / store 库、29 个 Jest 用例。
+
+**数据层**：14+ ORM 模型（含 RBAC 四表）、Alembic 迁移（双向可逆）、StorageBackend 抽象（Local 默认 / MinIO 可配置 / Memory 测试）、向量库抽象（InMemory 默认 / Qdrant 懒加载）。
+
+**企业能力**：RBAC（admin / designer / viewer 三角色 + `resource:action` 权限模型）、JWT HS256 认证（纯标准库，secret 仅 `.env`）、tenant_id 服务端签发隔离。
+
+**质量体系**：`local_ci.sh` 8 步门禁、业务数字杜撰扫描、硬编码扫描、GitHub Actions。
+
+### 当前风险（Current Risks）
+
+| 级别 | 风险 | 说明 / 动作 |
+|---|---|---|
+| 🔴 高 | 工程安全审核链未闭合 | `engineering_enabled = false`，风压 / 阈值全 `pending_verification`；上线前需 Engineering 计算闭环 + 专家签字（Phase 3 主线） |
+| 🟠 中 | 技术债 OPEN 13 项超标 | Phase 2.2 出口目标 ≤5 未达成；分类与还债计划见 [`.ai/technical_debt/`](.ai/technical_debt/) |
+| 🟠 中 | 真实外部数据源未接入 | Environment 天气 / GIS、真实 Embedding / Qdrant 均按 ADR 流程 DEFERRED，机制已就绪待选型 |
+| 🟠 中 | SQLite↔PG JSONB 差异未验证（TD-011） | 接 PG 后需 `EXPLAIN ANALYZE` + gin 索引评估 |
+| 🟡 低 | 前端 `/login` 未对接 `/api/auth/login` | RBAC 后端已就绪，前端仍为占位页（Phase 3.2 首步） |
 
 ## 环境要求
 

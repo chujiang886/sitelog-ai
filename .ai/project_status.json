@@ -1,0 +1,398 @@
+{
+  "schema_version": "1.0",
+  "current_roadmap_version": "V2",
+  "roadmap_v2_ref": ".ai/roadmap_v2.md",
+  "artifact": "BOIP project_status.json",
+  "purpose": "AI 会话间单一事实来源（Single Source of Truth）。后续 AI 读取本文件即可获得 BOIP 真实项目状态，无需重新全量扫描。",
+  "generated_at": "2026-07-26T14:16:59+08:00",
+  "generated_by": "BOIP AI 首席架构整理工程师（架构同步阶段，未改动业务代码）",
+  "source_of_truth_note": "本 JSON 由 .ai/architecture_sync_report.md 提炼；若二者冲突以本报告与人类主理人决策为准。",
+
+  "project": {
+    "name": "BOIP",
+    "full_name": "Building Opening Intelligence Platform",
+    "positioning": "面向建筑开口（门窗/阳台）行业的 AI Native 智能设计与经营平台",
+    "repo_local_path": "/Users/chujiangai/WorkBuddy仓库/初匠Ai应用开发/BOIP",
+    "repo_remote": "github.com/chujiang886/sitelog-ai",
+    "branch": "master",
+    "red_line": "任何无据行业数字必须标 pending_verification；不得编造工程参数（风压/楼层/评分权重）。"
+  },
+
+  "current_stage": {
+    "phase_number": 3,
+    "current_phase": "Phase 3 planning",
+    "phase_name": "Phase 3 planning — Phase 2.2 已 COMPLETED 并完成 3.0 前置整理（Git 冻结 + 文档收敛 + 技术债重分类），Phase 3 开发未启动",
+    "phase_2_2_status": "COMPLETED (2026-07-28 总结验收，见 .ai/reviews/phase2.2_final_review.md)",
+    "phase_3_0_status": "COMPLETED (2026-07-28 前置整理，见 .ai/reviews/phase2.2_release_freeze_report.md + .ai/reviews/phase3_readiness_report.md)",
+    "is_pass": true,
+    "evidence": [
+      "git HEAD = 22dc0ab（2026-07-26 回归测试）",
+      "deliverables/software-company/boip-phase2-delivery-2026-07-25.md 声明 Phase 2 (T12-T15) 交付",
+      "commit 7e2a585: 前端 consult/result 打通 + PDF endpoint + minimax 真实三 Agent 链路",
+      "commit f53b4be: Vision 接入腾讯混元 TokenHub HY-Vision-2.0-Instruct 多模态",
+      "commit fcb8a3c: 后端入口 load_dotenv 修复"
+    ],
+    "doc_claim_vs_reality": "文档(README/CHANGELOG)仍称 Phase 0 完成/进入 Phase 1，实际已到 Phase 2，滞后约 2 阶段。",
+    "last_known_green_tests": {
+      "backend_pytest": "246 passed，coverage 87.34%（门槛 60%，Sprint 要求 ≥85%）",
+      "frontend_jest": "29 passed / 6 suites，coverage 93.15%（门槛 50%）",
+      "note": "2.2.6 后最新绿灯（2026-07-27 local_ci.sh 8/8 全绿，合计 275 passed=246+29）；backend 较 2.2.5 的 224 净增 22（test_rbac.py 17 新用例 + uploads/analysis/report 鉴权改造新增 401/403 用例）；覆盖率 85%→87.34%（含 coverage greenlet 并发配置修复 async 路由覆盖漏采）；详见 .ai/reviews/2.2.6_rbac_foundation_report.md"
+    }
+  },
+
+  "git": {
+    "branch": "master",
+    "release_freeze": "2026-07-28 Phase 3.0 分批提交完成（R-N1 消除）：72bd9f2(2.1 架构基座+卫生) → 3280766(2.2.1+2.2.2) → 2c80ff0(2.2.3+2.2.4) → 2710307(2.2.5+2.2.6) → 34769e0(docs/SSOT 3.0 收敛 Phase 3 planning)",
+    "recent_commits": [
+      {"hash": "34769e0", "date": "2026-07-28", "subject": "docs(3.0): 文档收敛至 Phase 2.2 COMPLETED + SSOT/技术债台账入库（Phase 3 planning）"},
+      {"hash": "2710307", "date": "2026-07-28", "subject": "feat(2.2.5+2.2.6): RAG基础设施 + RBAC企业权限基础"},
+      {"hash": "2c80ff0", "date": "2026-07-28", "subject": "feat(2.2.3+2.2.4): PDF可信交付增强 + StorageBackend存储抽象"},
+      {"hash": "3280766", "date": "2026-07-28", "subject": "feat(2.2.1+2.2.2): Environment数据Provider抽象 + Design三方案专业化"},
+      {"hash": "72bd9f2", "date": "2026-07-28", "subject": "arch(2.1): AsyncSession + Engineering骨架 + Provider解耦 + 仓库卫生"},
+      {"hash": "22dc0ab", "date": "2026-07-26", "subject": "test: 为 _run_agent_coroutine 补回归测试"}
+    ],
+    "hygiene": "backend/storage/ 与 coverage.xml 已忽略；coverage.xml 移出跟踪；.ai/ SSOT 体系入库",
+    "tags": []
+  },
+
+  "llm_config": {
+    "enabled": true,
+    "strategy": "fastest",
+    "timeout_seconds": 30,
+    "track_a": {
+      "provider": "openai_compat",
+      "resolved_from_env": "LLM_A_BASE_URL / LLM_A_API_KEY / LLM_A_MODEL",
+      "current_reality": "腾讯混元 TokenHub HY-Vision-2.0-Instruct（多模态，文本+视觉共用）",
+      "key_present_in_env": true,
+      "key_secret_in_git": false,
+      "drift_note": "config.yaml 注释写 'DashScope qwen-max'；PHASE0_LOG T07 写 'DashScope qwen-max'；phase2-delivery 写 'minimax'——三代漂移，当前事实为 TokenHub。"
+    },
+    "track_b": {
+      "provider": "mock",
+      "env_keys_present": "LLM_B_* 存在但值为 pending_verification",
+      "effective": "MockProvider（因 config provider=mock，与 env 无关）",
+      "note": "用户确认跳过双轨冗余，track_b 维持 mock。"
+    },
+    "json_parsing": "agents/llm/jsonutil.extract_json（直解→剥 ```json```→截首尾 {}）",
+    "mock_behavior": "MockProvider.complete 抛 LLMProviderError，避免污染 fastest 真实链路（Phase2 修复）"
+  },
+
+  "completed_features": {
+    "backend_apis": [
+      "GET /health",
+      "GET /api/projects",
+      "GET /api/agents , GET /api/agents/{name}/invoke",
+      "GET /api/knowledge/rules",
+      "POST/GET /api/conversations , POST/GET /api/conversations/{id}/messages",
+      "POST /api/uploads , GET /api/uploads/{image_id}",
+      "POST /api/vision/analyze",
+      "POST /api/analysis/run (串联三 Agent → dossier)",
+      "POST /api/report/generate (PDF 流式)"
+    ],
+    "agents": [
+      "BaseAgent / AgentRegistry / Loader / config（T04 稳定）",
+      "CoreAgent + CoreOrchestrator + NLU(IntentExtractor 规则+LLM)",
+      "EnvironmentAgent（真实链路，风压/湿度/盐雾/日照占位字段）",
+      "VisionAgent（HY-Vision 多模态；无图/无网降级 pending_verification）",
+      "DesignAgent（经济/舒适/高性能三方案���真实链路）",
+      "ReportGenerator（generate_project_report → PDF）",
+      "LLM 双轨：OpenAICompat / AnthropicCompat / Mock / DualTrackRouter(fastest|first|consensus|fallback)"
+    ],
+    "frontend": {
+      "pages": ["/", "/consult", "/result", "/upload", "/agents", "/projects", "/knowledge", "/login"],
+      "components": ["ChatMessage", "IntentBadge", "upload/ImageDropzone", "upload/VisionResultCard"],
+      "lib": ["api.ts", "chat.ts", "analysis.ts(runAnalysis/generateReport/downloadReport)", "upload.ts", "store.ts(Zustand)"],
+      "types": ["chat.ts", "contracts.ts", "vision.ts"],
+      "tests": "6 文件 / 29 用例"
+    },
+    "data_layer": {
+      "models": ["tenant", "user", "project", "agent", "knowledge", "audit", "threshold", "conversation", "message", "image"],
+      "migrations": "Alembic（Phase0 初始 + Phase1 conversations + T08 image）",
+      "storage": "backend/app/core/storage_backends.py → StorageBackend 抽象（LocalStorage 默认 / MinIOStorage 可配置 / MemoryStorage 测试 mock）；get_storage_backend() 按 BOIP_STORAGE_BACKEND 切换；逻辑 key 统一 {tenant_id}/{sha256}.{ext}（TD-015 已接，MinIO 密钥仅 .env）"
+    },
+    "quality": [
+      "local_ci.sh 8 步（Ruff/pytest/ESLint/jest/alembic roundtrip/seed/业务数字扫描/硬编码扫描）",
+      "check_fabrication.py / check_hardcoded.py 合规扫描",
+      "GitHub Actions ci.yml + docs-check.yml"
+    ]
+  },
+
+  "code_architecture": {
+    "layers": [
+      "用户层: Next.js14 (consult/result/upload/agents/projects/knowledge/login)",
+      "API网关: FastAPI main.py (9 routers) + CORS + 错误信封",
+      "业务路由: health/projects/agents/knowledge/conversations/uploads/vision/analysis/report",
+      "Agent编排: CoreOrchestrator.chat(NLU) | /api/analysis/run 串联三 Agent",
+      "Agent层: Core→Environment/Vision/Design（各自 build_router_from_config）；Engineering 骨架已建（2.1.5，enabled:false 未进管道）",
+      "LLM抽象: DualTrackRouter(track_a=TokenHub / track_b=mock) + extract_json",
+      "数据层: PostgreSQL(目标)/SQLite(占位回归)/Redis/Qdrant/MinIO(待接)"
+    ],
+    "key_modules": {
+      "agents/llm/router.py": "DualTrackRouter + build_router_from_config + _build_provider(缺key→Mock)",
+      "agents/vision/agent.py": "多模态 _call_llm，捕获 LLMRouterError 降级 pending",
+      "agents/environment/agent.py": "同构 _call_llm 走 track_a",
+      "agents/design/agent.py": "同构 _call_llm 走 track_a",
+      "agents/engineering/agent.py": "2.1.5 骨架：五分析接口统一输出四字段 + EngineeringValidation 审核链（不调 LLM，不做真实计算）",
+      "agents/report/generator.py": "generate_project_report → PDF bytes",
+      "backend/app/api/analysis.py": "POST /api/analysis/run 串联三 Agent",
+      "backend/app/api/report.py": "POST /api/report/generate",
+      "backend/app/main.py": "load_dotenv 先于导入；注册 9 router"
+    },
+    "test_counts": {"backend_test_files": 27, "frontend_test_files": 6, "frontend_test_cases": 29},
+    "architectural_smell": "单一 track_a 同时服务文本(environment/design)与视觉(vision) Agent；未区分 text_provider 与 vision_provider。若 track_a 切纯文本模型，Vision 将失效。"
+  },
+
+  "docs_status": {
+    "stale": [
+      {"id": "D1", "file": "README.md", "issue": "顶部写 Phase 0 完成/进入 Phase 1", "severity": "high"},
+      {"id": "D2", "file": "docs/CHANGELOG.md", "issue": "末条停 T08，无 Phase2/T12-T15/TokenHub/minimax", "severity": "high"},
+      {"id": "D3", "file": "docs/PHASE0_LOG.md", "issue": "T07 写 DashScope qwen-max；无 T12-T15", "severity": "medium"},
+      {"id": "D4", "file": "docs/LLM.md", "issue": "架构图画 OpenAI/Anthropic 双云；§4 表 gpt-4o/claude、enabled=false；'必须 enabled=false'", "severity": "high"},
+      {"id": "D5", "file": "agents/config.yaml", "issue": "注释写 DashScope qwen-max", "severity": "medium"},
+      {"id": "D6", "file": "docs/AGENTS.md", "issue": "缺 Vision/Environment/Design 真实接入、analysis/report router、ReportGenerator", "severity": "medium"},
+      {"id": "D7", "file": "docs/API.md", "issue": "未含 /api/analysis/run、/api/report/generate", "severity": "medium"},
+      {"id": "D9", "file": "BOIP_AI_Documents/BOIP_PROJECT_TASK_TREE.md", "issue": "任务树停 Phase0 视角，T06-T20 未入账", "severity": "medium"},
+      {"id": "D10", "file": "BOIP_AI_Documents/technical_debt.md", "issue": "TD-013/014 仍 minimax/DashScope 语境；新债未登记", "severity": "medium"},
+      {"id": "D13", "file": "backend/app/db/session.py", "issue": "原仅同步 SessionLocal；2.1.4 已引入 AsyncSession/async_get_db（已验证）", "severity": "resolved", "status": "RESOLVED (2.1.4 验证通过)"}
+    ],
+    "missing": [
+      {"id": "D8", "item": "docs/ANALYSIS_REPORT.md（analysis/report 端点 + PDF 专文档）", "severity": "low"},
+      {"id": "D11", "item": "deliverables/ 3 份交付文档未纳入版本/文档体系", "severity": "low"},
+      {"id": "D12", "item": ".gitignore 未忽略 frontend/.next.trash/ 与 deliverables/", "severity": "low"}
+    ],
+    "accurate": [
+      "docs/PHASE0_DONE.md（Phase0 验收准确）",
+      "docs/TESTING.md（测试体系指南）",
+      "docs/VISION.md（Vision 设计，基本准确，待补 TokenHub 多模态细节）",
+      "docs/CONVERSATION_API.md（会话 API，准确）"
+    ]
+  },
+
+  "config_conflicts": [
+    {
+      "id": "C1",
+      "title": "LLM provider 身份在三处互相矛盾",
+      "detail": "config.yaml 注释(DashScope qwen-max) / LLM.md(gpt-4o/claude,enabled=false) / PHASE0_LOG(T07 DashScope) / phase2-delivery(minimax) / .env(TokenHub) 五源不一致。",
+      "truth": "当前事实：track_a=腾讯混元 TokenHub HY-Vision-2.0-Instruct(openai_compat)，enabled=true，track_b=mock。",
+      "severity": "high",
+      "fix": "以 .env::LLM_A_* 为唯一事实源；清理所有注释/文档中的 provider 硬编码名称。"
+    },
+    {
+      "id": "C2",
+      "title": "上一轮误判已更正",
+      "detail": "phase0_initial_analysis.md 曾写 '.env LLM_A_* 全空/密钥悬空'。实测 .env 已填入 TokenHub 密钥（已 gitignore）。",
+      "truth": "真实问题是文档/注释漂移，而非密钥缺失。",
+      "severity": "info"
+    },
+    {
+      "id": "C3",
+      "title": "track_b 死配置",
+      "detail": ".env 含 LLM_B_* 但 config track_b.provider=mock → 恒 MockProvider，LLM_B_* 无效。",
+      "severity": "low",
+      "fix": "如需冗余，把 track_b.provider 改 openai_compat 并填 LLM_B_*；否则删除 .env 中 LLM_B_* 避免误导。"
+    },
+    {
+      "id": "C4",
+      "title": "单 track_a 多模态混用",
+      "detail": "文本与视觉 Agent 共用 track_a；架构未区分 text/vision provider。",
+      "severity": "resolved",
+      "status": "RESOLVED (2.1.6)",
+      "fix": "已在 2.1.6 解决：config 引入 providers.text/vision 分离配置 + ProviderRole 语义枚举（C4 偿还）。"
+    }
+  ],
+
+  "tech_debt": {
+    "ledger": ".ai/technical_debt/README.md（Phase 3.0 起唯一有效台账，A/B/C 三级分类）",
+    "open_count": 11,
+    "class_A_must_before_phase3": ["TD-002 工程阈值未确认(高)", "TD-008 密钥管理基建(中→高)", "TD-019 RBAC遗留收敛(新登记：refresh token/前端login对接/User.role双轨)"],
+    "class_B_during_phase3": ["TD-011 SQLite↔PG JSONB(中,3.2)", "TD-016 Vision prompt 专家调优(高,3.1与TD-002同批)", "TD-006 LLM 选型/成本评测(中,3.1,并入原TD-013成本项)", "TD-010 后端拆分粒度(中,3.2)", "TD-005 Engineering 启用决策(低→中,3.1)"],
+    "class_C_long_term": ["TD-001 阶段编号不一致(中→低,SSOT已隔离影响)", "TD-007 i18n(低)", "TD-009 前端组件库(低)"],
+    "resolved": [
+      "TD-004 测试覆盖率门禁", "TD-012 AsyncSession(2.1.4)", "TD-013 Provider解耦(2.1.6收口,成本项并入TD-006)",
+      "TD-014 真实 LLM key 接入(TokenHub)", "TD-015 MinIO 抽象(2.2.4)",
+      "TD-003 文档/代码联动(3.0 收敛机制落地)", "TD-017 provider 注释漂移(3.0 收口)", "TD-018 analysis/report 缺文档(3.0 补全 API.md 含 auth/rag)"
+    ],
+    "repayment_target": "OPEN≤5 达标路径见 .ai/technical_debt/README.md 末节（3.0 后 11 → login对接后 10 → 专家评审批后 8 → Phase 3.1/3.2 收口后 5）"
+  },
+
+  "risks": [
+    {"id": "R1", "risk": "文档/配置严重滞后代码约 2 阶段", "level": "resolved", "status": "RESOLVED (3.0 文档收敛：README/CHANGELOG/LLM.md/AGENTS.md/API.md 刷至 Phase 2.2 COMPLETED)", "action": "后续每 Sprint 报告即文档，流程已固化"},
+    {"id": "R2", "risk": "provider 配置自相矛盾（DashScope/minimax/TokenHub）", "level": "resolved", "status": "RESOLVED (2.1.1/2.1.6/3.0 三轮清理，.env::LLM_A_* 唯一事实源)", "action": "已收口"},
+    {"id": "R3", "risk": "Session 同步/异步未决(TD-012)，async 路由已真实查库", "level": "resolved", "status": "RESOLVED (2.1.4 已验证)", "action": "引入 AsyncSession + async_get_db"},
+    {"id": "R4", "risk": "工程安全审核链未闭合（engineering_enabled=false，阈值全 pending）", "level": "high", "action": "上线前需 Engineer Agent + 专家签字"},
+    {"id": "R5", "risk": "SQLite↔PG JSONB 差异未验证(TD-011)", "level": "medium", "action": "接 PG 后 EXPLAIN ANALYZE + gin 索引评估"},
+    {"id": "R6", "risk": "覆盖率门禁数据陈旧（仍引用 Phase0 基线）", "level": "resolved", "action": "2.1.7 重跑 local_ci.sh 刷新权威基线（backend 82.67%/前端 93.15%）", "status": "RESOLVED (2.1.7)"},
+    {"id": "R7", "risk": "测试收集冲突（factories import）", "level": "resolved", "action": "2.1.7 实证不复现：仓库根合并收集 backend/tests+tests/agents+tests/e2e 151 passed，可独立跑", "status": "RESOLVED (2.1.7)"},
+    {"id": "R8", "risk": "仓库卫生：.next.trash 未忽略、分支为 master", "level": "resolved", "status": "RESOLVED (2.1.1 + 3.0：.next.trash/deliverables/backend-storage/coverage.xml 全部忽略)", "action": "分支模型维持单 master + 分批提交"},
+    {"id": "R-N1", "risk": "Phase 2.1/2.2 全部改动长期未 commit（曾 72 文件悬空）", "level": "resolved", "status": "RESOLVED (3.0 Release Freeze：5 批提交完成)", "action": "见 .ai/reviews/phase2.2_release_freeze_report.md"},
+    {"id": "R-N2", "risk": "远端未推送：本地 master 领先 origin 多个提交", "level": "medium", "action": "主理人验收 3.0 后 git push origin master（含密钥自查已过：.env 未入库）"}
+  ],
+
+  "roadmap": {
+    "immediate_doc_sync_no_code": [
+      "README 顶部 → Phase 2 进行中",
+      "CHANGELOG 追加 T12-T15 + TokenHub + 真实测试数",
+      "LLM.md 架构图/§4 表改为 track_a=TokenHub/track_b=mock/enabled=true",
+      "config.yaml 注释删除 DashScope/qwen-max",
+      "AGENTS.md 补 Vision/Environment/Design/analysis/report/ReportGenerator",
+      "新建 docs/ANALYSIS_REPORT.md",
+      ".gitignore 追加 frontend/.next.trash/；归档 deliverables/",
+      "升级 BOIP_PROJECT_TASK_TREE.md 为实时任务树"
+    ],
+    "decisions_needed": [
+      "TD-012 Session 模型（建议 AsyncSession）",
+      "TD-011 PG JSONB 验证计划",
+      "provider 分离（text vs vision）",
+      "TD-002/TD-016 专家评审排期（阈值 + Vision prompt）",
+      "TD-008 密钥管理基建（Vault/云密钥，正式环境前置）"
+    ],
+    "mid_term": [
+      "T09 Environment 接 weather/gis 真实数据",
+      "T10 Design 三方案阈值专家评审转正",
+      "T11 PDF 模板美化 + 真实数据填充",
+      "T12 工程引擎（风压/玻璃/型材/五金/评分/审核）闭合审核链",
+      "T13-T17 企业 SaaS（RBAC/多租户/CRM/知识库RAG/销售AI）",
+      "TD-015 MinIO 图片存储切换"
+    ],
+    "long_term": [
+      "T18-T20 数字孪生/施工交付/产业生态/AI 大脑（按 BOIP_PROJECT_TASK_TREE.md）"
+    ]
+  },
+
+  "evidence_index": {
+    "git_commits": ["22dc0ab", "fcb8a3c", "f53b4be", "7e2a585"],
+    "deliverables": [
+      "deliverables/software-company/boip-phase2-delivery-2026-07-25.md",
+      "deliverables/software-company/boip-nextsteps-execution-2026-07-26.md",
+      "deliverables/software-company/boip-wrapup-overview-2026-07-25.md"
+    ],
+    "config_files": [".env(脱敏)", "agents/config.yaml", "backend/app/main.py", "agents/llm/router.py"],
+    "doc_files": ["README.md", "docs/CHANGELOG.md", "docs/PHASE0_LOG.md", "docs/LLM.md", "docs/AGENTS.md", "docs/API.md", "BOIP_AI_Documents/BOIP_PROJECT_TASK_TREE.md", "BOIP_AI_Documents/technical_debt.md"]
+  },
+
+  "task_status": {
+    "phase_2_1": {
+      "2.1.4": {
+        "task": "AsyncSession（TD-012）",
+        "status": "COMPLETED",
+        "completed_at": "2026-07-27",
+        "verified_at": "2026-07-27",
+        "verified_by": "BOIP AI 高级研发工程负责人（Step 5 实跑）",
+        "implementation_summary": "引入 async_engine/AsyncSessionLocal/async_get_db，3 路由(conversations/vision/uploads)切异步；process_image 经 asyncio.to_thread 解耦；测试 fixture 改临时文件库共享数据；新增 backend/requirements.txt 登记 aiosqlite + greenlet。",
+        "verification_result": "backend/tests 64 passed + tests/agents 86 passed = 150 passed，0 失败，无告警",
+        "post_verify_fixes": "补 greenlet 依赖；测试 override 对齐 expire_on_commit=False（修复 MissingGreenlet）；vision.py 重载改为 rollback+refresh（读到 process_image 提交后最新行）；fixture dispose 告警清理",
+        "gate": "已获用户验收（2026-07-27，进入 2.1.7 指令即验收确认）"
+      },
+      "2.1.7": {
+        "task": "测试基线刷新（Phase 2.1 权威测试基线）",
+        "status": "COMPLETED",
+        "completed_at": "2026-07-27",
+        "executed_by": "BOIP AI 质量工程负责人",
+        "result": "local_ci.sh 第 1 轮即 8/8 全绿：Ruff 0 违规；backend pytest 151 passed（backend 64 + agents 86 + e2e 1）覆盖率 82.67%（门槛 60%）；ESLint 0 error/1 warning(观察项 upload/page.tsx:181 <img>)；Jest 29 passed/6 suites 覆盖率 93.15%（门槛 50%）；Alembic head↔base 双向通过；Seed 通过；编造扫描/硬编码扫描通过。",
+        "failure_classification": "无失败项（A/B/C/D 四类均空）",
+        "standards": "未降低任何测试标准：覆盖率门槛 60%/50% 不变，未 skip 用例、未改白名单、未改 local_ci.sh",
+        "report": ".ai/reviews/2.1.7_test_baseline_report.md",
+        "gate": "已获用户验收（2026-07-27，进入 2.1.5 指令即验收确认）"
+      },
+      "2.1.5": {
+        "task": "Engineering Agent 骨架（结构/接口契约/审核链/验证机制，无真实工程计算）",
+        "status": "COMPLETED",
+        "completed_at": "2026-07-27",
+        "executed_by": "BOIP AI 工程能力架构负责人",
+        "summary": "新建 agents/engineering/（agent.py + validation.py + agent/prompt/tools/tests/memory 五文档）；EngineeringAgent(BaseAgent) 定义五分析接口(wind_pressure/glass_safety/profile/hardware/installation_risk)，统一输出 {result,confidence,evidence,verification_status:pending_verification}（骨架内容字段恒空串，防编造）；EngineeringValidation 抽象契约 + PendingEngineeringValidation 结构校验实现，审核链 review_chain 逐接口落记录，验证器可注入替换；config.yaml 登记 engineering 但 enabled:false（不进管道，启用属 TD-005）。",
+        "constraints_kept": "未编造风压参数/楼层阈值/玻璃厚度/评分权重；未修改 frontend/database/已有 Agent 业务逻辑/编排管道",
+        "tests": "新增 tests/agents/test_engineering.py 13 passed；local_ci.sh 第 1 轮 8/8 全绿：backend pytest 164 passed 覆盖率 83.17%，Jest 29 passed，编造/硬编码扫描通过",
+        "report": ".ai/reviews/2.1.5_engineering_agent_report.md",
+        "gate": "等待用户验收；验收后 Phase 2.1 收口，进入 Phase 2.2 规划（不擅自推进）"
+      },
+      "2.1.6": {
+        "task": "Provider 架构解耦（C4 / TD-013）",
+        "status": "COMPLETED",
+        "completed_at": "2026-07-27",
+        "closed_by": "BOIP AI 质量收敛工程师",
+        "summary": "ProviderRole 语义枚举(TEXT/VISION/EMBEDDING/FALLBACK/UNKNOWN) + resolve_provider 命名注册表；config 迁移 llm.providers{text,vision,embedding,fallback}；三 Agent 改 role= 调用；Orchestrator P2 路由修复；UNKNOWN 防御状态补齐；local_ci 8/8 全绿(176 passed)。"
+      }
+    },
+    "phase_2_2": {
+      "_phase_status": "COMPLETED",
+      "_completed_at": "2026-07-28",
+      "_final_review": ".ai/reviews/phase2.2_final_review.md",
+      "_summary": "6/6 Sprint 全部交付（Environment/Design/PDF/MinIO/RAG/RBAC），每 Sprint local_ci.sh 8/8 全绿；最终基线 275 passed（backend 246/87.34% + Jest 29/93.15%）。出口标准：机制层全部达成（Provider 抽象+溯源+防编造+可交付 PDF+云存储+RBAC 地基），真实外部数据源接入按 ADR 流程 DEFERRED；技术债 OPEN≤5 未达标（实际 13，建议 Phase 3 前置还债专项）。全部改动已于 3.0 前置整理分批提交（R-N1 消除）。等待主理人验收，禁止进入 Phase 3。",
+      "2.2.1": {
+        "task": "Environment 真实数据接入（Provider 抽象层 + mock/disabled/real 三模式）",
+        "status": "COMPLETED",
+        "completed_at": "2026-07-27",
+        "executed_by": "BOIP AI 高级研发负责人",
+        "summary": "新建 agents/environment/providers/（base 契约 + mock_provider + factory + __init__），GeoResult/WindClimate 强制 source/fetched_at/raw_ref；config_loader 新增 load_environment_data_config；config.yaml 新增 environment_data 段（默认全 disabled，零行为变化）；agent.py 升至 1.1.0-phase2.2.1，invoke 前置数据段 + field_provenance + 顶层 pending_verification 语义修正（LLM 推理属 Level 0 永远 pending）+ ADR-03 降级（只增强不阻断）；新增 tests/agents/test_environment_providers.py 13 用例。",
+        "constraints_kept": "未触碰 frontend/database/其他 Agent；engineering_enabled=false；规范数值（风压/阈值）未进入；真实厂商选型 DEFERRED（ADR-02 待主理人批）",
+        "tests": "local_ci.sh 8/8 全绿：backend pytest 177 passed 覆盖率 83.95%，Jest 29 passed 覆盖率 93.15%；编造/硬编码扫描通过",
+        "report": ".ai/reviews/2.2.1_environment_data_report.md",
+        "adr": ".ai/decisions/ADR-2.2.1-environment-data-source.md",
+        "gate": "已验收；进入 Sprint 2A（2.2.2 Design 三方案专业化）"
+      },
+      "2.2.2": {
+        "task": "Design 三方案专业化（机制先行：语义修正 + 阈值治理 + Prompt 专业化）",
+        "status": "COMPLETED",
+        "completed_at": "2026-07-27",
+        "executed_by": "BOIP AI Design 架构工程师",
+        "summary": "agent.py 升至 1.1.0-phase2.2.2：语义修正（LLM 成功不再 pending=False，Level 0 inferred 永远 pending，顶层 pending 由 field_provenance 计算，对齐 ADR-2.2.1 §7）；新增 field_provenance / threshold_refs / decision_trace；新增 agents/design/thresholds/verified.json（D-TH-01~05 全 verified=false、value=null）+ agents/design/threshold_loader.py（load_verified_thresholds / is_fully_verified / resolve_field_provenance / build_threshold_refs）；config_loader 新增 load_verified_thresholds（SSOT 对称入口）；Prompt 专业化（环境感知输入带 provenance 标签、经济/舒适/高性能三方案约束、阈值引用槽位、强化不杜撰）；修正 test_design.py 与 test_integration_phase1.py 旧断言。",
+        "constraints_kept": "禁止填写任何工程阈值（verified.json value 全 null）；禁止设置 verified=true（全 false、verified_by/verified_at 全 null）；未修改 engineering_enabled（保持 false）；未实现工程计算；未触碰 frontend/database schema/其他 Agent；扫描标准未降（编造/硬编码扫描 8/8 通过）",
+        "tests": "local_ci.sh 8/8 全绿：backend pytest 185 passed 覆盖率 84.15%，Jest 29 passed 覆盖率 93.15%；新增 tests/agents/test_design_professionalization.py 8 用例（三方案数量/pending语义/provenance/verified机制一票否决/防编造）",
+        "report": ".ai/reviews/2.2.2_design_professional_report.md",
+        "design_doc": ".ai/tasks/2.2.2_design_professionalization_design.md",
+        "deferred": "专家签字段（S2A-3 落地）挂起待行业专家排期；verified.json 转正需主理人 + 专家双控；清单生成器 scripts/gen_threshold_checklist.py 属专家段，本 Sprint 未实现",
+        "gate": "等待主理人验收；验收后进入 Sprint 2B（2.2.3 PDF 方案书增强），不擅自推进"
+      },
+      "2.2.3": {
+        "task": "PDF 方案书增强（客户可交付：可信等级可视化 + 三方案对比 + 防编造）",
+        "status": "COMPLETED",
+        "completed_at": "2026-07-27",
+        "executed_by": "BOIP AI 高级研发负责人",
+        "summary": "重写 agents/report/generator.py：新增数据可信等级说明章节（Level 0~3 模型）；环境分析增加可信度列 + 数据来源溯源子表（消费 2.2.1 field_provenance/data_providers/real_data）；设计方案按 estimated_cost_tier 映射经济型/舒适型/高性能型三原型，每方案渲染依据说明/优势/限制/待验证项 + provenance 脚注；封面扩充咨询需求（预算/风格/约束）；统一可信徽标（[已验证]/[AI推理·待确认]/[待确认]），落实「不把 AI 推理包装成工程确认」；新增 tests/agents/test_report_provenance.py 10 用例（三方案数量/pending语义/provenance/verified机制/防编造/关键章节锚点），更新 test_report.py mock 对齐 2.2.2 语义。",
+        "constraints_kept": "未降低扫描标准（编造/硬编码扫描 8/8 通过）；未关闭 pending（全文档标 AI推理·待确认/待确认，无未经审核 verified）；未编造工程参数；未修改 engineering_enabled；pypdf 仅作测试依赖（backend/pyproject.toml test extras）",
+        "tests": "local_ci.sh 8/8 全绿：backend pytest 194 passed 覆盖率 84.58%，Jest 29 passed 覆盖率 93.15%；新增 10 用例",
+        "report": ".ai/reviews/2.2.3_pdf_enhancement_report.md",
+        "design_doc": ".ai/tasks/2.2.3_pdf_design.md",
+        "gate": "已产出报告并更新 SSOT；按授权继续进入 Sprint 3（2.2.4 MinIO 图片存储切换），两者完成后统一收口"
+      },
+      "2.2.4": {
+        "task": "MinIO 图片存储切换（StorageBackend 抽象 + Local/MinIO/Memory 三后端 + 配置可切换）",
+        "status": "COMPLETED",
+        "completed_at": "2026-07-27",
+        "executed_by": "BOIP AI 高级研发负责人",
+        "summary": "新建 backend/app/core/storage_backends.py：StorageBackend(ABC) 抽象 save/read/delete/resolve_key，逻辑 key 统一 {tenant_id}/{sha256}.{ext}（租户隔离 + 内容 hash 去重，跨后端迁移 DB storage_path 不变）；LocalStorage（dev/CI 默认，兼容旧绝对路径）/ MemoryStorage（测试 mock）/ MinIOStorage（生产可配置，密钥仅 .env，构造缺项 fail-fast 抛 StorageConfigError，懒加载 minio SDK，read 缺失对象统一映射 FileNotFoundError）；get_storage_backend() 按 BOIP_STORAGE_BACKEND 切换（local/memory/minio/未知→fail-fast）；migrate_storage() 按 key 逐对象 copy。改造 backend/app/api/uploads.py 写盘走 get_storage_backend().save（存逻辑 key）；backend/app/tasks/vision_tasks.py 读图走 get_storage_backend().read（异常标 STORAGE_READ_FAILED，兼容旧绝对路径）。",
+        "constraints_kept": "①不破坏既有上传 API（前端仅消费 storage_path 元数据，契约不变）；②开发/CI 默认 LocalStorage；③MinIO 经环境变量切换且密钥仅 .env（不提交）；④CI 不依赖真实 MinIO（MemoryStorage + fake-minio 注入测试覆盖 MinIOStorage 逻辑）；⑤所有外部服务支持 mock/disabled/fallback（规则⑦）；⑥未降低扫描标准（编造/硬编码扫描 8/8 通过，storage_backends.py 无硬编码阈值/品牌）；⑦覆盖率不降反升（84.58%→85%）。",
+        "tests": "local_ci.sh 8/8 全绿：backend pytest 209 passed 覆盖率 85%，Jest 29 passed 覆盖率 93.15%；新增 backend/tests/test_storage_backends.py 15 用例（local/memory roundtrip、read missing、delete、租户隔离、hash 去重、MinIO 未配置 fail-fast、default local、memory、unknown raises、migrate memory→local、migrate local→memory、local 绝对路径兼容、build_image_path 校验、fake-minio save/read/delete）。",
+        "report": ".ai/reviews/2.2.4_minio_storage_report.md",
+        "design_doc": ".ai/tasks/2.2.4_minio_design.md",
+        "gate": "已产出报告并更新 SSOT；2.2.3 + 2.2.4 双 Sprint 收口，停止等待主理人验收（禁止自动进入 2.2.5 RAG / 2.2.6 RBAC）"
+      },
+      "2.2.5": {
+        "task": "RAG 基础建设（knowledge ingestion / embedding 接口 / vector storage 接口 / search API，基础设施，非完整问答）",
+        "status": "COMPLETED",
+        "completed_at": "2026-07-27",
+        "executed_by": "BOIP AI 知识系统架构负责人",
+        "summary": "复用 ProviderRole.EMBEDDING：新建 agents/llm/embedding.py（EmbeddingProvider(ABC) + MockEmbeddingProvider 确定性内容敏感哈希向量 + OpenAICompatEmbeddingProvider 真实 /embeddings 端点，复用 openai_compat 的 urllib 模式，不引新依赖），扩展 router.py::build_embedding_provider 真正构造 provider（disabled→None 保持兼容）；新建 backend/app/core/rag/（embeddings 工厂 env 切换默认 mock、vector_store 抽象 InMemory/Qdrant 懒加载、chunking 分块、ingestion 入库强制 source/created_at/raw_ref）；新增 backend/app/api/rag.py（POST /api/rag/ingest、POST /api/rag/search、GET /api/rag/mode），注册进 main.py + app/api/__init__.py。入库强制三要素溯源，缺失即拒（IngestionError）。",
+        "constraints_kept": "①禁止直接接入真实 Embedding：默认 BOIP_EMBEDDING_PROVIDER=mock，真实 openai_compat 仅显式 env 配置后启用；②禁止无来源知识入库：ingest_document 校验 source/created_at/raw_ref，缺则拒；③复用 ProviderRole.EMBEDDING / agents.llm 抽象，未重新创建 LLM 体系（embedding 为单 provider，非双轨）；④CI 不依赖外部 Qdrant：默认 memory 向量库，qdrant_client 懒加载，CI 永不 import 真实 SDK；⑤未降低扫描标准（编造/硬编码扫描 8/8 通过）；⑥覆盖率不降（85% 维持）；⑦密钥仅 .env，无硬编码。",
+        "tests": "local_ci.sh 8/8 全绿：backend pytest 224 passed 覆盖率 85%，Jest 29 passed 覆盖率 93.15%；新增 backend/tests/test_rag.py 15 用例（mock embedding 确定性/分块重叠/溯源强制拒绝/InMemory 检索命中/CRUD/入库+检索 API/空 source 拒绝信封/mode/Qdrant 未配置 fail-fast/fake-qdrant upsert-search-delete/真实 embedding 路径 fake-urlopen/工厂回落/builder 配置）。",
+        "report": ".ai/reviews/2.2.5_rag_foundation_report.md",
+        "design_doc": ".ai/tasks/2.2.5_rag_design.md",
+        "deferred": "真实 Embedding/Qdrant 接入、完整 RAG 问答链（接 LLM 生成 + 答案溯源）待主理人排期；本 Sprint 仅基础设施；不进入 2.2.6 RBAC。",
+        "gate": "已验收（2026-07-27，进入 2.2.6 指令即验收确认）"
+      },
+      "2.2.6": {
+        "task": "RBAC 基础建设（Role/Permission/UserRole 模型 + JWT 认证 + Depends 鉴权 + tenant 隔离基础，非完整 SaaS）",
+        "status": "COMPLETED",
+        "completed_at": "2026-07-27",
+        "executed_by": "BOIP AI 企业平台架构负责人",
+        "summary": "新建 backend/app/db/models/rbac.py（roles/permissions/role_permissions/user_roles 四表，GUID 跨方言，Alembic 637cbf3eafca 双向可逆）；backend/app/core/security.py（pbkdf2_hmac 10万轮密码哈希 + JWT HS256 纯标准库零新依赖 + CurrentUser + get_current_user(401) + require_permission(403) + seed_rbac_catalog/assign_user_role）；backend/app/api/auth.py（POST /api/auth/login 统一 401 防枚举 + GET /api/auth/me）；三角色 admin/designer/viewer，权限 resource:action（upload/analysis/report 的 create/read + user:manage/tenant:manage），登录时权限嵌入 token 免每请求查库；保护 uploads(POST/GET)/analysis/run/report/generate 四端点，其余 API 保持开放；tenant_id 改由 JWT 服务端签发（弃用可伪造的 X-Tenant-Id 头，跨租户 404）；seed 注入 RBAC 目录 + 三演示账户（user_roles=3）；JWT_SECRET 仅 .env（gitignored），fail-closed。",
+        "constraints_kept": "①secret 只来自 .env 不提交（测试 secret 仅 tests/ 内，硬编码扫描排除）；②未登录 401/权限不足 403 明确返回，错误信封统一；③User/Tenant 既有表零改动（User.role 遗留列保留，授权走 user_roles 新表）；④不一次性保护全部 API（health/projects/agents/conversations/knowledge/vision/rag 照旧开放，匿名开发模式不破坏）；⑤未修改 engineering_enabled；⑥不进入完整 SaaS/Phase 3；⑦编造/硬编码扫描通过（RBAC 常量标 infrastructure-config）。",
+        "tests": "local_ci.sh 8/8 全绿：backend pytest 246 passed 覆盖率 87.34%（Sprint 要求 ≥85% 达标；含 pyproject coverage 增加 concurrency=thread,greenlet 修复 SQLAlchemy async 覆盖漏采），Jest 29 passed 覆盖率 93.15%；新增 tests/conftest.py（rbac_env 双租户三角色 fixture）+ test_rbac.py 17 用例（登录/JWT 生成验证过期畸形缺 secret/角色权限/403 越权/停用用户/tenant claims），test_uploads(11)/test_api_analysis(6)/test_api_report(6) 改造为 Bearer 鉴权并补 401/403 断言。",
+        "report": ".ai/reviews/2.2.6_rbac_foundation_report.md",
+        "design_doc": ".ai/tasks/2.2.6_rbac_design.md",
+        "deferred": "refresh token/吊销机制、前端 /login 对接 /api/auth/login、User.role 遗留列收敛、其余 API 渐进保护、Vault 密钥基建（TD-008）——均待主理人排期。",
+        "gate": "Phase 2.2 基础建设收口；已停止，等待主理人验收（禁止进入 Phase 3 / CRM / 销售 AI / Engineering 计算）"
+      }
+    }
+  }
+}
