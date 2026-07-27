@@ -1,19 +1,26 @@
-"""Design Agent 实现（Phase 1 / T10）。
+"""Design Agent 实现（Phase 1 / T10 + Phase 2.2 / 2.2.2 三方案专业化）。
 
-最小正确实现：
-- 继承 ``BaseAgent``，name=design，version=1.0.0-phase1；
-- ``invoke(input_data={vision_result, environment_result, consultation,
-  address, region_hint})`` → 调用 ``DualTrackRouter``（按
-  ``agents/config.yaml::llm.enabled`` 路由）；
-- LLM 启用时：综合视觉 / 环境 / 需求三类信息，要求模型输出严格 JSON，
-  含恰好 3 个设计候选（candidates），每个候选含开启方式 / 型材 / 玻璃 /
-  尺寸建议 / 成本档位 / 优劣势 / 推荐理由；
-- LLM 未启用 / 三类输入全缺 → 返回 ``pending_verification=True`` 占位
-  envelope，candidates=[]，不杜撰设计；
-- LLM 抛错 / 响应非合法 JSON / 解析后非 dict / candidates 非 3 项 →
-  返回 success=False 失败 envelope，error.code="DESIGN_FAILED"（异常不冒泡）；
-- 任何结构安全结论、规范数值、材料力学参数 Phase 1 仍不可得，必须
-  pending_verification=True 并标注 gaps，绝不允许凭空编造。
+Phase 1 基础（保留）：
+- 继承 ``BaseAgent``，name=design；
+- LLM 启用时构造结构化提示要求严格 JSON 输出恰好 3 个候选；
+- LLM 未启用 / Provider 抛错 / 响应非合法 JSON 时按"不编造"原则降级。
+
+Phase 2.2 / 2.2.2 增强（设计 §一~§七）：
+- **语义修正（修正 P1）**：LLM 成功**不再**自动 ``pending_verification=False``；
+  Level 0 inferred（LLM 推理）永远保持 pending；顶层 pending 由
+  ``field_provenance`` 计算（ADR-2.2.1 §7 对齐）。
+- **字段级溯源**：新增 ``field_provenance``（inferred / measured / verified /
+  unavailable）；设计字段均为 LLM 推理 → inferred，除非对应阈值已完整签字
+  （verified_by + verified_at 双控）→ verified。
+- **阈值引用槽位**：新增 ``threshold_refs``（候选字段 → 阈值 ID，仅引用，
+  数值仍 pending_verification）；已签字阈值落地机制见
+  ``agents/design/thresholds/verified.json`` + ``threshold_loader``。
+- **决策追踪**：新增 ``decision_trace``（三方案原型差异化依据与可信等级）。
+- **Prompt 专业化**：环境感知输入（带 provenance 标签）、经济/舒适/高性能
+  三方案约束、强化不杜撰。
+
+红线：本 Sprint **不填写**任何工程阈值、**不设置** verified=true、**不实现**
+工程计算（engineering_enabled 保持 false）。
 """
 
 from __future__ import annotations
@@ -23,17 +30,27 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from agents.base import AgentContext, AgentResult, BaseAgent
+from agents.design.threshold_loader import (
+    KEY_FIELDS,
+    build_threshold_refs,
+    load_verified_thresholds,
+    resolve_field_provenance,
+)
 
 
 DESIGN_AGENT_NAME: str = "design"
-DESIGN_AGENT_VERSION: str = "1.0.0-phase1"
+DESIGN_AGENT_VERSION: str = "1.1.0-phase2.2.2"
 DESIGN_AGENT_DESCRIPTION: str = (
     "Design Agent：综合 Vision/Environment Agent 输出与咨询需求，"
-    "组织为可审查、可追溯的设计候选；明确依据、假设与待人工/规则引擎复核项。"
+    "组织为可审查、可追溯的设计候选（经济/舒适/高性能三原型），明确依据、"
+    "假设与待人工/规则引擎复核项；非真实数据字段保持 pending_verification。"
 )
 _DESIGN_PROMPT_DIR: Path = Path(__file__).resolve().parent
 
-# 系统提示词：固定文案，确保 prompt.md 留底、运行时不漂移。
+# 三方案原型（设计 §二 / §七）。
+SCHEME_ARCHETYPES: tuple[str, ...] = ("economy", "comfort", "performance")
+
+# 系统提示词：固定文案，确保 prompt.md 留底、运行时不漂移（numeric-free，不触编造扫描）。
 SYSTEM_PROMPT: str = (
     "你是 BOIP Design Agent（建筑开口设计候选整理专家）。"
     "综合用户提供的视觉观察、环境事实与咨询需求，组织出可审查的设计候选。\n\n"
@@ -50,26 +67,35 @@ SYSTEM_PROMPT: str = (
     "  - pros（优势列表）\n"
     "  - cons（劣势/注意列表）\n"
     "  - rationale（推荐理由，需结合环境/视觉/需求说明）\n\n"
-    "约束：\n"
+    "三方案原型约束（设计 §七）：\n"
+    "- 三个候选应分别对应 **经济 / 舒适 / 高性能** 三种原型；\n"
+    "- 每个候选在「成本—舒适—性能」三角上明确取舍，rationale 须说明取舍；\n"
+    "- 允许候选携带 threshold_refs（指向阈值 ID），但数值本身仍待专家签字，"
+    "不得自行填入真实工程取值。\n\n"
+    "环境感知（设计 §七.a）：\n"
+    "- 若用户提供了标记为『实测数据 (measured)』的环境字段，须作为约束条件"
+    "（如高风环境优先内开式）；若标记为『推理 (inferred)』则仅作参考。\n\n"
+    "约束（强化不杜撰，红线）：\n"
     "1. 你无法获取真实结构计算、行业规范数据库或材料力学参数，任何数值都不得编造；\n"
     "2. 仅基于已提供的视觉/环境/需求信息做常识性方案整理，缺失信息用 'unknown' 标注；\n"
     "3. 输出必须是合法 JSON，candidates 恰好 3 项、顺序即推荐度；\n"
     "4. 不得声称方案已通过结构安全或法定审查；\n"
-    "5. 不杜撰产品品牌、型号、规范条文编号或力学参数。"
+    "5. 不杜撰产品品牌、型号、规范条文编号或力学参数；\n"
+    "6. 无实测依据处必须用 'unknown'，禁止输出具体风压 / 壁厚 / 玻璃厚度等数值。"
 )
 
 USER_PROMPT_TEMPLATE: str = (
-    "请基于以下上下文输出设计候选 JSON（candidates 恰好 3 项）：\n"
+    "请基于以下上下文输出设计候选 JSON（candidates 恰好 3 项，对应经济/舒适/高性能三原型）：\n"
     "- 地址：{address}\n"
     "- 区域提示：{region_hint}\n"
     "- 视觉观察（Vision Agent）：{vision_hint}\n"
-    "- 环境事实（Environment Agent）：{environment_hint}\n"
+    "- 环境事实（Environment Agent，括号标注可信度 measured/inferred）：{environment_hint}\n"
     "- 咨询需求（NLU）：{consultation_hint}\n"
 )
 
 
 class DesignAgent(BaseAgent):
-    """Design candidate structuring Agent (Phase 1 真实实现)。"""
+    """Design candidate structuring Agent（Phase 1 真实实现 + 2.2.2 三方案专业化）。"""
 
     def __init__(self) -> None:
         super().__init__(
@@ -80,7 +106,7 @@ class DesignAgent(BaseAgent):
 
     @property
     def tools(self) -> Sequence[str]:
-        """Declared tool identifiers (Phase 1 仍不真正连接，声明保留)。"""
+        """Declared tool identifiers (Phase 1 声明保留；真实连接属 Phase 3)。"""
 
         return ("knowledge_mcp", "rule_engine")
 
@@ -90,18 +116,18 @@ class DesignAgent(BaseAgent):
         return _DESIGN_PROMPT_DIR
 
     # ------------------------------------------------------------------ #
-    # Phase 1 真实实现                                                       #
+    # Phase 1 真实实现 + 2.2.2 增强                                          #
     # ------------------------------------------------------------------ #
 
     async def invoke(self, context: AgentContext) -> AgentResult:
-        """根据 LLM 路由结果产出设计候选。
+        """根据 LLM 路由结果产出三方案设计候选（含溯源 / 阈值引用 / 决策追踪）。
 
         ``input_data`` 推荐字段：
         - ``vision_result``     (dict) 可选，来自 Vision Agent（scene_type /
                                       orientation_hint / obstructions / quality）；
         - ``environment_result`` (dict) 可选，来自 Environment Agent（climate_zone /
                                       prevailing_wind / solar_exposure /
-                                      regulatory_hints / summary）；
+                                      field_provenance / summary）；
         - ``consultation``       (dict) 可选，来自 T06 NLU（opening_preference /
                                       budget_tier / style_preference / constraints）；
         - ``address``            (str)  可选，地址上下文；
@@ -124,6 +150,10 @@ class DesignAgent(BaseAgent):
         address: str = str(context.input_data.get("address", "") or "")
         region_hint: str = str(context.input_data.get("region_hint", "") or "")
 
+        # 已签字阈值库（缺省全 pending → 合入即零行为变化，ADR-03 同构）。
+        verified: Mapping[str, Any] = load_verified_thresholds()
+        threshold_refs: dict[str, str] = build_threshold_refs()
+
         # 视觉 / 环境 / 需求三类输入全缺 → 直接兜底，不允许在无上下文时硬编造。
         if not vision_result and not environment_result and not consultation:
             return self._placeholder_unavailable(
@@ -133,6 +163,8 @@ class DesignAgent(BaseAgent):
                     "environment_result",
                     "consultation",
                 ],
+                verified=verified,
+                threshold_refs=threshold_refs,
             )
 
         assumptions: list[str] = self._build_assumptions(
@@ -159,12 +191,12 @@ class DesignAgent(BaseAgent):
 
         # 走 LLM 路由 —— 失败 / 关闭时按"不编造"原则降级。
         parsed: dict[str, Any]
-        pending: bool = True
+        pending_llm: bool = True
         provider_name: str = "pending_verification"
         error: dict[str, Any] | None = None
 
         try:
-            parsed, provider_name, pending = await self._call_llm(
+            parsed, provider_name, pending_llm = await self._call_llm(
                 vision_result=vision_result,
                 environment_result=environment_result,
                 consultation=consultation,
@@ -178,65 +210,151 @@ class DesignAgent(BaseAgent):
             }
             return AgentResult(
                 success=False,
-                data={
-                    "agent": self.name,
-                    "version": self.version,
-                    "stage": "design_failed",
-                    "provider": provider_name,
-                    "candidates": [],
-                    "assumptions": assumptions,
-                    "pending_verification": True,
-                    "review_required": ["design_rule_engine: pending_verification"],
-                    "gaps": [
-                        "design_llm: failed",
-                        "design_rule_engine: pending_verification",
-                    ],
-                },
+                data=self._build_result_data(
+                    stage="design_failed",
+                    provider=provider_name,
+                    candidates=[],
+                    assumptions=assumptions,
+                    verified=verified,
+                    threshold_refs=threshold_refs,
+                    produced=False,
+                    pending_llm=True,
+                    error_gaps=["design_llm: failed"],
+                ),
                 evidence=evidence,
                 error=error,
             )
 
-        # 降级 / 占位路径（pending=True，通常 LLM 未启用）→ 不杜撰候选。
-        if pending:
+        # 降级 / 占位路径（pending_llm=True，通常 LLM 未启用）→ 不杜撰候选。
+        if pending_llm:
             return AgentResult(
                 success=True,
-                data={
-                    "agent": self.name,
-                    "version": self.version,
-                    "stage": "design_placeholder",
-                    "provider": provider_name,
-                    "candidates": [],
-                    "assumptions": assumptions,
-                    "pending_verification": True,
-                    "review_required": ["design_rule_engine: pending_verification"],
-                    "gaps": [
-                        "design_llm: pending_verification",
-                        "design_rule_engine: pending_verification",
-                    ],
-                },
+                data=self._build_result_data(
+                    stage="design_placeholder",
+                    provider=provider_name,
+                    candidates=[],
+                    assumptions=assumptions,
+                    verified=verified,
+                    threshold_refs=threshold_refs,
+                    produced=False,
+                    pending_llm=True,
+                    error_gaps=[],
+                ),
                 evidence=evidence,
             )
 
-        # 真实 LLM 成功路径（pending=False）→ 恰好 3 个候选透传。
+        # 真实 LLM 成功路径（pending_llm=False）→ 恰好 3 个候选透传 + 溯源增强。
         candidates: list[dict[str, Any]] = [
-            self._coerce_candidate(item, idx)
+            self._coerce_candidate(item, idx, threshold_refs)
             for idx, item in enumerate(parsed.get("candidates") or [])
         ]
         return AgentResult(
             success=True,
-            data={
-                "agent": self.name,
-                "version": self.version,
-                "stage": "design_proposed",
-                "provider": provider_name,
-                "candidates": candidates,
-                "assumptions": assumptions,
-                "pending_verification": False,
-                "review_required": ["design_rule_engine: pending_verification"],
-                "gaps": [],
-            },
+            data=self._build_result_data(
+                stage="design_proposed",
+                provider=provider_name,
+                candidates=candidates,
+                assumptions=assumptions,
+                verified=verified,
+                threshold_refs=threshold_refs,
+                produced=True,
+                pending_llm=False,
+                error_gaps=[],
+            ),
             evidence=evidence,
         )
+
+    # ------------------------------------------------------------------ #
+    # 内部：结果装配（2.2.2 溯源 / 阈值引用 / 决策追踪）                        #
+    # ------------------------------------------------------------------ #
+
+    def _build_result_data(
+        self,
+        *,
+        stage: str,
+        provider: str,
+        candidates: list[dict[str, Any]],
+        assumptions: list[str],
+        verified: Mapping[str, Any],
+        threshold_refs: dict[str, str],
+        produced: bool,
+        pending_llm: bool,
+        error_gaps: list[str],
+    ) -> dict[str, Any]:
+        """统一装配 result.data（含 field_provenance / threshold_refs / decision_trace）。
+
+        ``produced`` 区分「LLM 已产出候选」与「占位/降级」：
+        - False → 关键字段 ``unavailable``，顶层 pending 恒 True；
+        - True  → 关键字段 ``inferred``（除非对应阈值完整签字 → verified）。
+        """
+
+        field_provenance: dict[str, str] = resolve_field_provenance(
+            verified, produced=produced
+        )
+        # 顶层语义（ADR-2.2.1 §7 对齐）：任一关键字段非 verified 即 pending=True。
+        # LLM 推理属 Level 0（inferred），因此本 Sprint 永远 pending。
+        pending_top: bool = any(
+            field_provenance.get(key) != "verified" for key in KEY_FIELDS
+        )
+        decision_trace: dict[str, Any] = self._build_decision_trace(
+            candidates=candidates,
+            produced=produced,
+            field_provenance=field_provenance,
+        )
+        # 未签字阈值作为 pending gaps 落账（一票否决语义）。
+        gaps: list[str] = list(error_gaps)
+        if produced:
+            for field in KEY_FIELDS:
+                if field_provenance.get(field) != "verified":
+                    thr_id: str | None = threshold_refs.get(field)
+                    gaps.append(
+                        f"design_threshold:{thr_id or field}: pending_verification"
+                    )
+        else:
+            gaps.append("design_llm: pending_verification")
+            gaps.append("design_rule_engine: pending_verification")
+
+        return {
+            "agent": self.name,
+            "version": self.version,
+            "stage": stage,
+            "provider": provider,
+            "candidates": candidates,
+            "assumptions": assumptions,
+            "field_provenance": field_provenance,
+            "threshold_refs": threshold_refs,
+            "decision_trace": decision_trace,
+            "pending_verification": pending_top,
+            "review_required": ["design_rule_engine: pending_verification"],
+            "gaps": gaps,
+        }
+
+    def _build_decision_trace(
+        self,
+        *,
+        candidates: list[dict[str, Any]],
+        produced: bool,
+        field_provenance: Mapping[str, str],
+    ) -> dict[str, Any]:
+        """三方案原型差异化决策追踪（设计 §七.b / §二.2）。"""
+
+        ranking: list[str] = [c.get("id", f"D{i + 1}") for i, c in enumerate(candidates)]
+        return {
+            "scheme_archetypes": list(SCHEME_ARCHETYPES),
+            "ranking": ranking,
+            "differentiation": (
+                "cost-comfort-performance triangle; each candidate rationale "
+                "states its trade-off (economy / comfort / performance)"
+                if produced
+                else "no candidates produced; pending_verification"
+            ),
+            "scoring_weight_ref": "D-TH-05",
+            "provenance_level": (
+                "Level 0 inferred (LLM); all KEY_FIELDS pending_verification"
+                if field_provenance.get("frame_material") != "verified"
+                else "partial verified (some thresholds signed)"
+            ),
+        }
 
     # ------------------------------------------------------------------ #
     # 内部：LLM 路由（按 llm.enabled 自动降级）                                #
@@ -253,13 +371,13 @@ class DesignAgent(BaseAgent):
     ) -> tuple[dict[str, Any], str, bool]:
         """构造设计综合 LLM 请求，调用 ``DualTrackRouter``。
 
-        返回 ``(parsed_dict, provider_name, pending_verification)``。
+        返回 ``(parsed_dict, provider_name, pending_llm)``。
         LLM 未启用 → 返回占位结构 ``("mock", True)``；
         LLM 启用但响应非合法 JSON / 解析后非 dict / candidates 非 3 项 →
         抛 ``ValueError``，由 ``invoke`` 兜底为 DESIGN_FAILED。
         """
 
-        from agents.llm.router import build_router_from_config  # noqa: PLC0415
+        from agents.llm.router import ProviderRole, build_router_from_config  # noqa: PLC0415
         from agents.llm.types import LLMMessage, LLMRequest, LLMRole  # noqa: PLC0415
         from agents.config_loader import load_llm_config  # noqa: PLC0415
         from agents.llm.jsonutil import extract_json  # noqa: PLC0415
@@ -271,11 +389,7 @@ class DesignAgent(BaseAgent):
         vision_str: str = (
             json.dumps(vision_result, ensure_ascii=False) if vision_result else "无"
         )
-        env_str: str = (
-            json.dumps(environment_result, ensure_ascii=False)
-            if environment_result
-            else "无"
-        )
+        env_str: str = self._environment_hint_with_provenance(environment_result)
         consult_str: str = (
             json.dumps(consultation, ensure_ascii=False) if consultation else "无"
         )
@@ -295,7 +409,7 @@ class DesignAgent(BaseAgent):
             max_tokens=1024,
         )
 
-        router = build_router_from_config(llm_cfg)
+        router = build_router_from_config(llm_cfg, role=ProviderRole.TEXT)
         try:
             response, _ = await router.route(request)
         finally:
@@ -319,16 +433,51 @@ class DesignAgent(BaseAgent):
 
         return parsed, response.model or "unknown", False
 
+    @staticmethod
+    def _environment_hint_with_provenance(env_result: dict[str, Any]) -> str:
+        """把环境事实渲染为带可信度标签的文本（measured/inferred），供 LLM 区分。
+
+        若 Environment 结果携带 ``field_provenance``，按字段标注；否则整体按
+        inferred 处理（默认保守）。
+        """
+
+        if not env_result:
+            return "无"
+        provenance: Mapping[str, Any] = env_result.get("field_provenance", {}) or {}
+        fields: tuple[tuple[str, str], ...] = (
+            ("climate_zone", "气候区"),
+            ("prevailing_wind", "主导风向"),
+            ("solar_exposure", "日照/西晒"),
+        )
+        parts: list[str] = []
+        for key, label in fields:
+            value = env_result.get(key)
+            if value in (None, "", "unknown", "不确定"):
+                continue
+            level: str = str(provenance.get(key, "inferred"))
+            parts.append(f"{label}={value}({level})")
+        if not parts:
+            return json.dumps(env_result, ensure_ascii=False)
+        return "；".join(parts)
+
     # ------------------------------------------------------------------ #
     # 内部：字段标准化 / 假设构建                                          #
     # ------------------------------------------------------------------ #
 
-    def _coerce_candidate(self, raw: Any, index: int) -> dict[str, Any]:
-        """把 LLM 返回的原始候选标准化为完整 dict（缺字段补默认，不杜撰）。"""
+    def _coerce_candidate(
+        self,
+        raw: Any,
+        index: int,
+        threshold_refs: Mapping[str, str],
+    ) -> dict[str, Any]:
+        """把 LLM 返回的原始候选标准化为完整 dict（缺字段补默认，不杜撰）。
+
+        附 ``threshold_refs``（候选字段 → 阈值 ID 引用，数值仍 pending）。
+        """
 
         src: dict[str, Any] = raw if isinstance(raw, dict) else {}
         candidate_id: str = str(src.get("id") or f"D{index + 1}")
-        return {
+        coerced: dict[str, Any] = {
             "id": candidate_id,
             "title": str(src.get("title") or "待确认方案"),
             "opening_type": str(src.get("opening_type") or "unknown"),
@@ -339,7 +488,16 @@ class DesignAgent(BaseAgent):
             "pros": list(src.get("pros") or []),
             "cons": list(src.get("cons") or []),
             "rationale": str(src.get("rationale") or "待补充推荐理由。"),
+            "threshold_refs": {
+                "frame_material": threshold_refs.get("frame_material", "D-TH-01"),
+                "glass_type": threshold_refs.get("glass_type", "D-TH-02"),
+                "dimensions_hint": threshold_refs.get("dimensions_hint", "D-TH-03"),
+                "estimated_cost_tier": threshold_refs.get(
+                    "estimated_cost_tier", "D-TH-04"
+                ),
+            },
         }
+        return coerced
 
     def _build_assumptions(
         self,
@@ -362,9 +520,13 @@ class DesignAgent(BaseAgent):
             assumptions.append("未提供 Vision Agent 结果，开口形态未基于现场视觉证据。")
         if environment_result:
             climate: str = str(environment_result.get("climate_zone", "unknown"))
+            provenance: Mapping[str, Any] = environment_result.get(
+                "field_provenance", {}
+            ) or {}
+            level: str = str(provenance.get("climate_zone", "inferred"))
             assumptions.append(
-                f"环境结论取自 Environment Agent（climate_zone={climate}），"
-                f"未接入真实气象/地图数据。"
+                f"环境结论取自 Environment Agent（climate_zone={climate}，"
+                f"可信度 {level}），未接入真实气象/地图数据。"
             )
         else:
             assumptions.append("未提供 Environment Agent 结果，环境适应性未经推理。")
@@ -377,7 +539,7 @@ class DesignAgent(BaseAgent):
             assumptions.append("未提供咨询需求，成本与风格偏好按默认假设。")
         assumptions.append(
             "型材力学参数、玻璃规范数值与结构安全结论未经 rule_engine/knowledge_mcp "
-            "校验，待人工复核。"
+            "校验，待专家签字（verified.json）后转正，当前 pending_verification。"
         )
         return assumptions
 
@@ -394,25 +556,31 @@ class DesignAgent(BaseAgent):
         *,
         request_id: str,
         missing: Sequence[str],
+        verified: Mapping[str, Any],
+        threshold_refs: dict[str, str],
     ) -> AgentResult:
         """视觉/环境/需求三类输入全缺时的占位 envelope（不杜撰设计）。"""
 
+        data: dict[str, Any] = self._build_result_data(
+            stage="design_placeholder",
+            provider="mock",
+            candidates=[],
+            assumptions=[
+                "未提供任何视觉/环境/需求输入，无法形成设计假设。"
+            ],
+            verified=verified,
+            threshold_refs=threshold_refs,
+            produced=False,
+            pending_llm=True,
+            error_gaps=[],
+        )
+        data["gaps"] = [
+            f"{item}: missing" for item in missing
+        ] + ["design_rule_engine: pending_verification"]
+        data["request_id"] = request_id
         return AgentResult(
             success=True,
-            data={
-                "agent": self.name,
-                "version": self.version,
-                "stage": "design_placeholder",
-                "provider": "mock",
-                "candidates": [],
-                "assumptions": [
-                    "未提供任何视觉/环境/需求输入，无法形成设计假设。"
-                ],
-                "pending_verification": True,
-                "review_required": ["design_rule_engine: pending_verification"],
-                "gaps": [f"{item}: missing" for item in missing]
-                + ["design_rule_engine: pending_verification"],
-            },
+            data=data,
             evidence=(
                 self._emit_evidence(
                     source="invoke",
@@ -429,6 +597,7 @@ class DesignAgent(BaseAgent):
 __all__ = [
     "SYSTEM_PROMPT",
     "USER_PROMPT_TEMPLATE",
+    "SCHEME_ARCHETYPES",
     "DESIGN_AGENT_NAME",
     "DESIGN_AGENT_VERSION",
     "DESIGN_AGENT_DESCRIPTION",

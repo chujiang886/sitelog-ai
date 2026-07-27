@@ -23,12 +23,12 @@ from agents.environment.agent import (
 
 
 def test_environment_agent_identity() -> None:
-    """EnvironmentAgent must expose the canonical name and Phase 1 version."""
+    """EnvironmentAgent must expose the canonical name and 2.2.1 version."""
 
     agent = EnvironmentAgent()
     assert agent.name == ENVIRONMENT_AGENT_NAME
     assert agent.version == ENVIRONMENT_AGENT_VERSION
-    assert agent.version.startswith("1.0.0")
+    assert agent.version.startswith("1.1.0")
 
 
 def test_environment_agent_declares_tools() -> None:
@@ -116,7 +116,7 @@ def test_environment_agent_returns_failed_envelope_on_llm_error(
     fake_router = SimpleNamespace(route=_fake_route, aclose=lambda: asyncio.sleep(0))
     monkeypatch.setattr(
         "agents.llm.router.build_router_from_config",
-        lambda _cfg: fake_router,
+        lambda _cfg, **_kw: fake_router,
     )
 
     agent = EnvironmentAgent()
@@ -133,7 +133,8 @@ def test_environment_agent_returns_failed_envelope_on_llm_error(
 def test_environment_agent_parses_valid_json_response(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """LLM 返回合法 JSON 时 → 真实字段透传，pending_verification=False。"""
+    """LLM 返回合法 JSON 时 → 字段透传；但 LLM 推理属 Level 0（inferred），
+    顶层 pending_verification 保持 True（ADR-2.2.1 §7 语义修正）。"""
 
     monkeypatch.setattr(
         "agents.config_loader.load_llm_config",
@@ -174,7 +175,7 @@ def test_environment_agent_parses_valid_json_response(
     fake_router = SimpleNamespace(route=_fake_route, aclose=lambda: asyncio.sleep(0))
     monkeypatch.setattr(
         "agents.llm.router.build_router_from_config",
-        lambda _cfg: fake_router,
+        lambda _cfg, **_kw: fake_router,
     )
 
     agent = EnvironmentAgent()
@@ -188,7 +189,11 @@ def test_environment_agent_parses_valid_json_response(
     )
     result = asyncio.run(agent.invoke(ctx))
     assert result.success is True
-    assert result.data["pending_verification"] is False
+    # ADR-2.2.1 §7：LLM 推理是 Level 0（inferred），不再豁免顶层 pending。
+    assert result.data["pending_verification"] is True
+    assert result.data["field_provenance"]["climate_zone"] == "inferred"
+    assert result.data["field_provenance"]["prevailing_wind"] == "inferred"
+    assert result.data["stage"] == "environment_analyzed"
     assert result.data["climate_zone"] == "夏热冬暖地区"
     assert result.data["prevailing_wind"] == "东南"
     assert result.data["solar_exposure"] == "西晒明显"

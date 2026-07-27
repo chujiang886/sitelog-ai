@@ -23,12 +23,12 @@ from agents.design.agent import (
 
 
 def test_design_agent_identity() -> None:
-    """DesignAgent must expose the canonical name and Phase 1 version."""
+    """DesignAgent must expose the canonical name and Phase 2.2.2 version."""
 
     agent = DesignAgent()
     assert agent.name == DESIGN_AGENT_NAME
     assert agent.version == DESIGN_AGENT_VERSION
-    assert agent.version.startswith("1.0.0")
+    assert agent.version.startswith("1.1.0")
 
 
 def test_design_agent_declares_tools() -> None:
@@ -117,7 +117,7 @@ def test_design_agent_returns_failed_envelope_on_llm_error(
     fake_router = SimpleNamespace(route=_fake_route, aclose=lambda: asyncio.sleep(0))
     monkeypatch.setattr(
         "agents.llm.router.build_router_from_config",
-        lambda _cfg: fake_router,
+        lambda _cfg, **_kw: fake_router,
     )
 
     agent = DesignAgent()
@@ -193,7 +193,7 @@ def test_design_agent_returns_failed_envelope_when_candidates_not_three(
     fake_router = SimpleNamespace(route=_fake_route, aclose=lambda: asyncio.sleep(0))
     monkeypatch.setattr(
         "agents.llm.router.build_router_from_config",
-        lambda _cfg: fake_router,
+        lambda _cfg, **_kw: fake_router,
     )
 
     agent = DesignAgent()
@@ -279,7 +279,7 @@ def test_design_agent_parses_valid_json_response(
     fake_router = SimpleNamespace(route=_fake_route, aclose=lambda: asyncio.sleep(0))
     monkeypatch.setattr(
         "agents.llm.router.build_router_from_config",
-        lambda _cfg: fake_router,
+        lambda _cfg, **_kw: fake_router,
     )
 
     agent = DesignAgent()
@@ -299,7 +299,9 @@ def test_design_agent_parses_valid_json_response(
     )
     result = asyncio.run(agent.invoke(ctx))
     assert result.success is True
-    assert result.data["pending_verification"] is False
+    # 语义修正（ADR-2.2.1 §7 对齐）：LLM 成功不再豁免 pending；Level 0 inferred
+    # 永远 pending_verification。
+    assert result.data["pending_verification"] is True
     candidates = result.data["candidates"]
     assert isinstance(candidates, list)
     assert len(candidates) == 3
@@ -314,6 +316,16 @@ def test_design_agent_parses_valid_json_response(
     assert candidates[0]["cons"] == ["造价略高"]
     assert "汕头" in candidates[0]["rationale"]
     assert result.data["provider"] == "qwen-test"
+    # 溯源 / 阈值引用 / 决策追踪 齐全（设计 §一 / §五 / §七）
+    assert result.data["field_provenance"]["frame_material"] == "inferred"
+    assert result.data["field_provenance"]["glass_type"] == "inferred"
+    assert result.data["field_provenance"]["estimated_cost_tier"] == "inferred"
+    assert result.data["threshold_refs"]["frame_material"] == "D-TH-01"
+    assert result.data["decision_trace"]["scheme_archetypes"] == [
+        "economy",
+        "comfort",
+        "performance",
+    ]
     assert "design_rule_engine: pending_verification" in result.data["review_required"]
     assert "assumptions" in result.data and isinstance(result.data["assumptions"], list)
 

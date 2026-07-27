@@ -4,7 +4,7 @@
 # - 哪些 Agent 被注册（name → fully-qualified class path）
 # - Agent 框架全局开关（LLM、超时、重试、并发）
 #
-# 任何工程数值仍保持 pending_verification；Phase 1+ 再接入真实 LLM。
+# 任何工程数值仍保持 pending_verification；Phase 2 已接入真实 LLM（providers.text/vision=腾讯混元 TokenHub 多模态）。
 
 version: "0.1.0-phase0"
 description: "Phase 0 Agent 框架配置；不连接任何外部 LLM 或服务。"
@@ -26,31 +26,65 @@ agents:
     class_path: agents.design.agent.DesignAgent
     enabled: true
     stage: candidate
+  engineering:
+    class_path: agents.engineering.agent.EngineeringAgent
+    enabled: false  # 2.1.5 骨架已建立（结构/契约/审核链）；进编排管道待 TD-005 偿还评审后启用
+    stage: engineering
 
-# 全局开关：Phase 0 强制 false，loader 启动时会校验
-llm_enabled: false
-llm_provider: ""  # Phase 1 决定 provider（GPT-4o / Claude 3.5 / 通义 / 自研）
+# 全局开关（遗留键，已弃用，见下方 llm.* 段）
+llm_enabled: false  # 弃用：仅兼容遗留 loader 校验，真实开关见 llm.enabled
+llm_provider: ""    # 弃用：provider 事实源已迁移到 llm.providers.{text,vision,fallback}
 
-# Phase 1 / T07 双轨 LLM 配置
+# Phase 2 命名式 provider 注册表（LLM 配置）
 #
-# T07 起接入真实 track_a：DashScope（OpenAI 兼容）qwen-max；
-# track_b 暂未选型，保持 mock 以避免空跑 / 占位错误。
-# 真实 API key 已在 .env（不入 git），本文件不再含具体 key。
+# text / vision 主轨：腾讯混元 TokenHub `HY-Vision-2.0-Instruct`
+#   （openai_compat，多模态 text+vision 共享）；
+#   演进路径 DashScope qwen-max（T07, 401 失败）→ minimax（临时）→ TokenHub（Phase 2 采用）。
+# fallback：mock 容灾兜底（不接真实网络）；真实 key 在 .env（不入 git），本文件不含具体 key。
+# embedding：向量/检索预留（provider=disabled，无消费者；Phase 3 知识库/RAG 再接入）。
+# 视觉/文本 provider 解耦见 2.1.6（providers 注册表 + build_router_from_config(role=...)）。
+# 注：router.py 仍保留对旧 track_a/track_b 键的兼容解析，但本文件不再使用它们作为配置入口。
 llm:
-  enabled: true  # T07 起 track_a 已接入真实 DashScope qwen-max；启用后由 DualTrackRouter 选择 track
-  track_a:
-    provider: openai_compat
-    base_url: ${LLM_A_BASE_URL:pending_verification}
-    api_key: ${LLM_A_API_KEY:pending_verification}
-    model: ${LLM_A_MODEL:pending_verification}
-  track_b:
-    provider: mock  # T07 track_b 未选型前保持 mock，避免 pending_verification 触发空跑
-    base_url: ${LLM_B_BASE_URL:pending_verification}
-    api_key: ${LLM_B_API_KEY:pending_verification}
-    model: ${LLM_B_MODEL:pending_verification}
+  enabled: true  # Phase 2 已接 TokenHub 真实多模态；由 DualTrackRouter 选路
+  # ── 命名式 provider 注册表（2.1.6 provider 解耦，新配置唯一入口）──
+  providers:
+    text:                        # 文本推理主轨（与旧 track_a 同源）
+      provider: openai_compat
+      base_url: ${LLM_A_BASE_URL:pending_verification}
+      api_key: ${LLM_A_API_KEY:pending_verification}
+      model: ${LLM_A_MODEL:pending_verification}
+    vision:                      # 视觉推理主轨（多模态；当前与 text 同源）
+      provider: openai_compat
+      base_url: ${LLM_A_BASE_URL:pending_verification}
+      api_key: ${LLM_A_API_KEY:pending_verification}
+      model: ${LLM_A_MODEL:pending_verification}
+    embedding:                   # 向量/检索预留（暂不启用）
+      provider: disabled         # disabled → build_embedding_provider 返回 None
+    fallback:                    # 容灾副轨（文本/视觉共用）
+      provider: mock             # 不接真实网络；真实 key 在 .env（不入 git）
   router:
-    strategy: fastest  # T07 保持 fastest；选型评测由 TD-013 跟踪
+    strategy: fastest  # 选型评测由 TD-013 跟踪
     timeout: 30
+
+# Environment 真实数据接入（Phase 2.2 / 2.2.1，ADR-2.2.1）
+#
+# 三模式：disabled（默认，Agent 走 LLM 推理路径，零行为变化）｜ mock（CI/测试，
+# 零外网）｜ <真实源名>（ADR-02 厂商批准后经 register_*_provider 注册接入）。
+# api_key 仅为环境变量占位（缺省回落 pending_verification），本文件不含任何真实密钥。
+environment_data:
+  geo:
+    provider: disabled           # disabled | mock | <ADR-02 批准后的真实源名>
+    api_key: ${ENV_GEO_API_KEY:pending_verification}
+    timeout_seconds: 8           # infrastructure-config
+  weather:
+    provider: disabled           # disabled | mock | <ADR-02 批准后的真实源名>
+    api_key: ${ENV_WEATHER_API_KEY:pending_verification}
+    timeout_seconds: 8           # infrastructure-config
+  solar:
+    provider: local              # 策略锁定：本地天文算法（实现挂起至 2.2.1 Step 2，见 ADR §6）
+  cache:
+    backend: sqlite              # 实现随真实 Provider 同批（ADR §8）
+    ttl_days: 30                 # infrastructure-config
 
 # 占位超参数；Phase 1+ 由主理人评审后填实数
 runtime:

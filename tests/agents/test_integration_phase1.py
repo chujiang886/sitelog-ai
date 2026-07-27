@@ -154,7 +154,7 @@ def _patch_llm_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(
         "agents.llm.router.build_router_from_config",
-        lambda _cfg: _make_dispatcher_router(),
+        lambda _cfg, **_kw: _make_dispatcher_router(),
     )
 
 
@@ -226,7 +226,10 @@ def test_integration_phase1_full_pipeline(
     assert vision_res.success is True
     assert env_res.success is True
     assert design_res.success is True
-    assert design_res.data["pending_verification"] is False
+    # 2.2.2 语义修正（ADR-2.2.1 §7 对齐）：Design 候选属 LLM 推理（Level 0
+    # inferred），即使 LLM 成功也永远 pending_verification=True；实测/签字字段
+    # 才会回落。此处无签字阈值 → 恒 True。
+    assert design_res.data["pending_verification"] is True
 
     # 数据契约：报告模块读取的字段在真实输出中均存在。
     v = vision_res.data

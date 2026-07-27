@@ -55,12 +55,11 @@ def _deep_interpolate(obj: Any) -> Any:
     return obj
 
 
-def load_llm_config(config_path: Path | str = DEFAULT_CONFIG_PATH) -> Mapping[str, Any]:
-    """读取 ``llm.*`` 段；缺省返回空 dict（等价于 LLM 关闭）。
-
-    读取后会对整个 ``llm`` 段做递归环境变量插值，使 ``${VAR:default}``
-    占位符被展开。返回普通 dict，便于调用方按 ``track_a.api_key`` 取值。
-    """
+def _load_section(
+    section_name: str,
+    config_path: Path | str = DEFAULT_CONFIG_PATH,
+) -> Mapping[str, Any]:
+    """读取 config.yaml 顶层任意段并做环境变量插值；缺省返回空 dict。"""
 
     path: Path = Path(config_path)
     if not path.is_file():
@@ -69,11 +68,59 @@ def load_llm_config(config_path: Path | str = DEFAULT_CONFIG_PATH) -> Mapping[st
     parsed: Any = yaml.safe_load(text) or {}
     if not isinstance(parsed, Mapping):
         return {}
-    llm_section: Any = parsed.get("llm", {})
-    if not isinstance(llm_section, Mapping):
+    section: Any = parsed.get(section_name, {})
+    if not isinstance(section, Mapping):
         return {}
-    interpolated: Any = _deep_interpolate(dict(llm_section))
+    interpolated: Any = _deep_interpolate(dict(section))
     return dict(interpolated)
 
 
-__all__ = ["DEFAULT_CONFIG_PATH", "load_llm_config"]
+def load_llm_config(config_path: Path | str = DEFAULT_CONFIG_PATH) -> Mapping[str, Any]:
+    """读取 ``llm.*`` 段；缺省返回空 dict（等价于 LLM 关闭）。
+
+    读取后会对整个 ``llm`` 段做递归环境变量插值，使 ``${VAR:default}``
+    占位符被展开。返回普通 dict，便于调用方按 ``track_a.api_key`` 取值。
+    """
+
+    return _load_section("llm", config_path)
+
+
+def load_environment_data_config(
+    config_path: Path | str = DEFAULT_CONFIG_PATH,
+) -> Mapping[str, Any]:
+    """读取 ``environment_data.*`` 段（Phase 2.2 / 2.2.1，ADR-2.2.1）。
+
+    缺省返回空 dict（等价于全部 Provider disabled，Agent 行为零变化）。
+    """
+
+    return _load_section("environment_data", config_path)
+
+
+def load_verified_thresholds(
+    path: Path | str | None = None,
+) -> Mapping[str, Any]:
+    """读取 Design 已签字阈值库（Phase 2.2 / 2.2.2，设计 §五）。
+
+    缺省指向 ``agents/design/thresholds/verified.json``；文件缺失 / 解析失败
+    → 返回空 dict（等价全 ``pending_verification``），合入即零行为变化。
+    实际解析逻辑委托 ``agents.design.threshold_loader``，本函数仅作 SSOT
+    入口（与 ``load_environment_data_config`` 对称）。
+    """
+
+    from agents.design.threshold_loader import (  # noqa: PLC0415
+        DEFAULT_VERIFIED_PATH,
+        load_verified_thresholds as _load,
+    )
+
+    target: Path = (
+        Path(path) if path is not None else DEFAULT_VERIFIED_PATH
+    )
+    return _load(target)
+
+
+__all__ = [
+    "DEFAULT_CONFIG_PATH",
+    "load_environment_data_config",
+    "load_llm_config",
+    "load_verified_thresholds",
+]

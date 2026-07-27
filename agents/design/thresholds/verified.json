@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "note": "BOIP Design 阈值签字库（2.2.2 初始态）。全部阈值 verified=false、value=null；未经行业专家签字（verified_by + verified_at 双控）前任何工程阈值不得转正。本文件仅作机制占位，不含真实工程取值 pending_verification。",
+  "thresholds": {
+    "D-TH-01": {
+      "param": "型材壁厚/系列（frame profile）",
+      "value": null,
+      "unit": "mm",
+      "verified": false,
+      "verified_by": null,
+      "verified_at": null,
+      "source_ref": "待专家签字填入规范/标准号 pending_verification",
+      "applies_to_scheme": ["economy", "comfort", "performance"]
+    },
+    "D-TH-02": {
+      "param": "玻璃厚度/配置（glass thickness）",
+      "value": null,
+      "unit": "mm",
+      "verified": false,
+      "verified_by": null,
+      "verified_at": null,
+      "source_ref": "待专家签字填入规范/标准号 pending_verification",
+      "applies_to_scheme": ["economy", "comfort", "performance"]
+    },
+    "D-TH-03": {
+      "param": "开口尺寸阈值（dimensions）",
+      "value": null,
+      "unit": "pending_verification",
+      "verified": false,
+      "verified_by": null,
+      "verified_at": null,
+      "source_ref": "待专家签字填入规范/标准号 pending_verification",
+      "applies_to_scheme": ["economy", "comfort", "performance"]
+    },
+    "D-TH-04": {
+      "param": "成本档位→真实成本映射（cost tier）",
+      "value": null,
+      "unit": "pending_verification",
+      "verified": false,
+      "verified_by": null,
+      "verified_at": null,
+      "source_ref": "待专家签字填入成本基准 pending_verification",
+      "applies_to_scheme": ["economy", "comfort", "performance"]
+    },
+    "D-TH-05": {
+      "param": "三方案选型权重（scheme scoring）",
+      "value": null,
+      "unit": "pending_verification",
+      "verified": false,
+      "verified_by": null,
+      "verified_at": null,
+      "source_ref": "待专家签字填入权重基准 pending_verification",
+      "applies_to_scheme": ["economy", "comfort", "performance"]
+    }
+  }
+}
