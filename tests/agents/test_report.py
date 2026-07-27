@@ -40,6 +40,28 @@ def _mock_dossier() -> dict:
             "regulatory_hints": ["阳台封装需符合地方管理条例", "外立面改动需物业备案"],
             "regional_material_preference": "断桥铝为主",
             "summary": "华南沿海高温高湿、台风频发，需重视隔热与抗风压。",
+            "field_provenance": {
+                "climate_zone": "inferred",
+                "prevailing_wind": "inferred",
+                "solar_exposure": "inferred",
+                "noise_level_hint": "inferred",
+            },
+            "data_providers": [
+                {
+                    "name": "geo-mock",
+                    "type": "mock",
+                    "real_data": False,
+                    "source": "mock:geo:v1:__mock__",
+                    "fetched_at": "pending_verification",
+                },
+                {
+                    "name": "weather-mock",
+                    "type": "mock",
+                    "real_data": False,
+                    "source": "mock:wind:v1:__mock__",
+                    "fetched_at": "pending_verification",
+                },
+            ],
             "pending_verification": True,
             "gaps": [
                 "weather_data: pending_verification",
@@ -85,8 +107,24 @@ def _mock_dossier() -> dict:
                     "rationale": "面向高预算、重景观需求，强调舒适与美观统一。",
                 },
             ],
-            "pending_verification": False,
-            "gaps": [],
+            "pending_verification": True,
+            "field_provenance": {
+                "frame_material": "inferred",
+                "glass_type": "inferred",
+                "dimensions_hint": "inferred",
+                "estimated_cost_tier": "inferred",
+            },
+            "threshold_refs": {
+                "frame_material": "D-TH-01",
+                "glass_type": "D-TH-02",
+                "dimensions_hint": "D-TH-03",
+                "estimated_cost_tier": "D-TH-04",
+            },
+            "verified": {},
+            "gaps": [
+                "design_threshold:D-TH-01: pending_verification",
+                "design_threshold:D-TH-02: pending_verification",
+            ],
         },
     }
 

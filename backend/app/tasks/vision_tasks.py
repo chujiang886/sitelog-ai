@@ -94,9 +94,10 @@ def process_image(*, image_id: uuid.UUID, db: Session | None = None) -> dict[str
         from agents.vision.agent import VisionAgent  # noqa: PLC0415
 
         try:
-            storage_path: Path = Path(image.storage_path)
-            content: bytes = storage_path.read_bytes()
-        except OSError as exc:
+            from app.core.storage_backends import get_storage_backend  # noqa: PLC0415
+
+            content: bytes = get_storage_backend().read(image.storage_path)
+        except Exception as exc:  # noqa: BLE001 - 存储读取失败（含旧绝对路径/MinIO 错误）
             image.vision_status = VISION_STATUS_FAILED
             session.commit()
             return {
