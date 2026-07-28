@@ -20,10 +20,11 @@
 
   "current_stage": {
     "phase_number": 3,
-    "current_phase": "Phase 3 planning",
-    "phase_name": "Phase 3 planning — Phase 2.2 已 COMPLETED 并完成 3.0 前置整理（Git 冻结 + 文档收敛 + 技术债重分类），Phase 3 开发未启动",
+    "current_phase": "Phase 3 Ready",
+    "phase_name": "Phase 3 Ready — Phase 2.2 COMPLETED + 3.0 前置整理完成 + Phase 3 Readiness 审核通过；Final Go Preparation 已就绪（远端同步准备 + 施工计划 + SSOT 刷新 + 最终启动报告），Phase 3 开发未启动，等待主理人最终授权",
     "phase_2_2_status": "COMPLETED (2026-07-28 总结验收，见 .ai/reviews/phase2.2_final_review.md)",
     "phase_3_0_status": "COMPLETED (2026-07-28 前置整理，见 .ai/reviews/phase2.2_release_freeze_report.md + .ai/reviews/phase3_readiness_report.md)",
+    "phase_3_ready_status": "READY (2026-07-28 Final Go Preparation：git 同步准备 + 施工计划 + SSOT 刷新 + 最终启动报告就绪；见 .ai/reviews/phase3_go_report.md + .ai/reviews/phase3_git_sync_report.md + .ai/tasks/phase3_execution_plan.md)",
     "is_pass": true,
     "evidence": [
       "git HEAD = 22dc0ab（2026-07-26 回归测试）",
@@ -32,7 +33,7 @@
       "commit f53b4be: Vision 接入腾讯混元 TokenHub HY-Vision-2.0-Instruct 多模态",
       "commit fcb8a3c: 后端入口 load_dotenv 修复"
     ],
-    "doc_claim_vs_reality": "文档(README/CHANGELOG)仍称 Phase 0 完成/进入 Phase 1，实际已到 Phase 2，滞后约 2 阶段。",
+    "doc_claim_vs_reality": "已收敛（3.0 文档收敛：README/CHANGELOG/LLM.md/AGENTS.md/API.md 全部刷至 Phase 2.2 COMPLETED，D1–D7 全闭环）；无文档滞后（R1 resolved，TD-003 机制落地）。",
     "last_known_green_tests": {
       "backend_pytest": "246 passed，coverage 87.34%（门槛 60%，Sprint 要求 ≥85%）",
       "frontend_jest": "29 passed / 6 suites，coverage 93.15%（门槛 50%）",
@@ -42,9 +43,9 @@
 
   "git": {
     "branch": "master",
-    "release_freeze": "2026-07-28 Phase 3.0 分批提交完成（R-N1 消除）：72bd9f2(2.1 架构基座+卫生) → 3280766(2.2.1+2.2.2) → 2c80ff0(2.2.3+2.2.4) → 2710307(2.2.5+2.2.6) → 34769e0(docs/SSOT 3.0 收敛 Phase 3 planning)",
+    "release_freeze": "2026-07-28 Phase 3.0 分批提交完成（R-N1 消除）：72bd9f2(2.1 架构基座+卫生) → 3280766(2.2.1+2.2.2) → 2c80ff0(2.2.3+2.2.4) → 2710307(2.2.5+2.2.6) → cc4d666(docs/SSOT 3.0 收敛 Phase 3 planning，原 34769e0 amend 后真实 HEAD)",
     "recent_commits": [
-      {"hash": "34769e0", "date": "2026-07-28", "subject": "docs(3.0): 文档收敛至 Phase 2.2 COMPLETED + SSOT/技术债台账入库（Phase 3 planning）"},
+      {"hash": "cc4d666", "date": "2026-07-28", "subject": "docs(3.0): 文档收敛至 Phase 2.2 COMPLETED + SSOT/技术债台账入库（Phase 3 planning）"},
       {"hash": "2710307", "date": "2026-07-28", "subject": "feat(2.2.5+2.2.6): RAG基础设施 + RBAC企业权限基础"},
       {"hash": "2c80ff0", "date": "2026-07-28", "subject": "feat(2.2.3+2.2.4): PDF可信交付增强 + StorageBackend存储抽象"},
       {"hash": "3280766", "date": "2026-07-28", "subject": "feat(2.2.1+2.2.2): Environment数据Provider抽象 + Design三方案专业化"},

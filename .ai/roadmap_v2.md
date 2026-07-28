@@ -12,13 +12,13 @@
 
 | 维度 | 真实状态 |
 |---|---|
-| 阶段 | **Phase 2.2 COMPLETED → Phase 3 planning**（2.1 架构稳定 + 2.2 能力深化 2.2.1~2.2.6 六 Sprint 全部收口，2026-07-28 总结验收；2026-07-28 完成 3.0 前置整理 Sprint：文档收敛 + 技术债 A/B/C 重分类 + SSOT 同步。当前处于 **Phase 3 planning**，等待主理人验收并启动 Phase 3） |
+| 阶段 | **Phase 2.2 COMPLETED → 🟢 Phase 3 Ready**（2.1 架构稳定 + 2.2 能力深化 2.2.1~2.2.6 六 Sprint 全部收口，2026-07-28 总结验收；2026-07-28 完成 3.0 前置整理 Sprint + Final Go Preparation；**Phase 3 Readiness 已审核通过**，开发未启动，等待主理人最终授权） |
 | LLM | `track_a` = 腾讯混元 TokenHub `HY-Vision-2.0-Instruct`（openai_compat，文本+视觉共用），`llm.enabled=true`；`track_b`=mock；**ADR-001 确立 `.env::LLM_A_*` 为唯一事实源** |
 | 后端 | 11 个 router（含 /api/auth/*、/api/rag/*）；`/api/analysis/run` 串联三 Agent → dossier；`/api/report/generate` 流式 PDF |
 | 前端 | 8 个页面（home/consult/result/upload/agents/projects/knowledge/login）+ 29 个 Jest 用例 |
 | 数据层 | 10+ ORM 模型；SQLite 占位；Alembic 迁移；本地 uploads 存储 |
 | 测试门禁 | backend **246 passed**（覆盖 87.34%，门槛 60%）+ 前端 **29/6 suites**（覆盖 93.15%，门槛 50%）= **275 passed**（2.2.6 刷新；local_ci.sh 8/8 全绿） |
-| 分支 | `master`，已推远端 `github.com/chujiang886/sitelog-ai` |
+| 分支 | `master`，**本地领先 `origin/master` 5 提交（R-N2，未 push）**；远端 `github.com/chujiang886/sitelog-ai`。等待主理人确认后 `git push origin master`（密钥自查已过：`.env` 未入库） |
 | 🔴 红灯未闭合 | `engineering_enabled = false` → 工程安全审核链未闭环；行业阈值（风压/楼层/评分权重）全 `pending_verification` |
 | 技术债 | **OPEN = 11**（3.0 偿还 TD-003/017/018 + TD-013 收口；A/B/C 重分类见 `.ai/technical_debt/README.md`） |
 | 文档 | ✅ 已收敛（3.0 偿还 TD-003/017/018）：README/CHANGELOG/LLM.md/AGENTS.md/API.md 全部刷至 Phase 2.2 COMPLETED，D2–D7 全闭环 |
@@ -62,9 +62,9 @@
 
 ---
 
-## 4. Phase 3 路线（企业 SaaS + 工程引擎成熟）— 🟡 **Phase 3 planning 已启动（2026-07-28）**
+## 4. Phase 3 路线（企业 SaaS + 工程引擎成熟）— 🟢 **Phase 3 Ready（2026-07-28，Phase 3 Readiness 审核通过，开发未启动）**
 
-> 当前处于规划态，未进入开发。启动前的工程收敛（文档收敛 + 技术债 A/B/C 重分类 + SSOT 同步）已完成，见 `.ai/reviews/phase3_readiness_report.md`（能力 / 架构 / 债 / 风险 / 路线）与 `.ai/reviews/phase2.2_release_freeze_report.md`（版本冻结清单）。Phase 3 主线建议顺序：3.1 工程引擎闭环（TD-002/016/005）→ 3.2 企业 SaaS（RBAC 收口 TD-019 / PG TD-011 / 成本 TD-006）→ 3.3 数字孪生。
+> 当前处于就绪态，未进入开发。启动前全部准备已完成：文档收敛（3.0）+ 技术债 A/B/C 重分类 + SSOT 同步 + 最终启动准备（git 同步准备 + 施工计划 + SSOT 刷新 + 最终启动报告），见 `.ai/reviews/phase3_readiness_report.md`（能力/架构/债/风险/路线）、`.ai/reviews/phase3_go_report.md`（启动确认/条件/风险/首阶段建议）、`.ai/reviews/phase3_git_sync_report.md`（远端同步清单）、`.ai/tasks/phase3_execution_plan.md`（施工计划）。Phase 3 主线建议顺序：3.1 工程引擎闭环（TD-002/016/005）→ 3.2 企业 SaaS（RBAC 收口 TD-019 / PG TD-011 / 成本 TD-006）→ 3.3 数字孪生。
 
 - **3.1** T12 工程引擎完整闭环：风压 / 玻璃 / 型材 / 五金 / 评分 / 审核 → 工程安全审核链正式闭合（`engineering_enabled=true` 上线）。
 - **3.2** T13–T17 企业 SaaS：RBAC / 多租户 / CRM / 知识库 RAG / 销售 AI。
