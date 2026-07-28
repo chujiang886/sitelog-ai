@@ -12,7 +12,7 @@
 
 | 维度 | 真实状态 |
 |---|---|
-| 阶段 | **Phase 2.2 COMPLETED → 🟢 Phase 3 Ready**（2.1 架构稳定 + 2.2 能力深化 2.2.1~2.2.6 六 Sprint 全部收口，2026-07-28 总结验收；2026-07-28 完成 3.0 前置整理 Sprint + Final Go Preparation；**Phase 3 Readiness 已审核通过**，开发未启动，等待主理人最终授权） |
+| 阶段 | **Phase 2.2 COMPLETED → 🟢 Phase 3 Ready**（2.1 架构稳定 + 2.2 能力深化 2.2.1~2.2.6 六 Sprint 全部收口，2026-07-28 总结验收；2026-07-28 完成 3.0 前置整理 Sprint + Final Go Preparation；**Phase 3 Readiness 已审核通过**，开发未启动，等待主理人最终授权）；**Phase 3.1 工程智能闭环设计 🟡 DESIGN_READY（2026-07-28 四任务交付，待主理人审核，未进入编码）** |
 | LLM | `track_a` = 腾讯混元 TokenHub `HY-Vision-2.0-Instruct`（openai_compat，文本+视觉共用），`llm.enabled=true`；`track_b`=mock；**ADR-001 确立 `.env::LLM_A_*` 为唯一事实源** |
 | 后端 | 11 个 router（含 /api/auth/*、/api/rag/*）；`/api/analysis/run` 串联三 Agent → dossier；`/api/report/generate` 流式 PDF |
 | 前端 | 8 个页面（home/consult/result/upload/agents/projects/knowledge/login）+ 29 个 Jest 用例 |
@@ -62,11 +62,13 @@
 
 ---
 
-## 4. Phase 3 路线（企业 SaaS + 工程引擎成熟）— 🟢 **Phase 3 Ready（2026-07-28，Phase 3 Readiness 审核通过，开发未启动）**
+## 4. Phase 3 路线（企业 SaaS + 工程引擎成熟）— 🟢 **Phase 3 Ready（2026-07-28，Phase 3 Readiness 审核通过，开发未启动）** / 🟡 **Phase 3.1 工程智能闭环 DESIGN_READY（2026-07-28，设计完成待审核，未进入编码）**
 
 > 当前处于就绪态，未进入开发。启动前全部准备已完成：文档收敛（3.0）+ 技术债 A/B/C 重分类 + SSOT 同步 + 最终启动准备（git 同步准备 + 施工计划 + SSOT 刷新 + 最终启动报告），见 `.ai/reviews/phase3_readiness_report.md`（能力/架构/债/风险/路线）、`.ai/reviews/phase3_go_report.md`（启动确认/条件/风险/首阶段建议）、`.ai/reviews/phase3_git_sync_report.md`（远端同步清单）、`.ai/tasks/phase3_execution_plan.md`（施工计划）。Phase 3 主线建议顺序：3.1 工程引擎闭环（TD-002/016/005）→ 3.2 企业 SaaS（RBAC 收口 TD-019 / PG TD-011 / 成本 TD-006）→ 3.3 数字孪生。
 
-- **3.1** T12 工程引擎完整闭环：风压 / 玻璃 / 型材 / 五金 / 评分 / 审核 → 工程安全审核链正式闭合（`engineering_enabled=true` 上线）。
+> **Phase 3.1 设计态（2026-07-28，DESIGN_READY）**：四任务已交付 —— ① 整体架构设计（`.ai/tasks/phase3.1_engineering_architecture_design.md`，含五大模块 + ExpertBackedEngineeringValidation 审核链 + 六门槛 + Design/PDF 连接 + R-E1~R-E7 风险）；② 工程计算 ADR 体系（`.ai/decisions/ADR-phase3.1-engineering-calculation.md`，五模块数据来源/公式来源/规范依据/专家审核点/禁止 AI 自推范围 + §6 实施约束）；③ 专家审核流程（`.ai/tasks/phase3.1_expert_review_process.md`，四步阈值提交 + E-TH-01~06 + 双签 is_fully_verified 升级 + review_log.jsonl）；④ 测试方案（`.ai/tasks/phase3.1_test_plan.md`，单元/集成/安全/防编造四类别 + 六门槛门禁映射）。收口报告见 `.ai/reviews/phase3.1_design_readiness_report.md`。**红线守约**：设计物零真实工程参数、未开 `engineering_enabled`、未写业务代码。🔴 **待主理人审核闭合项**：ADR 阈值 ID `E-TH-wp-01` 与专家流程 `E-TH-01~06` 命名不一致，编码前须统一。**未授权前禁止进入 Phase 3.1 编码。**
+
+- **3.1** T12 工程引擎完整闭环：风压 / 玻璃 / 型材 / 五金 / 评分 / 审核 → 工程安全审核链正式闭合（`engineering_enabled=true` 上线）。**设计已 DESIGN_READY，待主理人审核 + 六门槛全满足后编码。**
 - **3.2** T13–T17 企业 SaaS：RBAC / 多租户 / CRM / 知识库 RAG / 销售 AI。
 - **3.3** T18–T20 数字孪生 / 施工交付 / 产业生态 / AI 大脑。
 - **3.4** 双轨 LLM 成本 / 性能治理（TD-013）正式评估并启用 `track_b`（容灾 / 多供应商）。

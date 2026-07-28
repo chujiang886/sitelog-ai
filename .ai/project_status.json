@@ -21,10 +21,11 @@
   "current_stage": {
     "phase_number": 3,
     "current_phase": "Phase 3 Ready",
-    "phase_name": "Phase 3 Ready — Phase 2.2 COMPLETED + 3.0 前置整理完成 + Phase 3 Readiness 审核通过；Final Go Preparation 已就绪（远端同步准备 + 施工计划 + SSOT 刷新 + 最终启动报告），Phase 3 开发未启动，等待主理人最终授权",
+    "phase_name": "Phase 3 Ready — Phase 2.2 COMPLETED + 3.0 前置整理完成 + Phase 3 Readiness 审核通过；Phase 3.1 工程智能闭环设计 DESIGN_READY（四任务交付，待主理人审核，未进入编码）；Phase 3 开发未启动，等待主理人最终授权",
     "phase_2_2_status": "COMPLETED (2026-07-28 总结验收，见 .ai/reviews/phase2.2_final_review.md)",
     "phase_3_0_status": "COMPLETED (2026-07-28 前置整理，见 .ai/reviews/phase2.2_release_freeze_report.md + .ai/reviews/phase3_readiness_report.md)",
     "phase_3_ready_status": "READY (2026-07-28 Final Go Preparation：git 同步准备 + 施工计划 + SSOT 刷新 + 最终启动报告就绪；见 .ai/reviews/phase3_go_report.md + .ai/reviews/phase3_git_sync_report.md + .ai/tasks/phase3_execution_plan.md)",
+    "phase_3_1_status": "DESIGN_READY (2026-07-28 Phase 3.1 工程智能闭环设计完成，待主理人审核，未进入编码；四任务交付：架构设计 + ADR + 专家流程 + 测试方案，见 .ai/reviews/phase3.1_design_readiness_report.md；红线守约：零真实工程参数 / 未开 engineering_enabled / 未写业务代码)",
     "is_pass": true,
     "evidence": [
       "git HEAD = 22dc0ab（2026-07-26 回归测试）",
@@ -393,6 +394,37 @@
         "design_doc": ".ai/tasks/2.2.6_rbac_design.md",
         "deferred": "refresh token/吊销机制、前端 /login 对接 /api/auth/login、User.role 遗留列收敛、其余 API 渐进保护、Vault 密钥基建（TD-008）——均待主理人排期。",
         "gate": "Phase 2.2 基础建设收口；已停止，等待主理人验收（禁止进入 Phase 3 / CRM / 销售 AI / Engineering 计算）"
+      }
+    },
+    "phase_3_1": {
+      "_phase_status": "DESIGN_READY",
+      "_completed_at": "2026-07-28",
+      "_design_readiness_report": ".ai/reviews/phase3.1_design_readiness_report.md",
+      "_summary": "Phase 3.1 工程智能闭环设计四任务全部完成：架构设计 + 工程计算 ADR + 专家审核流程 + 测试方案。设计严格基于实读骨架（agent.py/validation.py/threshold_loader.py），演进路径=替换注入 validator + 新建 Engineering 侧阈值库(E-TH-01~06) + 双签；EngineeringAgent 侧零改动。红线守约：零真实工程参数、未开 engineering_enabled、未写业务代码。阈值 ID 命名不一致(初稿 E-TH-wp-01 vs E-TH-01~06)已于收口轮闭合，ADR 统一为 E-TH-01~06。",
+      "_blocking_for_code": "主理人审核通过 + 阈值 ID 一致性闭合 + engineering_enabled 六门槛全满足后，方可进入编码",
+      "3.1.1": {
+        "task": "Engineering 整体架构分析（五大模块 + ExpertBackedEngineeringValidation 审核链 + 六门槛 + Design/PDF 连接 + R-E1~R-E7 风险）",
+        "status": "DESIGN_DONE",
+        "completed_at": "2026-07-28",
+        "deliverable": ".ai/tasks/phase3.1_engineering_architecture_design.md"
+      },
+      "3.1.2": {
+        "task": "工程计算 ADR 体系（五模块数据来源/公式来源/规范依据/专家审核点/禁止 AI 自推范围 + 6 实施约束）",
+        "status": "DESIGN_DONE",
+        "completed_at": "2026-07-28",
+        "deliverable": ".ai/decisions/ADR-phase3.1-engineering-calculation.md"
+      },
+      "3.1.3": {
+        "task": "专家审核流程（四步阈值提交 + E-TH-01~06 扩展 + verified_by/at + review_log.jsonl + 双签 is_fully_verified 升级）",
+        "status": "DESIGN_DONE",
+        "completed_at": "2026-07-28",
+        "deliverable": ".ai/tasks/phase3.1_expert_review_process.md"
+      },
+      "3.1.4": {
+        "task": "测试方案（单元/集成/安全/防编造四类别 + 运行方式 + 覆盖率基线 + 六门槛门禁映射）",
+        "status": "DESIGN_DONE",
+        "completed_at": "2026-07-28",
+        "deliverable": ".ai/tasks/phase3.1_test_plan.md"
       }
     }
   }
