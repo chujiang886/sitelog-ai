@@ -174,6 +174,7 @@
           <option value="框架施工">🔲 框架施工归档</option>
           <option value="玻扇施工">🪟 玻扇施工归档</option>
           <option value="五金安装">🔧 五金安装归档</option>
+          <option value="离场自检">🚪 离场前自检留底</option>
         </select>
         <button @click="openSettings()" class="px-3 py-1.5 text-sm hover:bg-white/10 rounded transition flex items-center gap-1.5" title="API Key 设置">
           <span>⚙️ 设置</span>
@@ -544,6 +545,7 @@
           if (this.templateType === '框架施工') return TEMPLATES.frame();
           if (this.templateType === '玻扇施工') return TEMPLATES.glass();
           if (this.templateType === '五金安装') return TEMPLATES.hardware();
+          if (this.templateType === '离场自检') return TEMPLATES.departure();
           return TEMPLATES.frame();
         },
 
@@ -592,6 +594,7 @@
           if (/五金|把手|锁|铰链|合页|风撑/.test(f)) return '五金安装';
           if (/胶|密封|收口|打胶|注胶/.test(f)) return '密封收口';
           if (/保护|膜|覆盖|清场/.test(f)) return '成品保护';
+          if (/关水|关电|关门|垃圾|离场|合规|留底|关阀/.test(f)) return '离场自检';
           return this.templateType; // 默认归到当前归档类型
         },
 
@@ -1324,6 +1327,78 @@
         <footer class="mt-16 pt-8 border-t-2 border-slate-200 text-center">
           <p class="text-lg text-slate-700 italic font-medium">「用精工艺，给您一个可追溯的家」</p>
           <p class="text-sm text-slate-500 mt-3 tracking-wider">初 匠 门 窗 服 务 · CHUJIANG</p>
+        </footer>
+      `,
+
+      departure: () => `
+        <div class="text-center mb-10 pb-8 border-b-2 border-slate-200">
+          <p class="text-xs text-slate-500 tracking-[0.3em]">CHU JIANG · MEN & WINDOW</p>
+          <h1 class="text-4xl font-bold text-slate-900 mt-3">离场前自检 · 安全合规留底</h1>
+          <p class="text-slate-600 mt-3 text-sm">—— 关水 · 关电 · 关门 · 清场 ——</p>
+          <p class="text-xs text-slate-400 mt-4">本档案作为门窗班组离场前的安全合规凭证，交付业主与监理方保存</p>
+        </div>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">一、</span>离场合规总览
+          </h2>
+          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+            [请编辑：本次离场前自检的整体说明。建议覆盖：项目名称、施工班组、自检日期、自检人、下道工序衔接安排。100-200 字为宜。]
+          </div>
+        </section>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">二、</span>四项合规自检 · 影像归档
+          </h2>
+          <div id="images-container"></div>
+          <div class="mt-6 grid grid-cols-2 gap-3 text-sm">
+            <div class="bg-blue-50 border border-blue-200 rounded p-3">
+              <p class="font-bold text-blue-900">💧 水源关闭</p>
+              <p class="text-blue-700 text-xs mt-1">现场用水阀门归零位、临时水管卸压</p>
+            </div>
+            <div class="bg-amber-50 border border-amber-200 rounded p-3">
+              <p class="font-bold text-amber-900">⚡ 电源关闭</p>
+              <p class="text-amber-700 text-xs mt-1">配电箱断路器归零位、临时用电插座拔除</p>
+            </div>
+            <div class="bg-emerald-50 border border-emerald-200 rounded p-3">
+              <p class="font-bold text-emerald-900">🚪 大门关闭</p>
+              <p class="text-emerald-700 text-xs mt-1">入户门 / 阳台门关闭上锁、钥匙移交</p>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded p-3">
+              <p class="font-bold text-slate-900">🗑️ 垃圾清场</p>
+              <p class="text-slate-700 text-xs mt-1">施工余料 / 包装 / 边角料打包成捆、定点堆放</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">三、</span>自检结论与离场声明
+          </h2>
+          <div class="bg-amber-50 border-l-4 border-amber-500 p-6 my-4 rounded-r">
+            <p class="text-slate-800 font-bold mb-3 text-lg">「关水、关电、关门！—— 树立门窗最后一道防火墙」</p>
+            <div class="editable-block text-slate-700 text-sm leading-relaxed" contenteditable="true">
+              [请编辑本次自检结论：本次离场前自检确认的四项合规动作各完成情况，自检人签字，下道工序（如泥工 / 漆工）入场前的水电门管理权限交接对象。]
+            </div>
+          </div>
+        </section>
+
+        <section class="mb-10">
+          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+            <span class="text-blue-600">四、</span>影像追溯体系
+          </h2>
+          <ul class="text-slate-700 space-y-2 leading-relaxed">
+            <li>📸 <strong>影像性质</strong>：本档案所有照片均为现场实拍，含拍摄人 / 拍摄时间 / 定位水印，可作为业主与监理方第三方追溯凭证</li>
+            <li>🔍 <strong>影像要素</strong>：四项合规事项逐一留底（关水 / 关电 / 关门 / 清场），照片可直观佐证离场状态</li>
+            <li>📦 <strong>影像归档</strong>：原图随本档案一并交付业主保存</li>
+          </ul>
+        </section>
+
+        <footer class="mt-16 pt-8 border-t-2 border-slate-200 text-center">
+          <p class="text-lg text-slate-700 italic font-medium">「安全离场 · 责任交接 · 凭证留底」</p>
+          <p class="text-sm text-slate-500 mt-3 tracking-wider">初 匠 门 窗 服 务 · CHUJIANG</p>
+          <p class="text-xs text-slate-400 mt-1">施 格 归 档 · SITELOG AI 出品</p>
         </footer>
       `
     };
