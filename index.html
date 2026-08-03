@@ -746,6 +746,47 @@
           });
         },
 
+        // 最终安全网：syncToReport 渲染前扫描，确保每张图都有 title 和 desc
+        // —— 即使 analyzeImage 兜底失效或被异常跳过，用户也永远看不到「未命名节点」
+        ensureTitles() {
+          const SAFE = {
+            '框架施工':  { title: '框体就位与水平校准',    desc: '采用化学锚栓将框体固定于结构墙体，激光水平仪校准垂直度偏差 ≤ 2mm。' },
+            '玻扇施工':  { title: '中空玻璃合片工艺',      desc: '中空玻璃已合片装入框体，铝隔条均匀分布，合片质量符合 GB/T 11944 标准。' },
+            '五金安装':  { title: '门窗五金件安装调试',    desc: '把手、锁具、铰链等五金件已安装到位，启闭顺畅无卡滞。' },
+            '密封收口':  { title: '框墙接缝密封收口',      desc: '采用硅酮结构胶进行双道密封，48h 完全固化后形成柔性防水屏障。' },
+            '成品保护':  { title: '门窗成品保护与自检',    desc: '框体及玻璃保护膜完整贴合，施工现场清理完毕，整窗处于完工待验收状态。' },
+            '离场自检':  { title: '离场前合规留底',        desc: '施工结束离场前按规范拍摄留底：大门关闭/垃圾清运/水源关闭/电源切断。' },
+          };
+          const aliasMap = {
+            '框架施工': ['框架','框体','立框','装框'],
+            '玻扇施工': ['玻璃','玻扇','玻璃施工','合片','装玻璃','挂扇','扇'],
+            '五金安装': ['五金','把手','锁具','铰链','合页'],
+            '密封收口': ['密封','收口','打胶','注胶','填缝'],
+            '成品保护': ['成品','保护','保护膜','完工','自检'],
+            '离场自检': ['离场','关门','关水','关电','清场','留底'],
+          };
+          const resolve = (cat) => {
+            for (const [k, aliases] of Object.entries(aliasMap)) {
+              if (cat === k || cat.includes(k) || k.includes(cat) || aliases.some(a => cat.includes(a) || a.includes(cat))) return k;
+            }
+            return cat;
+          };
+          let fixed = 0;
+          this.images.forEach(img => {
+            if (!img.title || !img.title.trim()) {
+              const k = resolve(img.category || '');
+              img.title = (SAFE[k] && SAFE[k].title) || `${img.category || '施工'}节点`;
+              fixed++;
+            }
+            if (!img.desc || !img.desc.trim()) {
+              const k = resolve(img.category || '');
+              img.desc = (SAFE[k] && SAFE[k].desc) || '（待补充工艺说明）';
+              fixed++;
+            }
+          });
+          if (fixed > 0) console.log(`🛡️ ensureTitles: 补全 ${fixed} 个空字段`);
+        },
+
         get pendingCount() {
           return this.images.filter(i => !i.aiConfirmed).length;
         },
@@ -795,17 +836,20 @@
 
           // ── 智能兜底：AI 偶尔漏填 title/desc，根据 category 自动生成 ──
           const CATEGORY_DEFAULTS = {
-            '框架施工':  { title: '框体就位与水平校准',    desc: '采用化学锚栓将框体固定于结构墙体，激光水平仪校准垂直度偏差 ≤ 2mm，预留注胶间隙。' },
-            '玻扇施工':  { title: '中空玻璃合片工艺',      desc: '中空玻璃已合片装入框体，铝隔条均匀分布，合片质量符合 GB/T 11944 标准。' },
-            '五金安装':  { title: '门窗五金件安装调试',    desc: '把手、锁具、铰链等五金件已安装到位，启闭顺畅无卡滞，锁点对位准确。' },
-            '密封收口':  { title: '框墙接缝密封收口',      desc: '采用硅酮结构胶（GB/T 14683）进行双道密封，48h 完全固化后形成柔性防水屏障。' },
-            '成品保护':  { title: '门窗成品保护与自检',    desc: '框体及玻璃保护膜完整贴合，施工现场清理完毕，整窗处于完工待验收状态。' },
-            '离场自检':  { title: '离场前合规留底',        desc: '施工结束离场前按规范拍摄留底：大门关闭 / 垃圾清运 / 水源关闭 / 电源切断。' },
+            '框架施工':  { title: '框体就位与水平校准',    desc: '采用化学锚栓将框体固定于结构墙体，激光水平仪校准垂直度偏差 ≤ 2mm，预留注胶间隙。', aliases: ['框架', '框体', '立框', '装框'] },
+            '玻扇施工':  { title: '中空玻璃合片工艺',      desc: '中空玻璃已合片装入框体，铝隔条均匀分布，合片质量符合 GB/T 11944 标准。', aliases: ['玻璃', '玻扇', '玻璃施工', '合片', '装玻璃', '挂扇', '扇'] },
+            '五金安装':  { title: '门窗五金件安装调试',    desc: '把手、锁具、铰链等五金件已安装到位，启闭顺畅无卡滞，锁点对位准确。', aliases: ['五金', '把手', '锁具', '铰链', '合页'] },
+            '密封收口':  { title: '框墙接缝密封收口',      desc: '采用硅酮结构胶（GB/T 14683）进行双道密封，48h 完全固化后形成柔性防水屏障。', aliases: ['密封', '收口', '打胶', '注胶', '填缝'] },
+            '成品保护':  { title: '门窗成品保护与自检',    desc: '框体及玻璃保护膜完整贴合，施工现场清理完毕，整窗处于完工待验收状态。', aliases: ['成品', '保护', '保护膜', '完工', '自检'] },
+            '离场自检':  { title: '离场前合规留底',        desc: '施工结束离场前按规范拍摄留底：大门关闭 / 垃圾清运 / 水源关闭 / 电源切断。', aliases: ['离场', '关门', '关水', '关电', '清场', '留底'] },
           };
           // 归一化 category 匹配（AI 可能返回近义词）
-          const normalizedCat = Object.keys(CATEGORY_DEFAULTS).find(k =>
-            finalCategory.includes(k) || k.includes(finalCategory)
-          ) || finalCategory;
+          const normalizedCat = Object.keys(CATEGORY_DEFAULTS).find(k => {
+            const d = CATEGORY_DEFAULTS[k];
+            if (!d.aliases) return finalCategory.includes(k) || k.includes(finalCategory);
+    return finalCategory === k || k.includes(finalCategory) || finalCategory.includes(k)
+      || (d.aliases && d.aliases.some(a => finalCategory.includes(a) || a.includes(finalCategory)));
+          }) || finalCategory;
           const defaults = CATEGORY_DEFAULTS[normalizedCat] || {};
 
           img.title = (winner.title || '').trim() || defaults.title || `${finalCategory}节点`;
@@ -1128,7 +1172,8 @@
           // 把图片数据同步到报告 DOM
           const container = document.getElementById('images-container');
           if (!container) return;
-          this.captureDomEdits(); // 先回写用户编辑，避免重建时丢失
+          this.captureDomEdits(); // 先回写用户编辑，避免重建丢失
+          this.ensureTitles();   // 最终安全网：确保没有空 title/desc 渲染出去
 
           if (this.images.length === 0) {
             container.innerHTML = `
