@@ -294,6 +294,7 @@
         id="report-content"
         class="bg-white rounded-lg shadow-sm p-10 max-w-4xl mx-auto"
         :class="templateType"
+        @click="onReportClick($event)"
       >
         <div x-html="reportHtml"></div>
       </article>
@@ -648,7 +649,8 @@
               this.syncToReport();
             }
             if (failures.length === 0) {
-              this.showToast(`✨ AI 整理完成，共 ${this.processedCount} 张`);
+              this.showToast(`✨ AI 整理完成，共 ${this.processedCount} 张 — 请逐张点"✓ 确认入档"或编辑后确认`);
+              this.scrollToPending();
             } else {
               this.showToast(
                 `⚠️ ${failures.length} 张识别失败：${failures[0].error.slice(0, 80)}`,
@@ -675,6 +677,80 @@
           } finally {
             img.analyzing = false;
           }
+        },
+
+        // ===== AI 结果确认 =====
+        toggleConfirm(imgId) {
+          const img = this.images.find(i => i.id === imgId);
+          if (!img) return;
+          img.aiConfirmed = !img.aiConfirmed;
+          this.syncToReport();
+          this.showToast(
+            img.aiConfirmed ? `✓「${img.title || '未命名'}」已确认入档` : `↩「${img.title || '未命名'}」已撤销确认`,
+            img.aiConfirmed ? 'success' : 'info'
+          );
+        },
+
+        confirmAll() {
+          const pending = this.images.filter(i => !i.aiConfirmed);
+          if (pending.length === 0) {
+            this.showToast('✅ 全部已确认，无需操作');
+            return;
+          }
+          if (!confirm(`一键确认全部 ${pending.length} 张照片的 AI 识别结果？\n\n如有错误建议逐张确认后核对。`)) return;
+          this.images.forEach(i => i.aiConfirmed = true);
+          this.syncToReport();
+          this.showToast(`✓ 全部 ${this.images.length} 张已确认`, 'success');
+        },
+
+        scrollToPending() {
+          // 滚到第一个待确认节点
+          setTimeout(() => {
+            const first = document.querySelector('.pending-confirm') || document.querySelector('[data-img-id]');
+            if (first) {
+              const nodeBlock = first.closest('.node-block');
+              if (nodeBlock) nodeBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 200);
+        },
+
+        // 事件委托：x-html 注入内容里的 @click 不会被 Alpine 绑定，
+        // 故改用 data-action，由根容器（article）接收冒泡后处理
+        onReportClick(e) {
+          const btn = e.target.closest('[data-action="confirm"]');
+          if (!btn) return;
+          const block = btn.closest('.node-block');
+          if (!block) return;
+          this.toggleConfirm(block.dataset.imgId);
+        },
+
+        // 重建 innerHTML 前，先把用户在 contenteditable 里的编辑回写到 img 数据，
+        // 否则 syncToReport 会用旧数据覆盖掉用户手改的标题/描述/亮点
+        captureDomEdits() {
+          const container = document.getElementById('images-container');
+          if (!container) return;
+          container.querySelectorAll('.node-block').forEach(block => {
+            const id = block.dataset.imgId;
+            const img = this.images.find(i => i.id === id);
+            if (!img) return;
+            const titleEl = block.querySelector('h3');
+            const descEl = block.querySelector('p.text-slate-700');
+            const hlBadges = block.querySelectorAll('.highlight-badge');
+            if (titleEl) img.title = titleEl.innerText.trim();
+            if (descEl) img.desc = descEl.innerText.trim();
+            if (hlBadges.length) {
+              img.highlights = Array.from(hlBadges)
+                .map(b => b.innerText.replace(/^✦\s*/, '').trim())
+                .filter(Boolean);
+            }
+          });
+        },
+
+        get pendingCount() {
+          return this.images.filter(i => !i.aiConfirmed).length;
+        },
+        get confirmedCount() {
+          return this.images.filter(i => i.aiConfirmed).length;
         },
 
         async analyzeImage(img) {
@@ -724,6 +800,8 @@
             pixelFeatures: pixelFeatures,
             overrides: override.changed ? [override] : []
           };
+          // 默认未确认，等用户在复核弹窗/节点上点 ✓ 确认才入档
+          img.aiConfirmed = false;
         },
 
         buildAnalysisPrompt() {
@@ -1029,6 +1107,7 @@
           // 把图片数据同步到报告 DOM
           const container = document.getElementById('images-container');
           if (!container) return;
+          this.captureDomEdits(); // 先回写用户编辑，避免重建时丢失
 
           if (this.images.length === 0) {
             container.innerHTML = `
@@ -1047,14 +1126,20 @@
               .map(h => `<span class="highlight-badge">✦ ${h}</span>`)
               .join('');
 
+            const confirmBadge = img.aiConfirmed
+              ? '<span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold">✓ 已确认</span><button data-action="confirm" class="text-xs text-slate-400 hover:text-blue-600 underline">↩ 撤销</button>'
+              : '<span class="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold border border-amber-300">⚠️ 待复核</span><button data-action="confirm" class="text-xs bg-blue-600 text-white px-2 py-0.5 rounded font-bold hover:bg-blue-700">✓ 确认入档</button>';
+
             html += `
-              <div class="node-block group" data-img-id="${img.id}">
-                <div class="flex items-baseline gap-2 mb-3">
+              <div class="node-block group${img.aiConfirmed ? '' : ' pending-confirm'}" data-img-id="${img.id}">
+                <div class="flex items-baseline gap-2 mb-3 flex-wrap">
                   <span class="text-sm font-bold text-blue-600">节点 ${String(idx + 1).padStart(2, '0')}</span>
                   <span class="text-xs text-slate-400">·</span>
                   <span class="text-xs text-slate-500">${img.category}</span>
                   <span class="text-xs text-slate-400">·</span>
                   <span class="text-xs text-slate-400">${img.time}</span>
+                  <span class="text-xs text-slate-400 ml-auto"></span>
+                  ${confirmBadge}
                 </div>
                 <h3 class="text-lg font-bold text-slate-900 mb-3 editable-block" contenteditable="true">${img.title || '未命名节点'}</h3>
                 ${img.stage ? `<p class="text-xs text-blue-700 bg-blue-50 inline-block px-2 py-0.5 rounded mb-3">📍 ${img.stage}</p>` : ''}
@@ -1083,6 +1168,11 @@
           if (this.images.length === 0) {
             if (!confirm('当前报告暂无照片，是否仍要导出空白模板？')) return;
           }
+          // ── 关键：未确认的节点会被过滤掉 ──
+          const pending = this.images.filter(i => !i.aiConfirmed);
+          if (pending.length > 0) {
+            if (!confirm(`⚠️ 当前还有 ${pending.length} 张照片 AI 识别结果待复核，未确认的节点不会出现在 PDF 中。\n\n是否继续导出（仅已确认的 ${this.images.length - pending.length} 张）？`)) return;
+          }
           // 每次打开弹窗时，根据 h1 给出默认建议名（用户没改过才覆盖）
           const h1 = document.querySelector('#report-content h1');
           const suggested = (h1 && h1.innerText.trim()) ? h1.innerText.trim() : (this.templateType + '归档');
@@ -1099,11 +1189,16 @@
           // 同步最后一次编辑到 reportHtml
           this.syncToReport();
 
-          const element = document.getElementById('report-content');
-          if (!element) {
+          const original = document.getElementById('report-content');
+          if (!original) {
             this.showToast('❌ 未找到报告内容，请刷新后重试', 'error');
             return;
           }
+
+          // ── 关键：克隆后删除未确认节点，避免错内容进 PDF ──
+          const element = original.cloneNode(true);
+          const pendingNodes = element.querySelectorAll('.pending-confirm');
+          pendingNodes.forEach(n => n.remove());
 
           // 优先用用户输入的文件名，否则从 h1 取，再否则用 reportTitle
           let baseName = '';
