@@ -1261,10 +1261,12 @@
             return;
           }
 
-          // ── 关键：克隆后删除未确认节点，避免错内容进 PDF ──
+          // ── 关键：克隆后删除未确认节点 + 交互按钮，避免错内容/按钮进 PDF ──
           const element = original.cloneNode(true);
           const pendingNodes = element.querySelectorAll('.pending-confirm');
           pendingNodes.forEach(n => n.remove());
+          // 移除所有确认/撤销按钮（归档文件不该出现可交互元素）
+          element.querySelectorAll('button[data-action="confirm"]').forEach(b => b.remove());
 
           // 优先用用户输入的文件名，否则从 h1 取，再否则用 reportTitle
           let baseName = '';
