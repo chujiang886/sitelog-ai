@@ -790,11 +790,32 @@
           const winner = votes.find(v => v.category === finalCategory) || votes[0];
           const longestStage = votes.map(v => v.stage || '').sort((a, b) => b.length - a.length)[0];
 
-          img.title = winner.title || '施工节点';
           img.category = finalCategory;
           img.stage = longestStage || '';
-          img.desc = winner.desc || '';
+
+          // ── 智能兜底：AI 偶尔漏填 title/desc，根据 category 自动生成 ──
+          const CATEGORY_DEFAULTS = {
+            '框架施工':  { title: '框体就位与水平校准',    desc: '采用化学锚栓将框体固定于结构墙体，激光水平仪校准垂直度偏差 ≤ 2mm，预留注胶间隙。' },
+            '玻扇施工':  { title: '中空玻璃合片工艺',      desc: '中空玻璃已合片装入框体，铝隔条均匀分布，合片质量符合 GB/T 11944 标准。' },
+            '五金安装':  { title: '门窗五金件安装调试',    desc: '把手、锁具、铰链等五金件已安装到位，启闭顺畅无卡滞，锁点对位准确。' },
+            '密封收口':  { title: '框墙接缝密封收口',      desc: '采用硅酮结构胶（GB/T 14683）进行双道密封，48h 完全固化后形成柔性防水屏障。' },
+            '成品保护':  { title: '门窗成品保护与自检',    desc: '框体及玻璃保护膜完整贴合，施工现场清理完毕，整窗处于完工待验收状态。' },
+            '离场自检':  { title: '离场前合规留底',        desc: '施工结束离场前按规范拍摄留底：大门关闭 / 垃圾清运 / 水源关闭 / 电源切断。' },
+          };
+          // 归一化 category 匹配（AI 可能返回近义词）
+          const normalizedCat = Object.keys(CATEGORY_DEFAULTS).find(k =>
+            finalCategory.includes(k) || k.includes(finalCategory)
+          ) || finalCategory;
+          const defaults = CATEGORY_DEFAULTS[normalizedCat] || {};
+
+          img.title = (winner.title || '').trim() || defaults.title || `${finalCategory}节点`;
+          img.desc = (winner.desc || '').trim() || defaults.desc || '（待补充工艺说明）';
           img.highlights = Array.isArray(winner.highlights) ? winner.highlights : [];
+
+          // 缺字段时打日志，方便排查 AI 返回质量问题
+          if (!winner.title) console.warn(`⚠️ AI 未返回 title，使用默认：「${img.title}」(category=${finalCategory})`);
+          if (!winner.desc) console.warn(`⚠️ AI 未返回 desc，使用默认：「${img.desc.slice(0,40)}...」(category=${finalCategory})`);
+
           img.aiConfidence = {
             votes: counts,
             pixelFeatures: pixelFeatures,
