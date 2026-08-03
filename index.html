@@ -212,6 +212,17 @@
           <input type="file" x-ref="fileInput" @change="handleFileSelect($event)" accept="image/*" multiple class="hidden">
         </div>
 
+        <!-- 项目信息（封面上报字段） -->
+        <div class="no-print mb-4 border border-slate-200 rounded-lg p-3 bg-slate-50">
+          <p class="text-xs font-semibold text-slate-500 mb-2">📋 项目信息（用于 PDF 封面）</p>
+          <input x-model="projectName" @input.debounce.400ms="syncToReport()" placeholder="项目名称" class="w-full text-xs px-2 py-1.5 border border-slate-200 rounded mb-2 focus:border-blue-400 focus:outline-none">
+          <input x-model="siteLocation" @input.debounce.400ms="syncToReport()" placeholder="施工部位 / 楼栋" class="w-full text-xs px-2 py-1.5 border border-slate-200 rounded mb-2 focus:border-blue-400 focus:outline-none">
+          <div class="grid grid-cols-2 gap-2">
+            <input type="date" x-model="archiveDate" @change="syncToReport()" class="text-xs px-2 py-1.5 border border-slate-200 rounded focus:border-blue-400 focus:outline-none">
+            <input x-model="archivePerson" @input.debounce.400ms="syncToReport()" placeholder="归档人" class="text-xs px-2 py-1.5 border border-slate-200 rounded focus:border-blue-400 focus:outline-none">
+          </div>
+        </div>
+
         <!-- 操作按钮 -->
         <button
           @click="aiOrganizeAll"
@@ -440,6 +451,11 @@
         reportTitle: '',
         pdfFilename: '',
         pdfFilenameTouched: false,
+        // 项目信息（用于 PDF 封面 / 归档抬头）
+        projectName: '',
+        siteLocation: '',
+        archiveDate: new Date().toISOString().slice(0, 10),
+        archivePerson: '',
         processing: false,
         processedCount: 0,
         showSettings: false,
@@ -511,6 +527,17 @@
         saveSettings() {
           localStorage.setItem('sitelog_api_key', this.apiKey);
           localStorage.setItem('sitelog_api_provider', this.apiProvider);
+        },
+
+        // 转义用户输入，避免注入到 x-html 报告时产生 XSS
+        escapeHtml(str) {
+          if (!str) return '';
+          return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
         },
 
         // ===== 统一关闭设置（带视觉反馈） =====
@@ -627,35 +654,45 @@
             this.showToast('⚠️ 请先在设置中填入 API Key', 'error');
             return;
           }
+          // 只分析还没有标题（即未识别）的照片
+          const todo = this.images.filter(img => !img.title);
+          if (todo.length === 0) {
+            this.showToast('✅ 所有照片已有识别结果，无需重复整理（如需重做请用单张「重分析」）');
+            return;
+          }
           this.processing = true;
           this.processedCount = 0;
           const failures = [];
-          try {
-            for (const img of this.images) {
-              if (!img.title) {
-                img.analyzing = true;
-                try {
-                  await this.analyzeImage(img);
-                } catch (e) {
-                  console.error('分析失败', img.file.name, e);
-                  img.title = `施工节点 ${this.images.indexOf(img) + 1}`;
-                  img.desc = `[AI 识别失败] ${e.message}\n\n请按 F12 打开浏览器控制台查看详细原因，或手动填写。`;
-                  img.aiError = e.message;
-                  failures.push({ name: img.file.name, error: e.message });
-                }
+          const CONCURRENCY = 3; // 3 张并发：兼顾速度与 API 限流
+          let cursor = 0;
+          const worker = async () => {
+            while (cursor < todo.length) {
+              const img = todo[cursor++];
+              img.analyzing = true;
+              try {
+                await this.analyzeImage(img);
+              } catch (e) {
+                console.error('分析失败', img.file && img.file.name, e);
+                img.title = `施工节点 ${this.images.indexOf(img) + 1}`;
+                img.desc = `[AI 识别失败] ${e.message}\n\n请按 F12 打开浏览器控制台查看详细原因，或手动填写。`;
+                img.aiError = e.message;
+                failures.push({ name: (img.file && img.file.name) || img.id, error: e.message });
+              } finally {
                 img.analyzing = false;
               }
               this.processedCount++;
               this.syncToReport();
             }
+          };
+          try {
+            await Promise.all(
+              Array.from({ length: Math.min(CONCURRENCY, todo.length) }, () => worker())
+            );
             if (failures.length === 0) {
-              this.showToast(`✨ AI 整理完成，共 ${this.processedCount} 张 — 请逐张点"✓ 确认入档"或编辑后确认`);
+              this.showToast(`✨ AI 整理完成，本次共处理 ${this.processedCount} 张 — 请逐张点"✓ 确认入档"或编辑后确认`);
               this.scrollToPending();
             } else {
-              this.showToast(
-                `⚠️ ${failures.length} 张识别失败：${failures[0].error.slice(0, 80)}`,
-                'error'
-              );
+              this.showToast(`⚠️ ${failures.length} 张识别失败：${failures[0].error.slice(0, 80)}`, 'error');
             }
           } finally {
             this.processing = false;
@@ -1186,7 +1223,19 @@
             return;
           }
 
-          let html = '<div class="space-y-8">';
+          const coverHtml = `
+            <div class="report-cover" style="border-bottom:2px solid #1e293b; padding-bottom:16px; margin-bottom:24px;">
+              <p class="text-xs text-slate-400 mb-1">工程施工影像归档报告</p>
+              <h1 class="text-2xl font-bold text-slate-900 mb-3">${this.escapeHtml(this.projectName) || '未命名项目'}</h1>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 24px; font-size:13px; color:#475569;">
+                <div>📍 施工部位：<span>${this.escapeHtml(this.siteLocation) || '—'}</span></div>
+                <div>📅 归档日期：<span>${this.escapeHtml(this.archiveDate) || '—'}</span></div>
+                <div>👤 归档人：<span>${this.escapeHtml(this.archivePerson) || '—'}</span></div>
+                <div>🏷️ 模板：<span>${this.escapeHtml(this.templateType) || '—'}</span></div>
+              </div>
+            </div>
+          `;
+          let html = coverHtml + '<div class="space-y-8">';
           this.images.forEach((img, idx) => {
             const highlightsHtml = (img.highlights || [])
               .map(h => `<span class="highlight-badge">✦ ${h}</span>`)
