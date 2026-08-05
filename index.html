@@ -839,10 +839,10 @@
           // ② 客户端图片特征二次校验（拿 base64 解析像素，强制玻璃检测）
           // ③ 不一致时强制纠正 + 落库
 
-          // 投票配置：通义走 3 个模型，OpenAI 走 1 个（GPT-4o 已经很准）
+          // 模型选择：按实测质量排序（qwen3-vl-plus 返回最详细，qwen-vl-max 次之，qwen-vl-plus 在 json_object 模式下不稳定）
           const models = this.apiProvider === 'openai'
             ? ['gpt-4o-mini']
-            : ['qwen-vl-plus', 'qwen3-vl-plus', 'qwen-vl-max'];
+            : ['qwen3-vl-plus', 'qwen-vl-max', 'qwen-vl-plus'];
 
           const votes = await this.callVisionAPIVoting(img.dataUrl, prompt, models);
 
@@ -864,8 +864,24 @@
             finalCategory = override.category;
           }
 
-          // 合并字段：标题/desc/highlights 取票数最多的版本，stage 取最长的
-          const winner = votes.find(v => v.category === finalCategory) || votes[0];
+          // ── 智能合并：不只取 category 匹配的第一个，而是选内容最丰富的 ──
+          // 旧逻辑：const winner = votes.find(v => v.category === finalCategory) || votes[0];
+          // 问题：如果高质量模型(如qwen3-vl-plus)给了很好的desc但category不同，
+          //       而低质量模型(如qwen-vl-max)category匹配但desc为空 → 最终拿到空desc
+          //
+          // 新逻辑：优先从同 category 中选 desc 最长的；如果同 category 都没有好 desc，
+          //       则从所有模型中选 desc 最长的（跨 category 补充）
+          const sameCategory = votes.filter(v => v.category === finalCategory);
+          let winner;
+          if (sameCategory.length > 0) {
+            // 同 category 里按 desc 长度排序，取最详细的
+            sameCategory.sort((a, b) => (b.desc || '').length - (a.desc || '').length);
+            winner = sameCategory[0];
+          } else {
+            // 没有同 category 的（理论上不应该发生），按 desc 长度全局排序
+            const sorted = [...votes].sort((a, b) => (b.desc || '').length - (a.desc || '').length);
+            winner = sorted[0];
+          }
           const longestStage = votes.map(v => v.stage || '').sort((a, b) => b.length - a.length)[0];
 
           img.category = finalCategory;
@@ -1120,7 +1136,10 @@
                   { type: 'text', text: prompt }
                 ]
               }],
-              response_format: { type: 'json_object' }
+              // 注意：不使用 response_format: json_object
+              // 原因：qwen-vl-plus 在 json_object 模式下处理大图片时不稳定（直接报错）
+              // 改为自由文本 + 智能提取 JSON，兼容性更好且 3 个模型都能正常返回
+              // response_format: { type: 'json_object' }  // 已移除
             })
           };
 
@@ -1138,9 +1157,28 @@
           }
 
           const data = await response.json();
-          const content = data.choices[0].message.content;
-          const parsed = JSON.parse(content);
-          // 归一化 category：去掉空格/全角
+          const rawContent = data.choices[0].message.content;
+
+          // 智能提取 JSON（兼容 markdown 代码块包裹、前后废话等）
+          let parsed;
+          const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try { parsed = JSON.parse(jsonMatch[0]); } catch(e) {
+              console.warn('⚠️ JSON 解析失败，尝试修复', e.message);
+              // 尝试修复常见问题：尾部逗号、单引号等
+              try {
+                parsed = JSON.parse(jsonMatch[0].replace(/,\s*([}\]])/g, '$1').replace(/'/g, '"'));
+              } catch(e2) {
+                parsed = { _raw: rawContent.slice(0, 300), _parseError: e2.message };
+              }
+            }
+          } else {
+            // 完全没找到 JSON，记录原始内容
+            parsed = { _raw: rawContent.slice(0, 300), _noJson: true };
+            console.warn('⚠️ AI 返回中未找到 JSON，原始内容前200字:', rawContent.slice(0, 200));
+          }
+
+          // 归一化 category
           if (parsed.category) {
             parsed.category = parsed.category.trim();
           }
