@@ -607,7 +607,8 @@
               title: '',
               desc: '',
               highlights: [],
-              analyzing: false
+              analyzing: false,
+              _analyzed: false   // 是否已被 AI 分析过（区分"AI真实结果"与"兜底默认值"）
             };
             this.images.push(img);
           }
@@ -654,8 +655,9 @@
             this.showToast('⚠️ 请先在设置中填入 API Key', 'error');
             return;
           }
-          // 只分析还没有标题（即未识别）的照片
-          const todo = this.images.filter(img => !img.title);
+          // 只分析还没有被 AI 分析过的照片（用 _analyzed 标记，而非检查 title）
+          // 因为 ensureTitles 会在渲染时自动补 title 兜底值，不能用它判断是否已分析
+          const todo = this.images.filter(img => !img._analyzed);
           if (todo.length === 0) {
             this.showToast('✅ 所有照片已有识别结果，无需重复整理（如需重做请用单张「重分析」）');
             return;
@@ -923,6 +925,7 @@
           };
           // 默认未确认，等用户在复核弹窗/节点上点 ✓ 确认才入档
           img.aiConfirmed = false;
+          img._analyzed = true;   // 标记：已被 AI 真正分析过（区别于 ensureTitles 兜底）
         },
 
         buildAnalysisPrompt() {
