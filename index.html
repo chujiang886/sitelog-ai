@@ -176,7 +176,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v2.4.11</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v2.5.0</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -1459,34 +1459,46 @@
           // 同步最后一次编辑到 reportHtml
           this.syncToReport();
 
-          const original = document.getElementById('report-content');
-          if (!original) {
+          const container = document.getElementById('report-content');
+          if (!container) {
             this.showToast('❌ 未找到报告内容，请刷新后重试', 'error');
             return;
           }
 
-          // ── 关键：克隆后删除未确认节点 + 交互按钮，避免错内容/按钮进 PDF ──
-          const element = original.cloneNode(true);
-          const pendingNodes = element.querySelectorAll('.pending-confirm');
-          pendingNodes.forEach(n => n.remove());
-          // 移除所有确认/撤销按钮（归档文件不该出现可交互元素）
-          element.querySelectorAll('button[data-action="confirm"]').forEach(b => b.remove());
-          // 移除调试面板（details.debug-panel）— 不该出现在正式 PDF 中
-          element.querySelectorAll('details').forEach(d => d.remove());
+          // ═══════════════════════════════════════════════════════
+          // ★ 关键架构变更 v2.5.0：放弃 cloneNode 离屏方案
+          //   cloneNode 产生的节点脱离文档流 → html2canvas 算不出布局
+          //   （offsetWidth/offsetHeight 全为 0）→ 空 canvas → 0 字节 PDF
+          //
+          //   新方案：「临时隐藏 → 渲染 → 恢复」
+          //   直接操作真实 DOM，html2canvas 能正确计算尺寸
+          // ═══════════════════════════════════════════════════════
+
+          // 1. 收集需要临时隐藏的元素及其原始 display 值
+          const hiddenStack = [];
+          function hide(selector) {
+            container.querySelectorAll(selector).forEach(el => {
+              hiddenStack.push({ el, backup: el.style.display });
+              el.style.display = 'none';
+            });
+          }
+          hide('.pending-confirm');       // 未确认节点不进 PDF
+          hide('button[data-action="confirm"]'); // 确认按钮不进 PDF
+          hide('details.debug-panel');    // 调试面板不进 PDF
+          hide('details');                // 所有 details 折叠面板
 
           // 优先用用户输入的文件名，否则从 h1 取，再否则用 reportTitle
           let baseName = '';
           if (this.pdfFilename && this.pdfFilename.trim()) {
             baseName = this.pdfFilename.trim();
           } else {
-            const h1 = element.querySelector('h1');
+            const h1 = container.querySelector('h1');
             if (h1 && h1.innerText.trim()) {
               baseName = h1.innerText.trim();
             } else {
               baseName = this.reportTitle || '施工归档';
             }
           }
-          // 清理 Windows / macOS 文件名非法字符，并去掉结尾的 .pdf（防止用户重复加）
           const cleanName = baseName.replace(/\.pdf$/i, '').replace(/[\\/:*?"<>|]/g, '_').trim();
           const filename = (cleanName || '施工归档') + '.pdf';
 
@@ -1507,67 +1519,91 @@
               html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
               jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
-            console.log('📄 [PDF] 开始生成:', filename, '元素大小:', element.offsetWidth + 'x' + element.offsetHeight);
 
-            // ── 策略：先尝试拿原生保存目标（需在用户手势内），再生成 PDF ──
-            // A. 原生「另存为」对话框（需 https / localhost + Chrome/Edge）
-            let saveTarget = null;
-            let useNative = false;
+            console.log('📄 [PDF] v2.5.0 开始生成:', filename,
+              '容器尺寸:', container.offsetWidth + 'x' + container.offsetHeight,
+              '隐藏元素数:', hiddenStack.length);
+
+            // ── A. 尝试原生「另存为」对话框（需 https / localhost）──
+            let saveHandle = null;
+            let useNativePicker = false;
             if (typeof window.showSaveFilePicker === 'function') {
               try {
-                saveTarget = await window.showSaveFilePicker({
+                saveHandle = await window.showSaveFilePicker({
                   suggestedName: filename,
                   types: [{ description: 'PDF 文档', accept: { 'application/pdf': ['.pdf'] } }]
                 });
-                useNative = true;
-                console.log('📄 [PDF] 拿到原生保存目标');
+                useNativePicker = true;
+                console.log('📄 [PDF] ✅ 拿到原生保存句柄');
               } catch (e) {
                 if (e && e.name === 'AbortError') { this.showToast('已取消保存'); return; }
-                saveTarget = null; // 选择器失败 → 降级
+                console.warn('📄 [PDF] 原生选择器不可用，降级:', e.message);
+                saveHandle = null;
               }
             }
 
-            // B. 非安全上下文 / 原生选择器不可用：预开空白页（稍后载入 PDF）
-            if (!saveTarget) {
-              try { saveTarget = window.open('about:blank', '_blank'); } catch (e) { saveTarget = null; }
+            // ── B. 渲染 PDF（操作真实 DOM 容器）──
+            const pdfInstance = await html2pdf().set(opt).from(container).build();
+            console.log('📄 [PDF] 渲染完成, jsPDF实例:', pdfInstance ? '存在' : 'NULL');
+
+            // ── C. 输出 PDF 数据（用 datauristring —— 与 save() 同路径，最稳定）──
+            const dataUri = pdfInstance.output('datauristring');
+            console.log('📄 [PDF] dataURI 长度:', dataUri.length,
+              '前缀:', dataUri.slice(0, 40));
+
+            // 校验数据非空
+            if (!dataUri || dataUri.length < 100) {
+              throw new Error('PDF 数据异常（长度=' + (dataUri||'').length + '），可能是渲染失败');
             }
 
-            // ── 渲染 PDF 并获取 dataURI（最稳定的输出格式，兼容性最好）──
-            const pdfInstance = await html2pdf().set(opt).from(element).build();
-            console.log('📄 [PDF] 渲染完成, PDF 对象:', pdfInstance ? 'OK' : 'NULL');
+            // base64 → 二进制
+            const b64Part = dataUri.split(',')[1];
+            if (!b64Part) {
+              throw new Error('PDF dataURI 格式异常，找不到 base64 数据部分');
+            }
+            const rawBinary = atob(b64Part);
+            const bytes = new Uint8Array(rawBinary.length);
+            for (let i = 0; i < rawBinary.length; i++) {
+              bytes[i] = rawBinary.charCodeAt(i);
+            }
+            console.log('📄 [PDF] 二进制大小:', bytes.length, '字节',
+              '(约', (bytes.length / 1024).toFixed(1), 'KB)');
 
-            // 用 output('datauristring') 获取 base64 数据 URI（纯文本，不涉及二进制序列化问题）
-            const dataUri = pdfInstance.output('datauristring');
-            console.log('📄 [PDF] dataURI 长度:', dataUri.length, '前缀:', dataUri.slice(0, 30));
+            // 校验 PDF 文件头
+            const header = String.fromCharCode(...bytes.slice(0, 5));
+            if (header !== '%PDF-') {
+              throw new Error('PDF 文件头异常: "' + header + '"，期望 "%PDF-"');
+            }
 
-            // ── 按保存目标写入 ──
-            if (useNative && saveTarget && typeof saveTarget.createWritable === 'function') {
-              // A. 原生「另存为」对话框：base64 → Uint8Array → 写入
-              const b64 = dataUri.split(',')[1];
-              const binary = atob(b64);
-              const bytes = new Uint8Array(binary.length);
-              for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-              const writable = await saveTarget.createWritable();
+            // ── D. 写入目标 ──
+            if (useNativePicker && saveHandle) {
+              // D1. 原生文件句柄写入
+              const writable = await saveHandle.createWritable();
               await writable.write(bytes);
               await writable.close();
+              console.log('📄 [PDF] ✅ 已通过原生对话框写入:', bytes.length, '字节');
               this.showToast('✅ PDF 已保存：' + filename);
-            } else if (saveTarget && typeof saveTarget.location !== 'undefined') {
-              // B. 新标签页：直接载入 dataURI（浏览器会识别为 PDF 并提供下载/打印）
-              saveTarget.location.href = dataUri;
-              this.showToast('📄 PDF 已在新标签页打开，请按「Cmd+S / 下载」选择存放位置', 'info', 6000);
             } else {
-              // C. 兜底：走 jsPDF.save() 传统下载（已验证能产出正常文件）
+              // D2. 降级：走 jsPDF.save() 自动下载（已验证能产出正常文件）
+              console.log('📄 [PDF] 降级使用 jsPDF.save() 自动下载');
               pdfInstance.save(filename);
-              this.showToast('✅ PDF 已下载：' + filename);
+              this.showToast('✅ PDF 已下载：' + filename（如需选择位置请用 Chrome 打开 https 版本）', 'info', 5000);
             }
+
           } catch (err) {
-            console.error('❌ [PDF] 生成失败详情:', err.message, err.stack);
+            console.error('❌ [PDF] v2.5.0 生成失败:', err.message, err.stack);
             const hint = err.message.includes('jsPDF') || err.message.includes('jspdf')
               ? '（jsPDF 库加载失败 → 刷新页面即可）'
               : err.message.includes('html2canvas') || err.message.includes('canvas')
                 ? '（页面渲染截图失败 → 检查图片是否过大或网络问题）'
-                : '（请按 F12 打开控制台查看详细错误）';
-            this.showToast('❌ PDF 生成失败: ' + err.message.slice(0, 60) + hint, 'error');
+                : '';
+            this.showToast('❌ PDF 生成失败: ' + err.message.slice(0, 80) + hint, 'error');
+          } finally {
+            // ═══ 无论成功失败，必须恢复隐藏的元素 ═══
+            hiddenStack.forEach(({ el, backup }) => {
+              el.style.display = backup;  // '' 还原为 CSS 默认值
+            });
+            console.log('📄 [PDF] 已恢复', hiddenStack.length, '个隐藏元素');
           }
         },
 
