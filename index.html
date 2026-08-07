@@ -69,7 +69,8 @@
 
             if (imgH <= contentH) {
               var imgData = canvas.toDataURL(opt.image.type, opt.image.quality);
-              pdf.addImage(imgData, 'JPEG', marginL, marginT, imgW, imgH, undefined, 'FAST');
+              // 注意：不传 compression 参数（'FAST' 在部分 jsPDF 构建不支持）
+              pdf.addImage(imgData, opt.image.type.toUpperCase(), marginL, marginT, imgW, imgH);
             } else {
               // 多页切片
               var pageCanvas = document.createElement('canvas');
@@ -89,7 +90,8 @@
                 var sliceData = pageCanvas.toDataURL(opt.image.type, opt.image.quality);
                 var sliceH_mm = h / ratio;
                 if (!firstPage) pdf.addPage();
-                pdf.addImage(sliceData, 'JPEG', marginL, marginT, contentW, sliceH_mm, undefined, 'FAST');
+                // 注意：不传 compression 参数（'FAST' 在部分 jsPDF 构建不支持）
+                pdf.addImage(sliceData, opt.image.type.toUpperCase(), marginL, marginT, contentW, sliceH_mm);
                 firstPage = false;
                 yOffset += h;
               }
@@ -1460,6 +1462,8 @@
           pendingNodes.forEach(n => n.remove());
           // 移除所有确认/撤销按钮（归档文件不该出现可交互元素）
           element.querySelectorAll('button[data-action="confirm"]').forEach(b => b.remove());
+          // 移除调试面板（details.debug-panel）— 不该出现在正式 PDF 中
+          element.querySelectorAll('details').forEach(d => d.remove());
 
           // 优先用用户输入的文件名，否则从 h1 取，再否则用 reportTitle
           let baseName = '';
@@ -1482,19 +1486,29 @@
           this.showToast('📄 正在生成 PDF，请稍候...');
 
           try {
+            // 前置检查：依赖库是否加载
+            if (typeof window.html2pdf !== 'function') throw new Error('html2pdf 库未加载，请刷新页面重试');
+            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) throw new Error('jsPDF 库未加载，请刷新页面重试');
+            if (typeof window.html2canvas === 'undefined') throw new Error('html2canvas 库未加载，请刷新页面重试');
+
             const opt = {
               margin:       [12, 12, 12, 12],
               filename:     filename,
               image:        { type: 'jpeg', quality: 0.98 },
               html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
-              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-              pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
+            console.log('📄 [PDF] 开始生成:', filename, '元素大小:', element.offsetWidth + 'x' + element.offsetHeight);
             await html2pdf().set(opt).from(element).save();
             this.showToast('✅ PDF 已下载：' + filename);
           } catch (err) {
-            console.error('PDF 生成失败:', err);
-            this.showToast('❌ PDF 生成失败，请检查浏览器控制台', 'error');
+            console.error('❌ [PDF] 生成失败详情:', err.message, err.stack);
+            const hint = err.message.includes('jsPDF') || err.message.includes('jspdf')
+              ? '（jsPDF 库加载失败 → 刷新页面即可）'
+              : err.message.includes('html2canvas') || err.message.includes('canvas')
+                ? '（页面渲染截图失败 → 检查图片是否过大或网络问题）'
+                : '（请按 F12 打开控制台查看详细错误）';
+            this.showToast('❌ PDF 生成失败: ' + err.message.slice(0, 60) + hint, 'error');
           }
         },
 
