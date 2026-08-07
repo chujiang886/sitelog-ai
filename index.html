@@ -37,7 +37,8 @@
         }
         function from(el) { source = (typeof el === 'string') ? document.querySelector(el) : el; return api; }
 
-        function save() {
+        // 共享：渲染 source → 返回 jsPDF 实例（save / outputBlob 复用）
+        function build() {
           if (!source) return Promise.reject(new Error('html2pdf: no source element'));
           if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
             return Promise.reject(new Error('html2pdf: jsPDF 未加载'));
@@ -96,12 +97,20 @@
                 yOffset += h;
               }
             }
-            pdf.save(opt.filename);
             return pdf;
           });
         }
 
-        var api = { set: set, from: from, save: save };
+        function save() {
+          return build().then(function (pdf) { pdf.save(opt.filename); return pdf; });
+        }
+
+        // 产出 PDF 二进制 Blob（供原生「另存为」对话框 / 新标签页使用）
+        function outputBlob() {
+          return build().then(function (pdf) { return pdf.output('blob'); });
+        }
+
+        var api = { set: set, from: from, save: save, outputBlob: outputBlob };
         return api;
       }
       window.html2pdf = html2pdf;
@@ -167,7 +176,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v2.4.8</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v2.4.9</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -1491,6 +1500,27 @@
             if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) throw new Error('jsPDF 库未加载，请刷新页面重试');
             if (typeof window.html2canvas === 'undefined') throw new Error('html2canvas 库未加载，请刷新页面重试');
 
+            // ── 关键：在用户手势窗口内先「拿保存目标」，再异步生成 PDF ──
+            // A. 原生「另存为」对话框（需 https / localhost + Chrome/Edge）
+            let saveTarget = null;
+            let useNative = false;
+            if (typeof window.showSaveFilePicker === 'function') {
+              try {
+                saveTarget = await window.showSaveFilePicker({
+                  suggestedName: filename,
+                  types: [{ description: 'PDF 文档', accept: { 'application/pdf': ['.pdf'] } }]
+                });
+                useNative = true;
+              } catch (e) {
+                if (e && e.name === 'AbortError') { this.showToast('已取消保存'); return; }
+                saveTarget = null; // 选择器失败 → 降级新标签页
+              }
+            }
+            // B. 非安全上下文（局域网 http）/ 原生选择器不可用时：手势内先开空白页，稍后载入 PDF
+            if (!saveTarget) {
+              try { saveTarget = window.open('about:blank', '_blank'); } catch (e) { saveTarget = null; }
+            }
+
             const opt = {
               margin:       [12, 12, 12, 12],
               filename:     filename,
@@ -1499,8 +1529,29 @@
               jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
             console.log('📄 [PDF] 开始生成:', filename, '元素大小:', element.offsetWidth + 'x' + element.offsetHeight);
-            await html2pdf().set(opt).from(element).save();
-            this.showToast('✅ PDF 已下载：' + filename);
+            const blob = await html2pdf().set(opt).from(element).outputBlob();
+
+            // ── 把生成的 Blob 落到用户选定的目标 ──
+            if (useNative && saveTarget && typeof saveTarget.createWritable === 'function') {
+              const writable = await saveTarget.createWritable();
+              await writable.write(blob);
+              await writable.close();
+              this.showToast('✅ PDF 已保存：' + filename);
+            } else if (saveTarget && typeof saveTarget.location !== 'undefined') {
+              // 新标签页打开（用户按 Cmd+S / 点下载 可存到任意位置）
+              const url = URL.createObjectURL(blob);
+              saveTarget.location.href = url;
+              setTimeout(() => URL.revokeObjectURL(url), 120000);
+              this.showToast('📄 PDF 已在新标签页打开，请按「Cmd+S / 下载」选择存放位置', 'info', 6000);
+            } else {
+              // C. 兜底：传统下载（位置由浏览器设置决定）
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = filename;
+              document.body.appendChild(a); a.click(); a.remove();
+              setTimeout(() => URL.revokeObjectURL(url), 120000);
+              this.showToast('✅ PDF 已下载：' + filename);
+            }
           } catch (err) {
             console.error('❌ [PDF] 生成失败详情:', err.message, err.stack);
             const hint = err.message.includes('jsPDF') || err.message.includes('jspdf')
@@ -1556,9 +1607,10 @@
         },
 
         // ===== 工具 =====
-        showToast(msg, type = 'info') {
+        showToast(msg, type = 'info', duration = 3000) {
           this.toast = { show: true, msg, type };
-          setTimeout(() => this.toast.show = false, 3000);
+          clearTimeout(this._toastTimer);
+          this._toastTimer = setTimeout(() => this.toast.show = false, duration);
         }
       };
     }
