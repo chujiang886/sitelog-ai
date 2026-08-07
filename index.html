@@ -165,7 +165,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v2.4.7</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -776,7 +776,16 @@
             const descEl = block.querySelector('p.text-slate-700');
             const hlBadges = block.querySelectorAll('.highlight-badge');
             if (titleEl) img.title = titleEl.innerText.trim();
-            if (descEl) img.desc = descEl.innerText.trim();
+            // ⚠️ 关键防护：只有用户手写的非占位符内容才回写。
+            //    如果 DOM 渲染的是系统占位符（📝 请补充 / [AI 识别失败] / [请填写]），
+            //    说明 analyzeImage 还没执行完、或是上一轮 rebuild 的兜底值，
+            //    此时 captureDomEdits 绝不能把它写回 img 对象——否则会覆盖真实 AI 结果。
+            if (descEl) {
+              const val = descEl.innerText.trim();
+              const isPlaceholder = val.includes('请补充') || val.includes('[AI 识别失败') || val.includes('[请填写') || val.startsWith('📝');
+              if (!isPlaceholder) img.desc = val;
+              else console.log(`🛡️ captureDomEdits: 跳过占位符回写 (img=${img.file?.name||img.id}, dom="${val.slice(0,30)}...")`);
+            }
             if (hlBadges.length) {
               img.highlights = Array.from(hlBadges)
                 .map(b => b.innerText.replace(/^✦\s*/, '').trim())
@@ -939,6 +948,27 @@
           // 默认未确认，等用户在复核弹窗/节点上点 ✓ 确认才入档
           img.aiConfirmed = false;
           img._analyzed = true;   // 标记：已被 AI 真正分析过（区别于 ensureTitles 兜底）
+
+          // 🔍 调试数据：保留每个模型的原始返回，UI 可展示用于排查 desc 占位符问题
+          img._debug = {
+            finalCategory,
+            winnerModel: winner._model || 'unknown',
+            winnerDesc: (winner.desc || '').slice(0, 120),
+            bestDesc,
+            votes: votes.map(v => ({
+              _model: v._model || '?',
+              category: v.category,
+              title: (v.title || '').slice(0, 60),
+              desc: (v.desc || '').slice(0, 120),
+              stage: (v.stage || '').slice(0, 60),
+              hasDesc: !!(v.desc || v.description || v['描述']),
+              rawLen: (v._raw || '').length,
+            })),
+          };
+          // 如果最终 desc 是占位符，打详细日志（F12 控制台可见）
+          if (bestDesc.includes('请补充') || bestDesc.includes('📝')) {
+            console.error(`🔍 [DESC_DEBUG] img=${img.file?.name||img.id} 最终 desc 为占位符！`, img._debug);
+          }
         },
 
         buildAnalysisPrompt() {
@@ -1182,6 +1212,8 @@
           if (parsed && parsed.category) {
             parsed.category = parsed.category.trim();
           }
+          // 挂模型名用于调试追踪
+          parsed._model = modelOverride || config.model || 'unknown';
           return parsed;
         },
 
@@ -1371,6 +1403,11 @@
                   </div>
                   <div class="col-span-3">
                     <p class="text-slate-700 leading-relaxed mb-3 editable-block" contenteditable="true">${img.desc || '<span class="text-slate-400">[请填写工艺说明]</span>'}</p>
+                    ${ (img.desc && (img.desc.includes('请补充') || img.desc.includes('📝'))) ? `
+                    <details class="mb-2 bg-amber-50 border border-amber-200 rounded p-2 text-xs">
+                      <summary class="cursor-pointer font-bold text-amber-700">🔍 工艺说明为占位符 — 点击查看 AI 原始返回（排查用）</summary>
+                      <pre class="mt-1 text-[10px] text-red-800 whitespace-pre-wrap break-all max-h-60 overflow-auto">${this.escapeHtml(JSON.stringify(img._debug||{error:'无调试数据（可能是旧版代码）'}, null, 2))}</pre>
+                    </details>` : '' }
                     <div class="pt-2 border-t border-slate-100">
                       <p class="text-xs text-slate-500 mb-1.5">🌟 工艺亮点</p>
                       <div class="editable-block" contenteditable="true">${highlightsHtml || '<span class="text-slate-400 text-xs">[请填写亮点]</span>'}</div>
