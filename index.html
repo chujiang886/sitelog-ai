@@ -176,7 +176,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v2.4.10</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v2.4.11</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -1500,7 +1500,16 @@
             if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) throw new Error('jsPDF 库未加载，请刷新页面重试');
             if (typeof window.html2canvas === 'undefined') throw new Error('html2canvas 库未加载，请刷新页面重试');
 
-            // ── 关键：在用户手势窗口内先「拿保存目标」，再异步生成 PDF ──
+            const opt = {
+              margin:       [12, 12, 12, 12],
+              filename:     filename,
+              image:        { type: 'jpeg', quality: 0.98 },
+              html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            console.log('📄 [PDF] 开始生成:', filename, '元素大小:', element.offsetWidth + 'x' + element.offsetHeight);
+
+            // ── 策略：先尝试拿原生保存目标（需在用户手势内），再生成 PDF ──
             // A. 原生「另存为」对话框（需 https / localhost + Chrome/Edge）
             let saveTarget = null;
             let useNative = false;
@@ -1511,76 +1520,44 @@
                   types: [{ description: 'PDF 文档', accept: { 'application/pdf': ['.pdf'] } }]
                 });
                 useNative = true;
+                console.log('📄 [PDF] 拿到原生保存目标');
               } catch (e) {
                 if (e && e.name === 'AbortError') { this.showToast('已取消保存'); return; }
-                saveTarget = null; // 选择器失败 → 降级新标签页
+                saveTarget = null; // 选择器失败 → 降级
               }
             }
-            // B. 非安全上下文（局域网 http）/ 原生选择器不可用时：手势内先开空白页，稍后载入 PDF
+
+            // B. 非安全上下文 / 原生选择器不可用：预开空白页（稍后载入 PDF）
             if (!saveTarget) {
               try { saveTarget = window.open('about:blank', '_blank'); } catch (e) { saveTarget = null; }
             }
 
-            const opt = {
-              margin:       [12, 12, 12, 12],
-              filename:     filename,
-              image:        { type: 'jpeg', quality: 0.98 },
-              html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
-              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
-            console.log('📄 [PDF] 开始生成:', filename, '元素大小:', element.offsetWidth + 'x' + element.offsetHeight);
-
-            // ── 先渲染拿到 jsPDF 实例，再按需输出 ──
+            // ── 渲染 PDF 并获取 dataURI（最稳定的输出格式，兼容性最好）──
             const pdfInstance = await html2pdf().set(opt).from(element).build();
             console.log('📄 [PDF] 渲染完成, PDF 对象:', pdfInstance ? 'OK' : 'NULL');
 
-            // 校验：PDF 至少应有几千字节（空白 A4 约 5-10KB）
-            const MIN_PDF_SIZE = 3000;
-            let pdfData = null;
-            let useSaveMethod = false; // 是否降级为 pdf.save()
+            // 用 output('datauristring') 获取 base64 数据 URI（纯文本，不涉及二进制序列化问题）
+            const dataUri = pdfInstance.output('datauristring');
+            console.log('📄 [PDF] dataURI 长度:', dataUri.length, '前缀:', dataUri.slice(0, 30));
 
-            try {
-              // 优先用 arrayBuffer（File System Access API 写入最可靠）
-              pdfData = await pdfInstance.output('arraybuffer');
-              console.log('📄 [PDF] arrayBuffer 大小:', pdfData.byteLength, 'bytes');
-
-              if (!pdfData || pdfData.byteLength < MIN_PDF_SIZE) {
-                console.warn('⚠️ [PDF] arrayBuffer 异常(', pdfData?.byteLength, 'bytes), 尝试 blob...');
-                const blob = await pdfInstance.output('blob');
-                pdfData = await blob.arrayBuffer();
-                console.log('📄 [PDF] fallback blob→arrayBuffer 大小:', pdfData.byteLength);
-              }
-            } catch (outErr) {
-              console.warn('⚠️ [PDF] output 失败, 降级 pdf.save():', outErr.message);
-              useSaveMethod = true;
-            }
-
-            // ── 把 PDF 数据写到用户选定的目标 ──
-            if (useSaveMethod) {
-              // 降级：走浏览器传统下载通道
-              pdfInstance.save(filename);
-              this.showToast('✅ PDF 已下载：' + filename);
-            } else if (useNative && saveTarget && typeof saveTarget.createWritable === 'function') {
-              // A. 原生「另存为」对话框写入（用 Uint8Array 最可靠）
+            // ── 按保存目标写入 ──
+            if (useNative && saveTarget && typeof saveTarget.createWritable === 'function') {
+              // A. 原生「另存为」对话框：base64 → Uint8Array → 写入
+              const b64 = dataUri.split(',')[1];
+              const binary = atob(b64);
+              const bytes = new Uint8Array(binary.length);
+              for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
               const writable = await saveTarget.createWritable();
-              await writable.write(new Uint8Array(pdfData));
+              await writable.write(bytes);
               await writable.close();
               this.showToast('✅ PDF 已保存：' + filename);
             } else if (saveTarget && typeof saveTarget.location !== 'undefined') {
-              // B. 新标签页打开（用户 Cmd+S 存任意位置）
-              const blob = new Blob([pdfData], { type: 'application/pdf' });
-              const url = URL.createObjectURL(blob);
-              saveTarget.location.href = url;
-              setTimeout(() => URL.revokeObjectURL(url), 120000);
+              // B. 新标签页：直接载入 dataURI（浏览器会识别为 PDF 并提供下载/打印）
+              saveTarget.location.href = dataUri;
               this.showToast('📄 PDF 已在新标签页打开，请按「Cmd+S / 下载」选择存放位置', 'info', 6000);
             } else {
-              // C. 兜底：传统下载
-              const blob = new Blob([pdfData], { type: 'application/pdf' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url; a.download = filename;
-              document.body.appendChild(a); a.click(); a.remove();
-              setTimeout(() => URL.revokeObjectURL(url), 120000);
+              // C. 兜底：走 jsPDF.save() 传统下载（已验证能产出正常文件）
+              pdfInstance.save(filename);
               this.showToast('✅ PDF 已下载：' + filename);
             }
           } catch (err) {
