@@ -910,8 +910,21 @@
           const defaults = CATEGORY_DEFAULTS[normalizedCat] || {};
 
           img.title = (winner.title || '').trim() || defaults.title || `${finalCategory}节点`;
-          // desc 兜底用醒目占位符——绝不假装识别出了内容
-          img.desc = (winner.desc || '').trim() || '📝 请补充本张照片的具体工艺说明（AI 未能生成差异化描述）';
+          // ── desc 多级兜底（根治「工艺说明全变占位符」）──
+          // 1) winner 自己的 desc（extractJSON 已做多键名归一化）
+          // 2) winner 没有 → 从同节点其它 vote 借最长的 desc（同一张图的补充视角）
+          // 3) 仍没有 → 用模型给的 stage（进度描述也是真实内容，远胜占位符）
+          // 4) 最后才回退到占位符
+          let bestDesc = (winner.desc || '').trim();
+          if (!bestDesc) {
+            const alt = votes
+              .filter(v => v !== winner && (v.desc || '').trim())
+              .sort((a, b) => (b.desc || '').length - (a.desc || '').length)[0];
+            if (alt) bestDesc = alt.desc.trim();
+          }
+          if (!bestDesc && (winner.stage || '').trim()) bestDesc = winner.stage.trim() + '。';
+          if (!bestDesc) bestDesc = '📝 请补充本张照片的具体工艺说明（AI 未能生成差异化描述）';
+          img.desc = bestDesc;
           img.highlights = Array.isArray(winner.highlights) ? winner.highlights : [];
 
           // 缺字段时打日志，方便排查 AI 返回质量问题
@@ -1162,30 +1175,125 @@
           const data = await response.json();
           const rawContent = data.choices[0].message.content;
 
-          // 智能提取 JSON（兼容 markdown 代码块包裹、前后废话等）
-          let parsed;
-          const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            try { parsed = JSON.parse(jsonMatch[0]); } catch(e) {
-              console.warn('⚠️ JSON 解析失败，尝试修复', e.message);
-              // 尝试修复常见问题：尾部逗号、单引号等
-              try {
-                parsed = JSON.parse(jsonMatch[0].replace(/,\s*([}\]])/g, '$1').replace(/'/g, '"'));
-              } catch(e2) {
-                parsed = { _raw: rawContent.slice(0, 300), _parseError: e2.message };
-              }
-            }
-          } else {
-            // 完全没找到 JSON，记录原始内容
-            parsed = { _raw: rawContent.slice(0, 300), _noJson: true };
-            console.warn('⚠️ AI 返回中未找到 JSON，原始内容前200字:', rawContent.slice(0, 200));
-          }
+          // 智能提取 JSON（兼容 markdown 代码块、前后废话、键名差异、多余花括号等）
+          const parsed = this.extractJSONRobust(rawContent);
 
           // 归一化 category
-          if (parsed.category) {
+          if (parsed && parsed.category) {
             parsed.category = parsed.category.trim();
           }
           return parsed;
+        },
+
+        // ─── 鲁棒 JSON 提取（根治 desc 丢失）───
+        // 旧实现用贪婪正则 /\{[\s\S]*\}/ —— 从第一个 { 匹配到最后一个 }，
+        // 一旦返回里夹杂任何多余花括号（解释文字/嵌套）就整段解析失败，desc 全丢。
+        // 新实现：① 整段直解 ② 平衡花括号定位 ③ 容错修复 ④ 逐字段正则抠取。
+        // 且 desc 做多键名归一化（desc/description/描述/工艺说明…），杜绝「键名不对就丢」。
+        extractJSONRobust(raw) {
+          if (!raw) return { _raw: '', _noJson: true };
+
+          // 1) 整段直接解析（纯 JSON 情况）
+          try {
+            const p = JSON.parse(raw.trim());
+            if (p && typeof p === 'object') return this._normalizeParsed(p, raw);
+          } catch (e) { /* 继续 */ }
+
+          // 2) 遍历所有 { 位置，找「能解析且字段最全」的 JSON 对象。
+          //    避免首个 { 误抓到解释文字里的小括号对（如「这是{玻扇施工}阶段」）。
+          let best = null, bestScore = -1;
+          for (let i = raw.indexOf('{'); i >= 0; i = raw.indexOf('{', i + 1)) {
+            const end = this._findMatchingBrace(raw, i);
+            if (end <= i) continue;
+            const cand = raw.slice(i, end + 1);
+            let obj = null;
+            try { obj = JSON.parse(cand); } catch (e) { obj = null; }
+            if (!obj || typeof obj !== 'object') {
+              // 3a) 容错修复：去尾逗号 + 未引号键
+              try {
+                const fixed = cand
+                  .replace(/,\s*([}\]])/g, '$1')
+                  .replace(/([{,])\s*([A-Za-z_\u4e00-\u9fa5]+)\s*:/g, '$1"$2":');
+                obj = JSON.parse(fixed);
+              } catch (e2) {
+                // 3b) 纯单引号 JSON → 全部转双引号（兼容旧式返回）
+                if (cand.includes("'") && !cand.includes('"')) {
+                  try { obj = JSON.parse(cand.replace(/'/g, '"')); } catch (e3) { obj = null; }
+                }
+              }
+            }
+            if (obj && typeof obj === 'object') {
+              const score = (obj.title ? 1 : 0)
+                + (obj.desc || obj.description || obj['描述'] ? 1 : 0)
+                + (obj.category ? 1 : 0)
+                + (obj.highlights ? 1 : 0);
+              if (score > bestScore) { bestScore = score; best = obj; }
+            }
+          }
+          if (best) return this._normalizeParsed(best, raw);
+
+          // 4) 完全解析不了 → 逐字段正则抠取（最差情况也尽量保留信息）
+          const byField = this._extractFieldsByRegex(raw);
+          if (byField) return byField;
+
+          // 5) 彻底没 JSON：保留原文，desc 兜底里尝试从原文抽一句
+          console.warn('⚠️ AI 返回中未找到可解析 JSON，原始内容前200字:', raw.slice(0, 200));
+          return { _raw: raw.slice(0, 600), _noJson: true };
+        },
+
+        _findMatchingBrace(s, start) {
+          let depth = 0, inStr = false, esc = false;
+          for (let i = start; i < s.length; i++) {
+            const c = s[i];
+            if (esc) { esc = false; continue; }
+            if (c === '\\') { esc = true; continue; }
+            if (c === '"') { inStr = !inStr; continue; }
+            if (inStr) continue;
+            if (c === '{') depth++;
+            else if (c === '}') { depth--; if (depth === 0) return i; }
+          }
+          return -1;
+        },
+
+        _normalizeParsed(p, raw) {
+          // 多键名归一化：模型可能用不同字段名表达「工艺说明」
+          const descKeys = ['desc','description','描述','工艺说明','说明','caption','detail','内容','备注'];
+          let desc = '';
+          for (const k of descKeys) {
+            if (typeof p[k] === 'string' && p[k].trim()) { desc = p[k].trim(); break; }
+          }
+          // JSON 里没有 desc，但从自然语言原文抽一句兜底（仍比占位符有价值）
+          if (!desc) desc = this._extractSentenceFromRaw(raw);
+          return {
+            title:     typeof p.title === 'string' ? p.title.trim() : '',
+            category:  typeof p.category === 'string' ? p.category.trim() : '',
+            stage:     typeof p.stage === 'string' ? p.stage.trim() : '',
+            desc:      desc,
+            highlights: Array.isArray(p.highlights) ? p.highlights.map(String) : [],
+            _raw:      raw ? raw.slice(0, 600) : ''
+          };
+        },
+
+        _extractFieldsByRegex(raw) {
+          const get = (key) => {
+            const m = raw.match(new RegExp('"?' + key + '"?\\s*[:：]\\s*"?([^"\\n,}]*)"?', 'i'));
+            return m ? m[1].trim().replace(/^["'「『]|["'」』]$/g, '') : '';
+          };
+          const title = get('title');
+          const category = get('category');
+          const stage = get('stage');
+          const desc = get('desc') || get('description') || get('描述') || get('工艺说明') || this._extractSentenceFromRaw(raw);
+          // 亮点只从 "highlights": [...] 数组里取，避免误抓键名/其它引号串
+          const hlMatch = raw.match(/"highlights"\s*:\s*\[([\s\S]*?)\]/i);
+          const hl = hlMatch ? [...hlMatch[1].matchAll(/"([^"]{1,40})"/g)].map(m => m[1]) : [];
+          if (!title && !desc && !category) return null;
+          return { title, category, stage, desc: desc || '', highlights: hl, _raw: raw.slice(0, 600) };
+        },
+
+        _extractSentenceFromRaw(raw) {
+          const cleaned = raw.replace(/```json|```|[\{\}\[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+          const m = cleaned.match(/[一-龥][^。！？\n]{6,60}[。！？]?/);
+          return m ? m[0].trim() : '';
         },
 
         async testConnection() {
