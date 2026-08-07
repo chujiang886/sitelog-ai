@@ -110,7 +110,7 @@
           return build().then(function (pdf) { return pdf.output('blob'); });
         }
 
-        var api = { set: set, from: from, save: save, outputBlob: outputBlob };
+        var api = { set: set, from: from, build: build, save: save, outputBlob: outputBlob };
         return api;
       }
       window.html2pdf = html2pdf;
@@ -176,7 +176,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v2.4.9</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v2.4.10</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -1529,22 +1529,53 @@
               jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
             console.log('📄 [PDF] 开始生成:', filename, '元素大小:', element.offsetWidth + 'x' + element.offsetHeight);
-            const blob = await html2pdf().set(opt).from(element).outputBlob();
 
-            // ── 把生成的 Blob 落到用户选定的目标 ──
-            if (useNative && saveTarget && typeof saveTarget.createWritable === 'function') {
+            // ── 先渲染拿到 jsPDF 实例，再按需输出 ──
+            const pdfInstance = await html2pdf().set(opt).from(element).build();
+            console.log('📄 [PDF] 渲染完成, PDF 对象:', pdfInstance ? 'OK' : 'NULL');
+
+            // 校验：PDF 至少应有几千字节（空白 A4 约 5-10KB）
+            const MIN_PDF_SIZE = 3000;
+            let pdfData = null;
+            let useSaveMethod = false; // 是否降级为 pdf.save()
+
+            try {
+              // 优先用 arrayBuffer（File System Access API 写入最可靠）
+              pdfData = await pdfInstance.output('arraybuffer');
+              console.log('📄 [PDF] arrayBuffer 大小:', pdfData.byteLength, 'bytes');
+
+              if (!pdfData || pdfData.byteLength < MIN_PDF_SIZE) {
+                console.warn('⚠️ [PDF] arrayBuffer 异常(', pdfData?.byteLength, 'bytes), 尝试 blob...');
+                const blob = await pdfInstance.output('blob');
+                pdfData = await blob.arrayBuffer();
+                console.log('📄 [PDF] fallback blob→arrayBuffer 大小:', pdfData.byteLength);
+              }
+            } catch (outErr) {
+              console.warn('⚠️ [PDF] output 失败, 降级 pdf.save():', outErr.message);
+              useSaveMethod = true;
+            }
+
+            // ── 把 PDF 数据写到用户选定的目标 ──
+            if (useSaveMethod) {
+              // 降级：走浏览器传统下载通道
+              pdfInstance.save(filename);
+              this.showToast('✅ PDF 已下载：' + filename);
+            } else if (useNative && saveTarget && typeof saveTarget.createWritable === 'function') {
+              // A. 原生「另存为」对话框写入（用 Uint8Array 最可靠）
               const writable = await saveTarget.createWritable();
-              await writable.write(blob);
+              await writable.write(new Uint8Array(pdfData));
               await writable.close();
               this.showToast('✅ PDF 已保存：' + filename);
             } else if (saveTarget && typeof saveTarget.location !== 'undefined') {
-              // 新标签页打开（用户按 Cmd+S / 点下载 可存到任意位置）
+              // B. 新标签页打开（用户 Cmd+S 存任意位置）
+              const blob = new Blob([pdfData], { type: 'application/pdf' });
               const url = URL.createObjectURL(blob);
               saveTarget.location.href = url;
               setTimeout(() => URL.revokeObjectURL(url), 120000);
               this.showToast('📄 PDF 已在新标签页打开，请按「Cmd+S / 下载」选择存放位置', 'info', 6000);
             } else {
-              // C. 兜底：传统下载（位置由浏览器设置决定）
+              // C. 兜底：传统下载
+              const blob = new Blob([pdfData], { type: 'application/pdf' });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url; a.download = filename;
