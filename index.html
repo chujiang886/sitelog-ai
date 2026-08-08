@@ -12,16 +12,54 @@
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="vendor/html2canvas.min.js"></script>
   <script>
-    // ===== html2pdf 轻量胶水层（本地化，无 CDN 依赖）=====
-    // 用法：await html2pdf().set(opt).from(element).save();
+    // ═══════════════════════════════════════════════════════════════
+    //  html2pdf 胶水层 v4.0.0 —— A4 规范化分页引擎（本地化，无 CDN 依赖）
+    //
+    //  ★ v4.0.0 核心重写：真正实现 pagebreak
+    //    旧版缺陷：整页截一张大 canvas → 按「固定高度」一刀切
+    //             → 卡片/图片被拦腰截断（跨页断层），pagebreak 配置是空转
+    //    新版方案：渲染前采集所有「不可切割块」在页面中的 y 坐标区间
+    //             → 切片时若切点落在某块内部，把切点上移到该块顶部
+    //             → 该块整体推到下一页，永不被切开
+    //
+    //  配置项：
+    //    margin:    [top, left, bottom, right]（mm）
+    //    pagebreak: { avoid: ['.node-card', ...], after: ['.pdf-cover'] }
+    //    footer:    { enabled, text（中文，预渲染成图）, pageLabel }
+    //  用法：await html2pdf().set(opt).from(el).build();
+    // ═══════════════════════════════════════════════════════════════
     (function () {
+      // 把一段中文文本预渲染成透明底小图（jsPDF 原生字体不支持中文，只能贴图）
+      function renderTextStrip(text) {
+        if (!text || typeof window.html2canvas !== 'function') return Promise.resolve(null);
+        var d = document.createElement('div');
+        // 注意：用 fixed 移出可视区（仍在文档流内渲染，offsetWidth 正常）
+        // 切勿用 detached DOM —— html2canvas 会算出 0 尺寸
+        d.style.cssText = 'position:fixed;left:-99999px;top:0;z-index:-1;' +
+          'font:500 10px/1.4 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;' +
+          'color:#9a9488;letter-spacing:0.08em;white-space:nowrap;padding:1px 0;background:transparent;';
+        d.textContent = text;
+        document.body.appendChild(d);
+        return window.html2canvas(d, { scale: 4, backgroundColor: null, logging: false })
+          .then(function (c) {
+            document.body.removeChild(d);
+            return { dataUrl: c.toDataURL('image/png'), w: c.width, h: c.height };
+          })
+          .catch(function () {
+            if (d.parentNode) document.body.removeChild(d);
+            return null;   // 失败就降级为无中文条，不阻断导出
+          });
+      }
+
       function html2pdf() {
         var opt = {
-          margin:       [10, 10, 10, 10],
+          margin:       [14, 15, 16, 15],   // [top, left, bottom, right] mm
           filename:     'document.pdf',
           image:        { type: 'jpeg', quality: 0.95 },
           html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
-          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak:    { avoid: [], after: [] },
+          footer:       { enabled: false, text: '', pageLabel: '' }
         };
         var source = null;
 
@@ -36,6 +74,29 @@
           return api;
         }
         function from(el) { source = (typeof el === 'string') ? document.querySelector(el) : el; return api; }
+
+        // ── 渲染前：采集不可切割块 / 强制分页点（真实 DOM 坐标，单位 CSS px）──
+        function collectBlocks() {
+          var srcRect = source.getBoundingClientRect();
+          var res = { atoms: [], forces: [], srcH: srcRect.height };
+          var avoidSel = (opt.pagebreak && opt.pagebreak.avoid) || [];
+          var afterSel = (opt.pagebreak && opt.pagebreak.after) || [];
+          if (avoidSel.length) {
+            source.querySelectorAll(avoidSel.join(',')).forEach(function (el) {
+              var r = el.getBoundingClientRect();
+              if (r.height > 1) res.atoms.push({ top: r.top - srcRect.top, bottom: r.bottom - srcRect.top });
+            });
+          }
+          if (afterSel.length) {
+            source.querySelectorAll(afterSel.join(',')).forEach(function (el) {
+              var r = el.getBoundingClientRect();
+              if (r.height > 1) res.forces.push(r.bottom - srcRect.top);
+            });
+          }
+          res.atoms.sort(function (a, b) { return a.top - b.top; });
+          res.forces.sort(function (a, b) { return a - b; });
+          return res;
+        }
 
         // 共享：渲染 source → 返回 jsPDF 实例（save / outputBlob 复用）
         function build() {
@@ -54,51 +115,118 @@
             orientation: opt.jsPDF.orientation
           });
 
-          var pageW = pdf.internal.pageSize.getWidth();
-          var pageH = pdf.internal.pageSize.getHeight();
-          var marginL = (Array.isArray(opt.margin) ? opt.margin[1] : opt.margin) || 0;
-          var marginR = (Array.isArray(opt.margin) ? opt.margin[3] : opt.margin) || 0;
-          var marginT = (Array.isArray(opt.margin) ? opt.margin[0] : opt.margin) || 0;
-          var marginB = (Array.isArray(opt.margin) ? opt.margin[2] : opt.margin) || 0;
-          var contentW = pageW - marginL - marginR;
-          var contentH = pageH - marginT - marginB;
+          var pageW = pdf.internal.pageSize.getWidth();    // 210mm
+          var pageH = pdf.internal.pageSize.getHeight();   // 297mm
+          var m  = Array.isArray(opt.margin) ? opt.margin : [opt.margin, opt.margin, opt.margin, opt.margin];
+          var mT = m[0] || 0, mL = m[1] || 0, mB = m[2] || 0, mR = m[3] || 0;
+          var contentW = pageW - mL - mR;
+          var contentH = pageH - mT - mB;
 
-          return window.html2canvas(source, Object.assign({}, opt.html2canvas)).then(function (canvas) {
-            var imgW = contentW;
-            var scale = contentW / canvas.width;
-            var imgH = canvas.height * scale;
+          // 采集必须在 html2canvas 之前（此时 DOM 布局已锁定为 A4 宽度）
+          var blocks = collectBlocks();
 
-            if (imgH <= contentH) {
-              var imgData = canvas.toDataURL(opt.image.type, opt.image.quality);
-              // 注意：不传 compression 参数（'FAST' 在部分 jsPDF 构建不支持）
-              pdf.addImage(imgData, opt.image.type.toUpperCase(), marginL, marginT, imgW, imgH);
-            } else {
-              // 多页切片
+          return renderTextStrip(opt.footer && opt.footer.enabled ? opt.footer.text : '')
+            .then(function (strip) {
+              return window.html2canvas(source, Object.assign({}, opt.html2canvas))
+                .then(function (canvas) { return { canvas: canvas, strip: strip }; });
+            })
+            .then(function (bundle) {
+              var canvas = bundle.canvas;
+              var strip  = bundle.strip;
+
+              // CSS px → canvas px 的换算比（用实测比例，比假定 scale 更准）
+              var pxPerCss = blocks.srcH > 0 ? (canvas.height / blocks.srcH) : (opt.html2canvas.scale || 2);
+              var ratio    = canvas.width / contentW;              // canvas px / mm
+              var sliceMax = Math.floor(contentH * ratio);         // 一页最多容纳的 canvas 像素高
+
+              var atoms  = blocks.atoms.map(function (b) {
+                return { top: b.top * pxPerCss, bottom: b.bottom * pxPerCss };
+              });
+              var forces = blocks.forces.map(function (v) { return v * pxPerCss; });
+
               var pageCanvas = document.createElement('canvas');
               pageCanvas.width = canvas.width;
-              var pageCtx = pageCanvas.getContext('2d');
-              var ratio = canvas.width / contentW;
-              var sliceHeightSrc = Math.floor(contentH * ratio);
-              var yOffset = 0;
-              var firstPage = true;
-              while (yOffset < canvas.height) {
-                var remaining = canvas.height - yOffset;
-                var h = Math.min(sliceHeightSrc, remaining);
+              var ctx = pageCanvas.getContext('2d');
+
+              var y = 0, first = true, guard = 0;
+              while (y < canvas.height - 2 && guard++ < 300) {
+                var cut = Math.min(y + sliceMax, canvas.height);
+
+                if (cut < canvas.height) {
+                  var chosen = cut;
+
+                  // (a) 避免切断原子块：块起点在本页内、终点超出切点 → 把切点提到块顶
+                  //     ★ 前提：该块本身塞得进一页。若块高 > 一页（如超长卡片），
+                  //       推到下一页照样放不下，反而制造一个只有几行的空页 → 直接硬切
+                  for (var j = 0; j < atoms.length; j++) {
+                    var b = atoms[j];
+                    if ((b.bottom - b.top) <= sliceMax &&
+                        b.top > y + 2 && b.top < cut && b.bottom > cut + 1) {
+                      if (b.top < chosen) chosen = b.top;
+                    }
+                  }
+
+                  // (b) 强制分页点（如封面之后必须换页）：取本页内最靠后的一个
+                  var fcut = -1;
+                  for (var i = 0; i < forces.length; i++) {
+                    if (forces[i] > y + 4 && forces[i] <= cut && forces[i] > fcut) fcut = forces[i];
+                  }
+                  if (fcut > 0 && fcut < chosen) chosen = fcut;
+
+                  // 兜底：切点至少要往前推进 10% 页高，防止死循环 / 大量空页
+                  cut = Math.max(chosen, y + Math.floor(sliceMax * 0.10));
+                  cut = Math.min(cut, canvas.height);
+                }
+
+                var h = Math.round(cut - y);
+                if (h <= 0) break;
+
                 pageCanvas.height = h;
-                pageCtx.fillStyle = '#ffffff';
-                pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-                pageCtx.drawImage(canvas, 0, yOffset, canvas.width, h, 0, 0, canvas.width, h);
-                var sliceData = pageCanvas.toDataURL(opt.image.type, opt.image.quality);
-                var sliceH_mm = h / ratio;
-                if (!firstPage) pdf.addPage();
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, pageCanvas.width, h);
+                ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+
+                // ★ v4.0.0 修复：MIME 必须写全 'image/jpeg'。
+                //   旧代码传 'jpeg'（无效 MIME）→ 浏览器静默退回 PNG，
+                //   jsPDF 却按 JPEG 声明嵌入 → 实为未压缩位图，
+                //   3 张图的报告能撑到 34MB，客户手机端打开必卡死。
+                var sliceData = pageCanvas.toDataURL('image/' + opt.image.type, opt.image.quality);
+                if (!first) pdf.addPage();
                 // 注意：不传 compression 参数（'FAST' 在部分 jsPDF 构建不支持）
-                pdf.addImage(sliceData, opt.image.type.toUpperCase(), marginL, marginT, contentW, sliceH_mm);
-                firstPage = false;
-                yOffset += h;
+                pdf.addImage(sliceData, opt.image.type.toUpperCase(), mL, mT, contentW, h / ratio);
+                first = false;
+                y = cut;
               }
-            }
-            return pdf;
-          });
+
+              // ── 每页统一页脚：金色细线 + 中文公司条 + 页码 ──
+              if (opt.footer && opt.footer.enabled) {
+                var total = pdf.internal.getNumberOfPages();
+                var lineY = pageH - mB + 5.5;
+                var textY = pageH - mB + 10.5;
+                for (var p = 1; p <= total; p++) {
+                  pdf.setPage(p);
+                  pdf.setDrawColor(184, 146, 74);      // 商务金 #B8924A
+                  pdf.setLineWidth(0.4);
+                  pdf.line(mL, lineY, pageW - mR, lineY);
+
+                  if (strip && strip.dataUrl) {
+                    var sW = 46;                                   // 固定宽 46mm
+                    var sH = sW * (strip.h / strip.w);
+                    pdf.addImage(strip.dataUrl, 'PNG', mL, textY - sH + 1, sW, sH);
+                  }
+
+                  pdf.setFont('helvetica', 'normal');
+                  pdf.setFontSize(8);
+                  pdf.setTextColor(154, 148, 136);
+                  var lbl = (opt.footer.pageLabel || '') +
+                    ('0' + p).slice(-2) + ' / ' + ('0' + total).slice(-2);
+                  pdf.text(lbl, pageW - mR, textY, { align: 'right' });
+                }
+                pdf.setPage(1);
+              }
+
+              return pdf;
+            });
         }
 
         function save() {
@@ -351,6 +479,58 @@
     /* 可编辑区域交互提示 */
     #report-content [contenteditable]:hover { background: rgba(184,146,74,0.04); border-radius: 2px; }
     #report-content [contenteditable]:focus { background: rgba(184,146,74,0.08); }
+
+    /* ═══════════════════════════════════════════════════════
+       PDF 导出态 v4.0 · A4 打印规范化
+       导出瞬间给 #report-content 挂上 .pdf-exporting，
+       把版心锁死为 A4 内容区宽度：180mm ≈ 680px @96dpi
+       → 手机 / 平板 / 宽屏电脑导出的 PDF 排版 100% 一致
+       ═══════════════════════════════════════════════════════ */
+    #report-content.pdf-exporting {
+      width: 680px !important; min-width: 680px !important; max-width: 680px !important;
+      padding: 0 !important; margin: 0 auto !important;
+      background: #ffffff !important; box-shadow: none !important;
+    }
+    /* 封面独占首页：撑满一页内容区（267mm ≈ 1009px），内容垂直居中 */
+    #report-content.pdf-exporting .pdf-cover {
+      min-height: 985px; display: flex; flex-direction: column; justify-content: center;
+      margin-bottom: 0 !important;
+    }
+    /* 章节间距（导出态收紧，避免尾页大片留白） */
+    #report-content.pdf-exporting .pdf-section { margin-bottom: 26px; }
+    #report-content.pdf-exporting .pdf-section:first-of-type { margin-top: 6px; }
+    /* 节点卡片：去阴影 + 打印安全边框；单卡片高度务必 < 一页内容区 */
+    #report-content.pdf-exporting .node-card {
+      box-shadow: none !important; border: 1px solid #d8d0c0 !important;
+      break-inside: avoid; page-break-inside: avoid;
+    }
+    #report-content.pdf-exporting .node-cards-container { gap: 16px; }
+    /* 图区放大：215px ≈ 57mm 宽、190px ≈ 50mm 高，业主在 A4 纸上看得清工艺细节 */
+    #report-content.pdf-exporting .node-card-body { grid-template-columns: 215px 1fr; }
+    #report-content.pdf-exporting .node-card-image img { max-height: 190px; }
+    #report-content.pdf-exporting .node-card-desc { font-size: 12.5px; line-height: 1.75; }
+    /* 去掉编辑态视觉干扰（黄色高亮、hover 底色） */
+    #report-content.pdf-exporting [contenteditable] { background: transparent !important; }
+    #report-content.pdf-exporting .pdf-footer { margin-top: 32px; break-inside: avoid; }
+
+    /* 导出遮罩：宽度切换瞬间盖住，避免用户看到页面「跳一下」 */
+    .pdf-export-mask {
+      position: fixed; inset: 0; z-index: 9998;
+      background: rgba(250,250,248,0.92); backdrop-filter: blur(3px);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pdf-export-mask-box {
+      background: #fff; border: 1px solid #E8E2D0; border-radius: 10px;
+      padding: 26px 38px; text-align: center; box-shadow: 0 8px 30px rgba(31,61,42,0.12);
+    }
+    .pdf-export-mask-box .t { font-size: 15px; font-weight: 700; color: #1F3D2A; margin-bottom: 6px; }
+    .pdf-export-mask-box .s { font-size: 12px; color: #999; }
+    .pdf-export-spinner {
+      width: 30px; height: 30px; margin: 0 auto 14px;
+      border: 3px solid #E8E2D0; border-top-color: #B8924A;
+      border-radius: 50%; animation: pdfspin 0.8s linear infinite;
+    }
+    @keyframes pdfspin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body class="bg-slate-50" x-data="siteLogApp()">
@@ -361,7 +541,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v3.2.0</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v4.0.0</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -1682,6 +1862,29 @@
             }
           });
 
+          // ═══════════════════════════════════════════════════════
+          // ★ v4.0.0：A4 版心锁定
+          //   把 #report-content 宽度强制为 680px（= 180mm @96dpi，
+          //   即 A4 去掉左右各 15mm 页边距后的内容区宽度）
+          //   → 无论同事用手机、平板还是 27 寸宽屏导出，
+          //     PDF 的字号 / 换行 / 图文比例完全一致，不会再各看各的样
+          //   注意：以下全部为「同步」DOM 操作，不能插入 await，
+          //         否则会丢失用户手势上下文导致 showSaveFilePicker 报错
+          // ═══════════════════════════════════════════════════════
+          const styleBackup = container.getAttribute('style');
+          container.classList.add('pdf-exporting');
+
+          // 导出遮罩（盖住版心切换的瞬间跳动）
+          const mask = document.createElement('div');
+          mask.className = 'pdf-export-mask';
+          mask.innerHTML =
+            '<div class="pdf-export-mask-box">' +
+              '<div class="pdf-export-spinner"></div>' +
+              '<div class="t">正在按 A4 规范排版</div>' +
+              '<div class="s">逐页计算分页点，卡片不会被切开…</div>' +
+            '</div>';
+          document.body.appendChild(mask);
+
           // 优先用用户输入的文件名，否则从 h1 取，再否则用 reportTitle
           let baseName = '';
           if (this.pdfFilename && this.pdfFilename.trim()) {
@@ -1707,17 +1910,40 @@
             if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) throw new Error('jsPDF 库未加载，请刷新页面重试');
             if (typeof window.html2canvas === 'undefined') throw new Error('html2canvas 库未加载，请刷新页面重试');
 
+            // ═══ v4.0.0 A4 规范化排版配置 ═══
+            // margin 顺序：[上, 左, 下, 右]（mm）
+            //   上 14 / 左右 15 / 下 16（下方 16mm 留给统一页脚）
+            //   内容区 = 180mm × 267mm，正是打印安全区
             const opt = {
-              margin:       [12, 12, 12, 12],
+              margin:       [14, 15, 16, 15],
               filename:     filename,
-              image:        { type: 'jpeg', quality: 0.98 },
+              image:        { type: 'jpeg', quality: 0.92 },   // 0.92 在 A4 打印下已看不出损失，体积却小一大截
               html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
               jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-              pagebreak:    { mode: ['avoid-all', 'css', 'legacy'], before: '.node-card', avoid: ['.node-card', '.pdf-section-header', 'section', 'h2'] }
+              // 不可切割块：分页时若切点落在其内部，整块推到下一页
+              pagebreak: {
+                avoid: [
+                  '.node-card',          // 图文节点卡片（断层重灾区）
+                  '.pdf-cover',          // 封面
+                  '.pdf-section-header', // 章节标题（避免孤行）
+                  '.pdf-editable-box',   // 文字段落框
+                  '.pdf-info-card',      // 影像追溯卡
+                  '.pdf-check-card',     // 自检卡
+                  '.pdf-callout',        // SOP / 声明框
+                  '.pdf-footer'          // 落款页脚
+                ],
+                after: ['.pdf-cover']    // 封面之后强制换页 → 封面独占第 1 页
+              },
+              footer: {
+                enabled:   true,
+                text:      '汕头市初匠门窗科技有限公司 · 工程影像归档',
+                pageLabel: ''
+              }
             };
 
-            console.log('📄 [PDF] v2.5.0 开始生成:', filename,
-              '容器尺寸:', container.offsetWidth + 'x' + container.offsetHeight,
+            console.log('📄 [PDF] v4.0.0 A4 规范化排版:', filename,
+              '版心:', container.offsetWidth + 'x' + container.offsetHeight,
+              '(目标 680px)',
               '隐藏元素数:', hiddenStack.length);
 
             // ── A. 尝试原生「另存为」对话框（需 https / localhost）──
@@ -1738,9 +1964,21 @@
               }
             }
 
+            // ── A2. 等浏览器按 680px 版心完成重排（关键！）──
+            //   分页坐标是渲染前从真实 DOM 量出来的，
+            //   必须确保此刻布局已经是 A4 版心，否则坐标全错
+            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+            // 等图片在新宽度下解码完成，避免量到 0 高度
+            const imgs = Array.from(container.querySelectorAll('img'));
+            await Promise.all(imgs.map(im => (im.complete && im.naturalHeight)
+              ? Promise.resolve()
+              : new Promise(res => { im.onload = im.onerror = res; setTimeout(res, 1500); })));
+            console.log('📄 [PDF] 版心重排完成:', container.offsetWidth + 'px', '图片数:', imgs.length);
+
             // ── B. 渲染 PDF（操作真实 DOM 容器）──
             const pdfInstance = await html2pdf().set(opt).from(container).build();
-            console.log('📄 [PDF] 渲染完成, jsPDF实例:', pdfInstance ? '存在' : 'NULL');
+            console.log('📄 [PDF] 渲染完成, 页数:',
+              pdfInstance ? pdfInstance.internal.getNumberOfPages() : 'NULL');
 
             // ── C. 输出 PDF 数据（用 datauristring —— 与 save() 同路径，最稳定）──
             const dataUri = pdfInstance.output('datauristring');
@@ -1787,7 +2025,7 @@
             }
 
           } catch (err) {
-            console.error('❌ [PDF] v2.5.0 生成失败:', err.message, err.stack);
+            console.error('❌ [PDF] v4.0.0 生成失败:', err.message, err.stack);
             const hint = err.message.includes('jsPDF') || err.message.includes('jspdf')
               ? '（jsPDF 库加载失败 → 刷新页面即可）'
               : err.message.includes('html2canvas') || err.message.includes('canvas')
@@ -1795,11 +2033,20 @@
                 : '';
             this.showToast('❌ PDF 生成失败: ' + err.message.slice(0, 80) + hint, 'error');
           } finally {
-            // ═══ 无论成功失败，必须恢复隐藏的元素 ═══
+            // ═══ 无论成功失败，必须完全还原页面状态 ═══
             hiddenStack.forEach(({ el, backup }) => {
               el.style.display = backup;  // '' 还原为 CSS 默认值
             });
-            console.log('📄 [PDF] 已恢复', hiddenStack.length, '个隐藏元素');
+            // 解除 A4 版心锁定，回到正常网页浏览宽度
+            container.classList.remove('pdf-exporting');
+            if (styleBackup === null) {
+              container.removeAttribute('style');
+            } else {
+              container.setAttribute('style', styleBackup);
+            }
+            // 移除导出遮罩
+            if (mask && mask.parentNode) mask.parentNode.removeChild(mask);
+            console.log('📄 [PDF] 已还原页面：', hiddenStack.length, '个隐藏元素 + A4 版心解锁');
           }
         },
 
@@ -1809,13 +2056,22 @@
         },
 
         // ===== 示例数据 =====
+        // ★ v4.0.0 修复：btoa() 无法编码中文（Latin1 范围外）→ 示例按钮原本必崩
+        //    改用 UTF-8 → base64 的安全转换
+        svgDataUrl(svg) {
+          const bytes = new TextEncoder().encode(svg);
+          let bin = '';
+          for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+          return 'data:image/svg+xml;base64,' + btoa(bin);
+        },
+
         loadSampleData() {
           if (this.images.length > 0 && !confirm('载入示例会覆盖当前图片，是否继续？')) return;
           this.templateType = '框架施工';
           this.images = [
             {
               id: 'sample1',
-              dataUrl: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect fill="#e2e8f0" width="400" height="300"/><text x="200" y="150" text-anchor="middle" fill="#64748b" font-size="20">工具清点</text><text x="200" y="180" text-anchor="middle" fill="#94a3b8" font-size="12">电钻 · 水平仪 · 羊角锤</text></svg>`),
+              dataUrl: this.svgDataUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect fill="#e2e8f0" width="400" height="300"/><text x="200" y="150" text-anchor="middle" fill="#64748b" font-size="20">工具清点</text><text x="200" y="180" text-anchor="middle" fill="#94a3b8" font-size="12">电钻 · 水平仪 · 羊角锤</text></svg>`),
               category: '框架施工',
               time: '2026-06-23 14:00',
               title: '工具准备与定位放线',
@@ -1824,7 +2080,7 @@
             },
             {
               id: 'sample2',
-              dataUrl: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect fill="#dbeafe" width="400" height="300"/><text x="200" y="150" text-anchor="middle" fill="#1e40af" font-size="20">框体就位</text><text x="200" y="180" text-anchor="middle" fill="#3b82f6" font-size="12">化学锚栓 · 激光校准</text></svg>`),
+              dataUrl: this.svgDataUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect fill="#dbeafe" width="400" height="300"/><text x="200" y="150" text-anchor="middle" fill="#1e40af" font-size="20">框体就位</text><text x="200" y="180" text-anchor="middle" fill="#3b82f6" font-size="12">化学锚栓 · 激光校准</text></svg>`),
               category: '框架施工',
               time: '2026-06-23 15:30',
               title: '框体就位与化学锚栓固定',
@@ -1833,7 +2089,7 @@
             },
             {
               id: 'sample3',
-              dataUrl: 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect fill="#dcfce7" width="400" height="300"/><text x="200" y="150" text-anchor="middle" fill="#166534" font-size="20">注胶密封</text><text x="200" y="180" text-anchor="middle" fill="#16a34a" font-size="12">硅酮结构胶</text></svg>`),
+              dataUrl: this.svgDataUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><rect fill="#dcfce7" width="400" height="300"/><text x="200" y="150" text-anchor="middle" fill="#166534" font-size="20">注胶密封</text><text x="200" y="180" text-anchor="middle" fill="#16a34a" font-size="12">硅酮结构胶</text></svg>`),
               category: '密封收口',
               time: '2026-06-24 13:53',
               title: '框墙接缝注胶密封',
