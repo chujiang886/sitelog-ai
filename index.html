@@ -176,7 +176,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v2.5.2</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v2.5.3</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -1438,10 +1438,10 @@
           if (this.images.length === 0) {
             if (!confirm('当前报告暂无照片，是否仍要导出空白模板？')) return;
           }
-          // ── 关键：未确认的节点会被过滤掉 ──
+          // 所有已 AI 分析的照片都会进 PDF；未确认仅表示尚未逐张打勾核对，不影响入档
           const pending = this.images.filter(i => !i.aiConfirmed);
           if (pending.length > 0) {
-            if (!confirm(`⚠️ 当前还有 ${pending.length} 张照片 AI 识别结果待复核，未确认的节点不会出现在 PDF 中。\n\n是否继续导出（仅已确认的 ${this.images.length - pending.length} 张）？`)) return;
+            this.showToast(`ℹ️ 有 ${pending.length} 张照片待复核，仍将一并入档（逐张点「✓确认入档」可标记已核对）`, 'info', 6000);
           }
           // 每次打开弹窗时，根据 h1 给出默认建议名（用户没改过才覆盖）
           const h1 = document.querySelector('#report-content h1');
