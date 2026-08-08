@@ -176,7 +176,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v2.5.1</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v2.5.2</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -1482,10 +1482,19 @@
               el.style.display = 'none';
             });
           }
-          hide('.pending-confirm');       // 未确认节点不进 PDF
-          hide('button[data-action="confirm"]'); // 确认按钮不进 PDF
-          hide('details.debug-panel');    // 调试面板不进 PDF
-          hide('details');                // 所有 details 折叠面板
+          // ═══ PDF 导出时只隐藏「交互元素」和「调试信息」═══
+          // 不再隐藏 .pending-confirm —— 已分析的图片节点必须进 PDF
+          // （AI 分析完默认 aiConfirmed=false，全藏了就只剩文字模板）
+          hide('button[data-action="confirm"]'); // 确认/撤销按钮不进 PDF
+          hide('button[data-action="reanalyze"]'); // 重分析按钮不进 PDF
+          hide('details.debug-panel');            // 调试面板不进 PDF
+          // 隐藏 node-block 里的操作按钮行（保留内容，去掉交互）
+          container.querySelectorAll('.node-block .flex.gap-1').forEach(el => {
+            if (el.querySelector('button')) {
+              hiddenStack.push({ el, backup: el.style.display });
+              el.style.display = 'none';
+            }
+          });
 
           // 优先用用户输入的文件名，否则从 h1 取，再否则用 reportTitle
           let baseName = '';
