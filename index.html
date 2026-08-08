@@ -121,18 +121,31 @@
     [contenteditable]:focus { background: #fef9c3; border-radius: 2px; }
     .editable-block { min-height: 1.5em; }
 
+    /* ════════════════════════════════════════
+       专业 PDF 报告模板样式 · 墨绿+金商务配色
+       配色体系：墨绿 #1F3D2A / 金 #B8924A / 米白 #FAFAF8
+       ════════════════════════════════════════ */
     @media print {
       .no-print { display: none !important; }
       .print-only { display: block !important; }
-      body { background: white !important; font-size: 11pt; }
+      body { background: #fff !important; font-size: 10.5pt; }
       .page-break { page-break-before: always; }
-      @page { margin: 1.8cm; size: A4; }
-      #report-content { box-shadow: none !important; padding: 0 !important; max-width: 100% !important; }
+      @page { margin: 1.5cm; size: A4; }
+      #report-content {
+        box-shadow: none !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+        background: #fff !important;
+      }
       h1 { font-size: 22pt; }
-      h2 { font-size: 14pt; page-break-after: avoid; }
-      h3 { font-size: 12pt; page-break-after: avoid; }
-      img { page-break-inside: avoid; }
+      h2 { font-size: 13pt; page-break-after: avoid; }
+      h3 { font-size: 11pt; page-break-after: avoid; }
+      img { page-break-inside: avoid; max-width: 100%; }
       section { page-break-inside: avoid; }
+      .pdf-cover-band { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+      .pdf-footer-band { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+      .pdf-section-header { page-break-after: avoid; }
+      .node-card { page-break-inside: avoid; border: 1px solid #e8e2d0 !important; box-shadow: none !important; }
     }
 
     .drag-over {
@@ -150,21 +163,292 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
 
-    /* 渐变品牌色 */
+    /* 导航栏渐变（保持不变） */
     .brand-gradient {
       background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #0e7490 100%);
     }
 
-    /* 工艺亮点徽章 */
+    /* ===== 报告内容区专业样式 ===== */
+    #report-content {
+      font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: #1a1a1a;
+      line-height: 1.75;
+      background: #FAFAF8;
+    }
+
+    /* 封面顶部品牌条 */
+    .pdf-cover-band {
+      background: linear-gradient(135deg, #1F3D2A 0%, #2D5A47 100%);
+      padding: 28px 36px 20px;
+      margin: -40px -40px 0 -40px;
+      position: relative;
+      overflow: hidden;
+    }
+    .pdf-cover-band::after {
+      content: '';
+      position: absolute;
+      top: 0; right: 0;
+      width: 200px; height: 100%;
+      background: linear-gradient(135deg, transparent 30%, rgba(184,146,74,0.08) 100%);
+      pointer-events: none;
+    }
+    .pdf-cover-brand {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .pdf-cover-brand-name {
+      color: #fff;
+      font-size: 11px;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      opacity: 0.85;
+    }
+    .pdf-cover-doc-meta {
+      text-align: right;
+      color: rgba(255,255,255,0.7);
+      font-size: 9px;
+      letter-spacing: 0.05em;
+      line-height: 1.8;
+    }
+    .pdf-cover-title {
+      color: #fff;
+      font-size: 32px;
+      font-weight: 700;
+      margin-top: 16px;
+      letter-spacing: 0.08em;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .pdf-cover-subtitle {
+      color: #B8924A;
+      font-size: 13px;
+      margin-top: 8px;
+      letter-spacing: 0.2em;
+      font-weight: 500;
+    }
+    .pdf-cover-desc {
+      color: rgba(255,255,255,0.6);
+      font-size: 11px;
+      margin-top: 10px;
+    }
+
+    /* 封面信息卡片区 */
+    .pdf-cover-info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0 32px;
+      margin-top: 24px;
+      padding: 20px 24px;
+      background: #fff;
+      border: 1px solid #E8E2D0;
+      border-radius: 0 0 8px 8px;
+      font-size: 13px;
+    }
+    .pdf-cover-info-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      color: #555;
+    }
+    .pdf-cover-info-item .label {
+      color: #888;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .pdf-cover-info-item .value {
+      color: #1a1a1a;
+      font-weight: 500;
+    }
+
+    /* 章节标题 */
+    .pdf-section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #E8E2D0;
+      position: relative;
+    }
+    .pdf-section-header::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      width: 80px;
+      height: 2px;
+      background: #B8924A;
+    }
+    .pdf-section-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px; height: 28px;
+      background: #1F3D2A;
+      color: #B8924A;
+      font-size: 13px;
+      font-weight: 700;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .pdf-section-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1F3D2A;
+      letter-spacing: 0.04em;
+    }
+
+    /* 节点卡片（图片+AI识别） */
+    .node-card {
+      background: #fff;
+      border: 1px solid #E8E2D0;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(31,61,42,0.06);
+      position: relative;
+    }
+    .node-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 4px; height: 100%;
+      background: linear-gradient(180deg, #1F3D2A 0%, #B8924A 100%);
+    }
+    .node-card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 18px 10px 22px;
+      border-bottom: 1px solid #f0ece0;
+    }
+    .node-card-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px; height: 24px;
+      background: #1F3D2A;
+      color: #B8924A;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .node-card-meta {
+      font-size: 11px;
+      color: #999;
+    }
+    .node-card-body {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 0;
+    }
+    .node-card-image {
+      padding: 12px 12px 12px 18px;
+    }
+    .node-card-image img {
+      width: 100%;
+      border-radius: 6px;
+      border: 1px solid #eee8d8;
+      display: block;
+    }
+    .node-card-detail {
+      padding: 14px 18px 14px 8px;
+    }
+    .node-card-stage-badge {
+      display: inline-block;
+      background: #EDF5EE;
+      color: #2D5A47;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      border: 1px solid #D4E8DA;
+    }
+    .node-card-desc {
+      font-size: 13px;
+      color: #444;
+      line-height: 1.85;
+      margin-bottom: 12px;
+    }
+    .node-card-highlights-label {
+      font-size: 11px;
+      color: #888;
+      font-weight: 600;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* 工艺亮点徽章 —— 金色系 */
     .highlight-badge {
       display: inline-block;
-      padding: 2px 8px;
-      margin: 2px;
-      background: #dbeafe;
-      color: #1e40af;
+      padding: 3px 10px;
+      margin: 2px 3px 2px 0;
+      background: linear-gradient(135deg, #FBF5E6 0%, #F5ECD0 100%);
+      color: #8B6914;
+      border: 1px solid #E8D9A8;
       border-radius: 9999px;
       font-size: 11px;
       font-weight: 500;
+    }
+
+    /* 页脚 */
+    .pdf-footer-band {
+      background: linear-gradient(135deg, #1F3D2A 0%, #162820 100%);
+      color: #fff;
+      padding: 32px 36px;
+      margin: 48px -40px -40px -40px;
+      position: relative;
+      overflow: hidden;
+    }
+    .pdf-footer-band::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #B8924A 0%, #D4AF37 50%, #B8924A 100%);
+    }
+    .pdf-footer-slogan {
+      font-size: 16px;
+      font-style: italic;
+      color: #B8924A;
+      font-weight: 500;
+      margin-bottom: 16px;
+      letter-spacing: 0.06em;
+    }
+    .pdf-footer-company {
+      font-size: 13px;
+      letter-spacing: 0.25em;
+      opacity: 0.85;
+      margin-bottom: 6px;
+    }
+    .pdf-footer-sub {
+      font-size: 10px;
+      opacity: 0.5;
+      letter-spacing: 0.1em;
+    }
+    .pdf-footer-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+      font-size: 10px;
+      opacity: 0.6;
+    }
+
+    /* 可编辑区域微调 */
+    #report-content [contenteditable]:hover {
+      background: rgba(184,146,74,0.05);
+      border-radius: 2px;
+    }
+    #report-content [contenteditable]:focus {
+      background: rgba(184,146,74,0.1);
+      box-shadow: inset 0 0 0 1px rgba(184,146,74,0.3);
     }
   </style>
 </head>
@@ -176,7 +460,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v2.5.3</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v3.0.0</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -1374,14 +1658,30 @@
           }
 
           const coverHtml = `
-            <div class="report-cover" style="border-bottom:2px solid #1e293b; padding-bottom:16px; margin-bottom:24px;">
-              <p class="text-xs text-slate-400 mb-1">工程施工影像归档报告</p>
-              <h1 class="text-2xl font-bold text-slate-900 mb-3">${this.escapeHtml(this.projectName) || '未命名项目'}</h1>
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 24px; font-size:13px; color:#475569;">
-                <div>📍 施工部位：<span>${this.escapeHtml(this.siteLocation) || '—'}</span></div>
-                <div>📅 归档日期：<span>${this.escapeHtml(this.archiveDate) || '—'}</span></div>
-                <div>👤 归档人：<span>${this.escapeHtml(this.archivePerson) || '—'}</span></div>
-                <div>🏷️ 模板：<span>${this.escapeHtml(this.templateType) || '—'}</span></div>
+            <div class="report-cover">
+              <!-- 品牌条 -->
+              <div class="pdf-cover-band">
+                <div class="pdf-cover-brand">
+                  <div>
+                    <div class="pdf-cover-brand-name">CHUJIANG MEN & WINDOW · 初匠门窗</div>
+                    <div class="pdf-cover-title">${this.escapeHtml(this.projectName) || '未命名项目'}</div>
+                    <div class="pdf-cover-subtitle">精工艺 · 守标准 · 留凭证</div>
+                    <div class="pdf-cover-desc">本档案作为施工过程追溯凭证，交付业主保存</div>
+                  </div>
+                  <div class="pdf-cover-doc-meta">
+                    <div>文档编号：CJ-SL-${new Date().getFullYear()}${String(new Date().getMonth()+1).padStart(2,'0')}${String(new Date().getDate()).padStart(2,'0')}-${String(Math.floor(Math.random()*9000)+1000)}</div>
+                    <div>密级：内部公开</div>
+                    <div>版本：V1.0</div>
+                    <div>${this.escapeHtml(this.archiveDate) || new Date().toISOString().slice(0,10)}</div>
+                  </div>
+                </div>
+              </div>
+              <!-- 信息卡片区 -->
+              <div class="pdf-cover-info-grid">
+                <div class="pdf-cover-info-item"><span class="label">📍 施工部位</span><span class="value">${this.escapeHtml(this.siteLocation) || '—'}</span></div>
+                <div class="pdf-cover-info-item"><span class="label">📅 归档日期</span><span class="value">${this.escapeHtml(this.archiveDate) || '—'}</span></div>
+                <div class="pdf-cover-info-item"><span class="label">👤 归档人</span><span class="value">${this.escapeHtml(this.archivePerson) || '—'}</span></div>
+                <div class="pdf-cover-info-item"><span class="label">🏷️ 归档类型</span><span class="value">${this.escapeHtml(this.templateType) || '—'}</span></div>
               </div>
             </div>
           `;
@@ -1396,33 +1696,27 @@
               : '<span class="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold border border-amber-300">⚠️ 待复核</span><button data-action="confirm" class="text-xs bg-blue-600 text-white px-2 py-0.5 rounded font-bold hover:bg-blue-700">✓ 确认入档</button>';
 
             html += `
-              <div class="node-block group${img.aiConfirmed ? '' : ' pending-confirm'}" data-img-id="${img.id}">
-                <div class="flex items-baseline gap-2 mb-3 flex-wrap">
-                  <span class="text-sm font-bold text-blue-600">节点 ${String(idx + 1).padStart(2, '0')}</span>
-                  <span class="text-xs text-slate-400">·</span>
-                  <span class="text-xs text-slate-500">${img.category}</span>
-                  <span class="text-xs text-slate-400">·</span>
-                  <span class="text-xs text-slate-400">${img.time}</span>
-                  <span class="text-xs text-slate-400 ml-auto"></span>
-                  ${confirmBadge}
+              <div class="node-card node-block group${img.aiConfirmed ? '' : ' pending-confirm'}" data-img-id="${img.id}">
+                <div class="node-card-header">
+                  <span class="node-card-num">${String(idx + 1).padStart(2, '0')}</span>
+                  <span class="node-card-meta">${img.category} · ${img.time}</span>
+                  <div style="margin-left:auto">${confirmBadge}</div>
                 </div>
-                <h3 class="text-lg font-bold text-slate-900 mb-3 editable-block" contenteditable="true">${img.title || '未命名节点'}</h3>
-                ${img.stage ? `<p class="text-xs text-blue-700 bg-blue-50 inline-block px-2 py-0.5 rounded mb-3">📍 ${img.stage}</p>` : ''}
-                <div class="grid grid-cols-5 gap-4">
-                  <div class="col-span-2">
-                    <img src="${img.dataUrl}" class="w-full rounded shadow-sm" alt="${img.title}">
+                <h3 class="text-base font-bold text-[#1F3D2A] mb-2 px-5 editable-block" contenteditable="true" style="padding-left:18px;padding-right:18px;">${img.title || '未命名节点'}</h3>
+                ${img.stage ? `<div style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 ${img.stage}</span></div>` : ''}
+                <div class="node-card-body">
+                  <div class="node-card-image">
+                    <img src="${img.dataUrl}" alt="${img.title}" loading="lazy">
                   </div>
-                  <div class="col-span-3">
-                    <p class="text-slate-700 leading-relaxed mb-3 editable-block" contenteditable="true">${img.desc || '<span class="text-slate-400">[请填写工艺说明]</span>'}</p>
+                  <div class="node-card-detail">
+                    <p class="node-card-desc editable-block" contenteditable="true">${img.desc || '<span style="color:#bbb">[请填写工艺说明]</span>'}</p>
                     ${ (img.desc && (img.desc.includes('请补充') || img.desc.includes('📝'))) ? `
-                    <details class="mb-2 bg-amber-50 border border-amber-200 rounded p-2 text-xs">
-                      <summary class="cursor-pointer font-bold text-amber-700">🔍 工艺说明为占位符 — 点击查看 AI 原始返回（排查用）</summary>
-                      <pre class="mt-1 text-[10px] text-red-800 whitespace-pre-wrap break-all max-h-60 overflow-auto">${this.escapeHtml(JSON.stringify(img._debug||{error:'无调试数据（可能是旧版代码）'}, null, 2))}</pre>
+                    <details class="mb-2 bg-amber-50 border border-amber-200 rounded p-2 text-xs debug-panel">
+                      <summary class="cursor-pointer font-bold text-amber-700">🔍 工艺说明为占位符 — 点击查看 AI 原始返回</summary>
+                      <pre class="mt-1 text-[10px] text-red-800 whitespace-pre-wrap break-all max-h-60 overflow-auto">${this.escapeHtml(JSON.stringify(img._debug||{error:'无调试数据'}, null, 2))}</pre>
                     </details>` : '' }
-                    <div class="pt-2 border-t border-slate-100">
-                      <p class="text-xs text-slate-500 mb-1.5">🌟 工艺亮点</p>
-                      <div class="editable-block" contenteditable="true">${highlightsHtml || '<span class="text-slate-400 text-xs">[请填写亮点]</span>'}</div>
-                    </div>
+                    <div class="node-card-highlights-label">✦ 工艺亮点</div>
+                    <div class="editable-block" contenteditable="true">${highlightsHtml || '<span style="color:#bbb;font-size:12px">[待补充]</span>'}</div>
                   </div>
                 </div>
               </div>
@@ -1669,67 +1963,90 @@
     }
 
 
-    // ====== 模板定义 ======
+    // ====== 模板定义（专业版 v3 · 墨绿+金商务配色）======
     const TEMPLATES = {
       frame: () => `
-        <div class="text-center mb-10 pb-8 border-b-2 border-slate-200">
-          <p class="text-xs text-slate-500 tracking-[0.3em]">CHU JIANG · MEN & WINDOW</p>
-          <h1 class="text-4xl font-bold text-slate-900 mt-3">框架施工归档</h1>
-          <p class="text-slate-600 mt-3 text-sm">—— 精工艺 · 守标准 · 留凭证 ——</p>
-          <p class="text-xs text-slate-400 mt-4">本档案作为施工过程追溯凭证，交付业主保存</p>
+        <div class="text-center mb-10">
+          <p class="text-xs tracking-[0.35em] text-[#1F3D2A] font-semibold mb-6">ENGINEERING ARCHIVE · 工程影像归档</p>
+          <h1 class="text-4xl font-bold text-[#1F3D2A] mt-2" style="letter-spacing:0.08em">框架施工归档</h1>
+          <div class="flex items-center justify-center gap-4 mt-4 mb-5">
+            <span class="h-[2px] w-16 bg-gradient-to-r from-transparent to-[#B8924A]"></span>
+            <span class="text-sm text-[#B8924A] font-medium tracking-widest">精工艺 · 守标准 · 留凭证</span>
+            <span class="h-[2px] w-16 bg-gradient-to-l from-transparent to-[#B8924A]"></span>
+          </div>
         </div>
 
         <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">一、</span>阶段实施概况
-          </h2>
-          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+          <div class="pdf-section-header pdf-section-header">
+            <span class="pdf-section-num">一</span>
+            <span class="pdf-section-title">阶段实施概况</span>
+          </div>
+          <div class="bg-white border border-[#E8E2D0] rounded-lg p-5 editable-block text-[#444] leading-relaxed" contenteditable="true" style="font-size:13.5px">
             [请编辑：本次框架施工的整体进度总结，包括入场时间、施工范围、班组配置、材料品牌等关键信息。建议 100-200 字。]
           </div>
         </section>
 
         <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">二、</span>现场工艺与进度详解
-          </h2>
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">二</span>
+            <span class="pdf-section-title">现场工艺与进度详解</span>
+          </div>
           <div id="images-container"></div>
         </section>
 
         <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">三、</span>工艺亮点与品质承诺
-          </h2>
-          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">三</span>
+            <span class="pdf-section-title">工艺亮点与品质承诺</span>
+          </div>
+          <div class="bg-white border border-[#E8E2D0] rounded-lg p-5 editable-block text-[#444] leading-relaxed" contenteditable="true" style="font-size:13.5px">
             [请编辑：本项目的差异化工艺亮点。例如：化学锚栓固定 / 硅酮结构胶双道密封 / 激光水平仪校准 / 框体保护膜全程保留 等。每条亮点建议 20-30 字，3-5 条为宜。]
           </div>
         </section>
 
         <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">四、</span>影像追溯体系
-          </h2>
-          <ul class="text-slate-700 space-y-2 leading-relaxed">
-            <li>📸 <strong>影像数量</strong>：本次归档覆盖全部关键工序，每张实拍照片均含拍摄人、拍摄时间、定位水印</li>
-            <li>🔍 <strong>影像要素</strong>：照片水印可作为业主第三方追溯凭证</li>
-            <li>📦 <strong>影像归档</strong>：原图随本档案一并交付业主保存</li>
-          </ul>
-        </section>
-
-        <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">五、</span>班组离场 SOP
-          </h2>
-          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
-            「关水、关电、关门！—— 树立门窗最后一道防火墙」是初匠门窗的标准离场 SOP。
-            班组在门窗工序全部完工后，按 SOP 进入离场阶段，与下一道工序（泥工 / 漆工等）柔性交接水电门的管理权限，确保整体工程节奏顺畅。
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">四</span>
+            <span class="pdf-section-title">影像追溯体系</span>
+          </div>
+          <div class="grid grid-cols-3 gap-4 text-sm">
+            <div class="bg-[#FAFAF8] border border-[#E8E2D0] rounded-lg p-4 text-center">
+              <div class="text-2xl mb-2">📸</div>
+              <p class="font-bold text-[#1F3D2A] text-sm mb-1">影像数量</p>
+              <p class="text-[#666] text-xs leading-relaxed">本次归档覆盖全部关键工序，每张实拍照片均含拍摄人、拍摄时间、定位水印</p>
+            </div>
+            <div class="bg-[#FAFAF8] border border-[#E8E2D0] rounded-lg p-4 text-center">
+              <div class="text-2xl mb-2">🔍</div>
+              <p class="font-bold text-[#1F3D2A] text-sm mb-1">影像要素</p>
+              <p class="text-[#666] text-xs leading-relaxed">照片水印可作为业主第三方追溯凭证</p>
+            </div>
+            <div class="bg-[#FAFAF8] border border-[#E8E2D0] rounded-lg p-4 text-center">
+              <div class="text-2xl mb-2">📦</div>
+              <p class="font-bold text-[#1F3D2A] text-sm mb-1">影像归档</p>
+              <p class="text-[#666] text-xs leading-relaxed">原图随本档案一并交付业主保存</p>
+            </div>
           </div>
         </section>
 
         <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">六、</span>业主使用与维护建议
-          </h2>
-          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">五</span>
+            <span class="pdf-section-title">班组离场 SOP</span>
+          </div>
+          <div class="bg-[#EDF5EE] border-l-4 border-[#1F3D2A] p-5 rounded-r-lg">
+            <p class="text-[#1F3D2A] font-bold mb-2 text-base">「关水、关电、关门！—— 树立门窗最后一道防火墙」</p>
+            <div class="editable-block text-[#444] text-sm leading-relaxed" contenteditable="true">
+              班组在门窗工序全部完工后，按 SOP 进入离场阶段，与下一道工序（泥工 / 漆工等）柔性交接水电门的管理权限，确保整体工程节奏顺畅。
+            </div>
+          </div>
+        </section>
+
+        <section class="mb-10">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">六</span>
+            <span class="pdf-section-title">业主使用与维护建议</span>
+          </div>
+          <div class="bg-white border border-[#E8E2D0] rounded-lg p-5 editable-block text-[#444] leading-relaxed" contenteditable="true" style="font-size:13.5px">
             [请编辑：<br>
             1. 入住初期（移交后 7 日内）：胶体固化期注意事项<br>
             2. 日常使用：开关窗扇的规范动作<br>
@@ -1738,42 +2055,53 @@
           </div>
         </section>
 
-        <footer class="mt-16 pt-8 border-t-2 border-slate-200 text-center">
-          <p class="text-lg text-slate-700 italic font-medium">「用精工艺，给您一个可追溯的家」</p>
-          <p class="text-sm text-slate-500 mt-3 tracking-wider">初 匠 门 窗 服 务 · CHUJIANG</p>
-          <p class="text-xs text-slate-400 mt-1">施 格 归 档 · SITELOG AI 出品</p>
+        <footer class="pdf-footer-band">
+          <p class="pdf-footer-slogan">「用精工艺，给您一个可追溯的家」</p>
+          <p class="pdf-footer-company">汕头市初匠门窗科技有限公司 · CHUJIANG</p>
+          <p class="pdf-footer-sub">施格归档 · SITELOG AI 出品 · ICP备2024297744号-2</p>
+          <div class="pdf-footer-info">
+            <span>服务热线：待填写</span>
+            <span>官网：chujiang.中国</span>
+            <span>地址：广东省汕头市</span>
+          </div>
         </footer>
       `,
 
       glass: () => `
-        <div class="text-center mb-10 pb-8 border-b-2 border-slate-200">
-          <p class="text-xs text-slate-500 tracking-[0.3em]">CHU JIANG · MEN & WINDOW</p>
-          <h1 class="text-4xl font-bold text-slate-900 mt-3">玻扇施工归档</h1>
-          <p class="text-slate-600 mt-3 text-sm">—— 精工艺 · 守标准 · 留凭证 ——</p>
-          <p class="text-xs text-slate-400 mt-4">本档案作为施工过程追溯凭证，交付业主保存</p>
+        <div class="text-center mb-10">
+          <p class="text-xs tracking-[0.35em] text-[#1F3D2A] font-semibold mb-6">ENGINEERING ARCHIVE · 工程影像归档</p>
+          <h1 class="text-4xl font-bold text-[#1F3D2A] mt-2" style="letter-spacing:0.08em">玻扇施工归档</h1>
+          <div class="flex items-center justify-center gap-4 mt-4 mb-5">
+            <span class="h-[2px] w-16 bg-gradient-to-r from-transparent to-[#B8924A]"></span>
+            <span class="text-sm text-[#B8924A] font-medium tracking-widest">精工艺 · 守标准 · 留凭证</span>
+            <span class="h-[2px] w-16 bg-gradient-to-l from-transparent to-[#B8924A]"></span>
+          </div>
         </div>
 
         <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">一、</span>阶段实施概况
-          </h2>
-          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">一</span>
+            <span class="pdf-section-title">阶段实施概况</span>
+          </div>
+          <div class="bg-white border border-[#E8E2D0] rounded-lg p-5 editable-block text-[#444] leading-relaxed" contenteditable="true" style="font-size:13.5px">
             [请编辑：本次玻扇施工的整体进度总结，包括玻璃品牌 / 规格 / 合片工艺 / 密封系统 / 五金配置等关键信息。]
           </div>
         </section>
 
         <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">二、</span>玻扇工艺与进度详解
-          </h2>
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">二</span>
+            <span class="pdf-section-title">玻扇工艺与进度详解</span>
+          </div>
           <div id="images-container"></div>
         </section>
 
         <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">三、</span>玻璃配置与材料追溯
-          </h2>
-          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">三</span>
+            <span class="pdf-section-title">玻璃配置与材料追溯</span>
+          </div>
+          <div class="bg-white border border-[#E8E2D0] rounded-lg p-5 editable-block text-[#444] leading-relaxed" contenteditable="true" style="font-size:13.5px">
             [请编辑：<br>
             1. 玻璃品牌 / 型号（如南玻 5+12A+5 中空玻璃）<br>
             2. 合片工艺（丁基胶 + 聚硫胶双道密封）<br>
@@ -1783,10 +2111,11 @@
         </section>
 
         <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">四、</span>五金系统配置
-          </h2>
-          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">四</span>
+            <span class="pdf-section-title">五金系统配置</span>
+          </div>
+          <div class="bg-white border border-[#E8E2D0] rounded-lg p-5 editable-block text-[#444] leading-relaxed" contenteditable="true" style="font-size:13.5px">
             [请编辑：<br>
             1. 把手 / 锁具品牌（如丝吉利娅 / 诺托）<br>
             2. 铰链 / 风撑规格<br>
@@ -1796,119 +2125,156 @@
         </section>
 
         <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">五、</span>业主使用与维护建议
-          </h2>
-          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">五</span>
+            <span class="pdf-section-title">业主使用与维护建议</span>
+          </div>
+          <div class="bg-white border border-[#E8E2D0] rounded-lg p-5 editable-block text-[#444] leading-relaxed" contenteditable="true" style="font-size:13.5px">
             [请编辑：玻扇的日常使用与维护建议，重点是五金保养和玻璃清洁。]
           </div>
         </section>
 
-        <footer class="mt-16 pt-8 border-t-2 border-slate-200 text-center">
-          <p class="text-lg text-slate-700 italic font-medium">「用精工艺，给您一个可追溯的家」</p>
-          <p class="text-sm text-slate-500 mt-3 tracking-wider">初 匠 门 窗 服 务 · CHUJIANG</p>
-          <p class="text-xs text-slate-400 mt-1">施 格 归 档 · SITELOG AI 出品</p>
+        <footer class="pdf-footer-band">
+          <p class="pdf-footer-slogan">「用精工艺，给您一个可追溯的家」</p>
+          <p class="pdf-footer-company">汕头市初匠门窗科技有限公司 · CHUJIANG</p>
+          <p class="pdf-footer-sub">施格归档 · SITELOG AI 出品 · ICP备2024297744号-2</p>
+          <div class="pdf-footer-info">
+            <span>服务热线：待填写</span>
+            <span>官网：chujiang.中国</span>
+            <span>地址：广东省汕头市</span>
+          </div>
         </footer>
       `,
 
       hardware: () => `
-        <div class="text-center mb-10 pb-8 border-b-2 border-slate-200">
-          <p class="text-xs text-slate-500 tracking-[0.3em]">CHU JIANG · MEN & WINDOW</p>
-          <h1 class="text-4xl font-bold text-slate-900 mt-3">五金安装归档</h1>
-          <p class="text-slate-600 mt-3 text-sm">—— 精工艺 · 守标准 · 留凭证 ——</p>
+        <div class="text-center mb-10">
+          <p class="text-xs tracking-[0.35em] text-[#1F3D2A] font-semibold mb-6">ENGINEERING ARCHIVE · 工程影像归档</p>
+          <h1 class="text-4xl font-bold text-[#1F3D2A] mt-2" style="letter-spacing:0.08em">五金安装归档</h1>
+          <div class="flex items-center justify-center gap-4 mt-4 mb-5">
+            <span class="h-[2px] w-16 bg-gradient-to-r from-transparent to-[#B8924A]"></span>
+            <span class="text-sm text-[#B8924A] font-medium tracking-widest">精工艺 · 守标准 · 留凭证</span>
+            <span class="h-[2px] w-16 bg-gradient-to-l from-transparent to-[#B8924A]"></span>
+          </div>
         </div>
 
         <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">一、</span>阶段实施概况
-          </h2>
-          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">一</span>
+            <span class="pdf-section-title">阶段实施概况</span>
+          </div>
+          <div class="bg-white border border-[#E8E2D0] rounded-lg p-5 editable-block text-[#444] leading-relaxed" contenteditable="true" style="font-size:13.5px">
             [请编辑：本次五金安装的整体进度。]
           </div>
         </section>
 
         <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">二、</span>五金安装工艺详解
-          </h2>
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">二</span>
+            <span class="pdf-section-title">五金安装工艺详解</span>
+          </div>
           <div id="images-container"></div>
         </section>
 
-        <footer class="mt-16 pt-8 border-t-2 border-slate-200 text-center">
-          <p class="text-lg text-slate-700 italic font-medium">「用精工艺，给您一个可追溯的家」</p>
-          <p class="text-sm text-slate-500 mt-3 tracking-wider">初 匠 门 窗 服 务 · CHUJIANG</p>
+        <footer class="pdf-footer-band">
+          <p class="pdf-footer-slogan">「用精工艺，给您一个可追溯的家」</p>
+          <p class="pdf-footer-company">汕头市初匠门窗科技有限公司 · CHUJIANG</p>
+          <p class="pdf-footer-sub">施格归档 · SITELOG AI 出品 · ICP备2024297744号-2</p>
         </footer>
       `,
 
       departure: () => `
-        <div class="text-center mb-10 pb-8 border-b-2 border-slate-200">
-          <p class="text-xs text-slate-500 tracking-[0.3em]">CHU JIANG · MEN & WINDOW</p>
-          <h1 class="text-4xl font-bold text-slate-900 mt-3">离场前自检 · 安全合规留底</h1>
-          <p class="text-slate-600 mt-3 text-sm">—— 关水 · 关电 · 关门 · 清场 ——</p>
-          <p class="text-xs text-slate-400 mt-4">本档案作为门窗班组离场前的安全合规凭证，交付业主与监理方保存</p>
+        <div class="text-center mb-10">
+          <p class="text-xs tracking-[0.35em] text-[#1F3D2A] font-semibold mb-6">SAFETY COMPLIANCE · 安全合规留底</p>
+          <h1 class="text-4xl font-bold text-[#1F3D2A] mt-2" style="letter-spacing:0.08em">离场前自检 · 安全合规留底</h1>
+          <div class="flex items-center justify-center gap-4 mt-4 mb-5">
+            <span class="h-[2px] w-16 bg-gradient-to-r from-transparent to-[#B8924A]"></span>
+            <span class="text-sm text-[#B8924A] font-medium tracking-widest">关水 · 关电 · 关门 · 清场</span>
+            <span class="h-[2px] w-16 bg-gradient-to-l from-transparent to-[#B8924A]"></span>
+          </div>
         </div>
 
         <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">一、</span>离场合规总览
-          </h2>
-          <div class="editable-block text-slate-700 leading-relaxed" contenteditable="true">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">一</span>
+            <span class="pdf-section-title">离场合规总览</span>
+          </div>
+          <div class="bg-white border border-[#E8E2D0] rounded-lg p-5 editable-block text-[#444] leading-relaxed" contenteditable="true" style="font-size:13.5px">
             [请编辑：本次离场前自检的整体说明。建议覆盖：项目名称、施工班组、自检日期、自检人、下道工序衔接安排。100-200 字为宜。]
           </div>
         </section>
 
         <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">二、</span>四项合规自检 · 影像归档
-          </h2>
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">二</span>
+            <span class="pdf-section-title">四项合规自检 · 影像归档</span>
+          </div>
           <div id="images-container"></div>
-          <div class="mt-6 grid grid-cols-2 gap-3 text-sm">
-            <div class="bg-blue-50 border border-blue-200 rounded p-3">
-              <p class="font-bold text-blue-900">💧 水源关闭</p>
-              <p class="text-blue-700 text-xs mt-1">现场用水阀门归零位、临时水管卸压</p>
+          <div class="mt-6 grid grid-cols-2 gap-4 text-sm">
+            <div class="bg-[#EDF5EE] border border-[#D4E8DA] rounded-lg p-4">
+              <p class="font-bold text-[#1F3D2A] mb-1 flex items-center gap-2"><span>💧</span>水源关闭</p>
+              <p class="text-[#555] text-xs leading-relaxed">现场用水阀门归零位、临时水管卸压</p>
             </div>
-            <div class="bg-amber-50 border border-amber-200 rounded p-3">
-              <p class="font-bold text-amber-900">⚡ 电源关闭</p>
-              <p class="text-amber-700 text-xs mt-1">配电箱断路器归零位、临时用电插座拔除</p>
+            <div class="bg-[#FBF5E6] border border-[#E8D9A8] rounded-lg p-4">
+              <p class="font-bold text-[#8B6914] mb-1 flex items-center gap-2"><span>⚡</span>电源关闭</p>
+              <p class="text-[#555] text-xs leading-relaxed">配电箱断路器归零位、临时用电插座拔除</p>
             </div>
-            <div class="bg-emerald-50 border border-emerald-200 rounded p-3">
-              <p class="font-bold text-emerald-900">🚪 大门关闭</p>
-              <p class="text-emerald-700 text-xs mt-1">入户门 / 阳台门关闭上锁、钥匙移交</p>
+            <div class="bg-[#EDF5EE] border border-[#D4E8DA] rounded-lg p-4">
+              <p class="font-bold text-[#1F3D2A] mb-1 flex items-center gap-2"><span>🚪</span>大门关闭</p>
+              <p class="text-[#555] text-xs leading-relaxed">入户门 / 阳台门关闭上锁、钥匙移交</p>
             </div>
-            <div class="bg-slate-50 border border-slate-200 rounded p-3">
-              <p class="font-bold text-slate-900">🗑️ 垃圾清场</p>
-              <p class="text-slate-700 text-xs mt-1">施工余料 / 包装 / 边角料打包成捆、定点堆放</p>
+            <div class="bg-[#FAFAF8] border border-[#E8E2D0] rounded-lg p-4">
+              <p class="font-bold text-[#444] mb-1 flex items-center gap-2"><span>🗑️</span>垃圾清场</p>
+              <p class="text-[#555] text-xs leading-relaxed">施工余料 / 包装 / 边角料打包成捆、定点堆放</p>
             </div>
           </div>
         </section>
 
         <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">三、</span>自检结论与离场声明
-          </h2>
-          <div class="bg-amber-50 border-l-4 border-amber-500 p-6 my-4 rounded-r">
-            <p class="text-slate-800 font-bold mb-3 text-lg">「关水、关电、关门！—— 树立门窗最后一道防火墙」</p>
-            <div class="editable-block text-slate-700 text-sm leading-relaxed" contenteditable="true">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">三</span>
+            <span class="pdf-section-title">自检结论与离场声明</span>
+          </div>
+          <div class="bg-gradient-to-br from-[#FBF5E6] to-[#FAFAF8] border-l-4 border-[#B8924A] p-6 my-4 rounded-r-lg">
+            <p class="text-[#1F3D2A] font-bold mb-3 text-base">「关水、关电、关门！—— 树立门窗最后一道防火墙」</p>
+            <div class="editable-block text-[#444] text-sm leading-relaxed" contenteditable="true">
               [请编辑本次自检结论：本次离场前自检确认的四项合规动作各完成情况，自检人签字，下道工序（如泥工 / 漆工）入场前的水电门管理权限交接对象。]
             </div>
           </div>
         </section>
 
         <section class="mb-10">
-          <h2 class="text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200 flex items-center gap-2">
-            <span class="text-blue-600">四、</span>影像追溯体系
-          </h2>
-          <ul class="text-slate-700 space-y-2 leading-relaxed">
-            <li>📸 <strong>影像性质</strong>：本档案所有照片均为现场实拍，含拍摄人 / 拍摄时间 / 定位水印，可作为业主与监理方第三方追溯凭证</li>
-            <li>🔍 <strong>影像要素</strong>：四项合规事项逐一留底（关水 / 关电 / 关门 / 清场），照片可直观佐证离场状态</li>
-            <li>📦 <strong>影像归档</strong>：原图随本档案一并交付业主保存</li>
-          </ul>
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">四</span>
+            <span class="pdf-section-title">影像追溯体系</span>
+          </div>
+          <div class="grid grid-cols-3 gap-4 text-sm">
+            <div class="bg-[#FAFAF8] border border-[#E8E2D0] rounded-lg p-4 text-center">
+              <div class="text-2xl mb-2">📸</div>
+              <p class="font-bold text-[#1F3D2A] text-sm mb-1">影像性质</p>
+              <p class="text-[#666] text-xs leading-relaxed">所有照片均为现场实拍，含拍摄人/时间/定位水印，可作为第三方追溯凭证</p>
+            </div>
+            <div class="bg-[#FAFAF8] border border-[#E8E2D0] rounded-lg p-4 text-center">
+              <div class="text-2xl mb-2">🔍</div>
+              <p class="font-bold text-[#1F3D2A] text-sm mb-1">影像要素</p>
+              <p class="text-[#666] text-xs leading-relaxed">四项合规事项逐一留底（关水/关电/关门/清场），照片可直观佐证离场状态</p>
+            </div>
+            <div class="bg-[#FAFAF8] border border-[#E8E2D0] rounded-lg p-4 text-center">
+              <div class="text-2xl mb-2">📦</div>
+              <p class="font-bold text-[#1F3D2A] text-sm mb-1">影像归档</p>
+              <p class="text-[#666] text-xs leading-relaxed">原图随本档案一并交付业主保存</p>
+            </div>
+          </div>
         </section>
 
-        <footer class="mt-16 pt-8 border-t-2 border-slate-200 text-center">
-          <p class="text-lg text-slate-700 italic font-medium">「安全离场 · 责任交接 · 凭证留底」</p>
-          <p class="text-sm text-slate-500 mt-3 tracking-wider">初 匠 门 窗 服 务 · CHUJIANG</p>
-          <p class="text-xs text-slate-400 mt-1">施 格 归 档 · SITELOG AI 出品</p>
+        <footer class="pdf-footer-band">
+          <p class="pdf-footer-slogan">「安全离场 · 责任交接 · 凭证留底」</p>
+          <p class="pdf-footer-company">汕头市初匠门窗科技有限公司 · CHUJIANG</p>
+          <p class="pdf-footer-sub">施格归档 · SITELOG AI 出品 · ICP备2024297744号-2</p>
+          <div class="pdf-footer-info">
+            <span>服务热线：待填写</span>
+            <span>官网：chujiang.中国</span>
+            <span>地址：广东省汕头市</span>
+          </div>
         </footer>
       `
     };
