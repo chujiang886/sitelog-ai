@@ -296,10 +296,12 @@
       font-size: 11px; font-weight: 700; border-radius: 4px; flex-shrink: 0;
     }
     .node-card-meta { font-size: 11px; color: #999; }
-    .node-card-body { display: grid; grid-template-columns: 220px 1fr; gap: 0; }
+    .node-card-body { display: grid; grid-template-columns: 200px 1fr; gap: 0; }
     .node-card-image { padding: 12px 12px 12px 18px; }
     .node-card-image img {
-      width: 100%; border-radius: 6px; border: 1px solid #eee8d8; display: block;
+      width: 100%; max-height: 180px; object-fit: contain;
+      border-radius: 6px; border: 1px solid #eee8d8; display: block;
+      background: #f8f6f0;
     }
     .node-card-detail { padding: 14px 18px 14px 8px; }
     .node-card-stage-badge {
@@ -359,7 +361,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v3.1.0</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v3.2.0</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -1710,7 +1712,8 @@
               filename:     filename,
               image:        { type: 'jpeg', quality: 0.98 },
               html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
-              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+              pagebreak:    { mode: ['avoid-all', 'css', 'legacy'], before: '.node-card', avoid: ['.node-card', '.pdf-section-header', 'section', 'h2'] }
             };
 
             console.log('📄 [PDF] v2.5.0 开始生成:', filename,
