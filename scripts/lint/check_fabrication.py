@@ -23,13 +23,28 @@ RESET: str = "\033[0m"
 PENDING_MARKER: str = "pending_verification"
 
 # 业务数字扫描：覆盖所有支持的文件后缀
+# 注：agents/engineering/ 下的 .py（审核链/加载器）与 .json（verified.json）
+# 本就在全仓扫描范围内；此处显式补入 .jsonl 以覆盖 Engineering 审核日志
+# review_log.jsonl（防编造扫描同样需监管 append-only 日志中的硬编码工程数字）。
 SCANNED_SUFFIXES: frozenset[str] = frozenset(
-    {".js", ".json", ".md", ".py", ".toml", ".ts", ".tsx", ".yaml", ".yml"}
+    {".js", ".json", ".jsonl", ".md", ".py", ".toml", ".ts", ".tsx", ".yaml", ".yml"}
 )
 # 指纹扫描：仅 markdown（人眼最容易泄露 key 的地方）
 FINGERPRINT_SUFFIXES: frozenset[str] = frozenset({".md"})
 EXCLUDED_DIRECTORIES: frozenset[str] = frozenset(
-    {".git", ".next", ".venv", "__pycache__", "build", "dist", "node_modules"}
+    {
+        ".git",
+        ".next",
+        ".venv",
+        "__pycache__",
+        "build",
+        "dist",
+        "node_modules",
+        # 代理私有工作记忆（gitignore、非仓库交付物、自由格式笔记），
+        # 不应纳入防编造扫描——其引用风压/阈值等仅为内部记录，且每次写入都可能
+        # 携带阶段号/统计数字，纳入会无谓阻断 CI。工程源码与 .ai/ 交付物仍全量扫描。
+        ".workbuddy",
+    }
 )
 EXCLUDED_FILE_NAMES: frozenset[str] = frozenset({".env"})
 

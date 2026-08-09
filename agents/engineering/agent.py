@@ -15,6 +15,17 @@
 - 不编造评分权重。
 所有 ``result`` / ``confidence`` / ``evidence`` 字段在骨架阶段保持空串，
 缺口通过 ``gaps`` 显式声明，等待真实规范库 / 计算引擎接入后填充。
+
+Sprint C 起 wind_pressure 接入 WindPressureCalculator（仅结构装配，不产真实数值），
+Sprint E 起 glass_safety 接入 GlassSafetyCalculator（仅结构装配，不产真实数值，
+含 wind_pressure 上游 w_k 跨模块降级），
+Sprint G 起 profile 接入 ProfileCalculator（仅结构装配，不产真实数值，
+含 wind_pressure 上游 w_k 跨模块降级），
+Sprint I 起 hardware 接入 HardwareCalculator（仅结构装配，不产真实数值，
+含 profile 上游审核态跨模块降级，禁止重算型材受力）；
+Sprint K 起 installation_risk 接入 InstallationRiskCalculator（仅结构装配，不产真实数值，
+含 glass_safety/profile/hardware 三上游审核态跨模块降级，禁止重算玻璃重量/型材受力/五金承载）；
+统一四字段契约与 validator 流程保持不变。
 """
 
 from __future__ import annotations
@@ -23,6 +34,15 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from agents.base import AgentContext, AgentResult, BaseAgent
+from agents.engineering.calc.glass_safety import GlassSafetyCalculator
+from agents.engineering.calc.hardware import HardwareCalculator
+from agents.engineering.calc.installation_risk import InstallationRiskCalculator
+from agents.engineering.calc.profile import ProfileCalculator
+from agents.engineering.calc.wind_pressure import WindPressureCalculator
+from agents.engineering.knowledge.activation.runtime_integration import (
+    EngineeringRuntimeGuard,
+    InterfaceGuardResult,
+)
 from agents.engineering.validation import (
     PENDING_VERIFICATION,
     EngineeringValidation,
@@ -81,6 +101,8 @@ class EngineeringAgent(BaseAgent):
         self,
         *,
         validator: EngineeringValidation | None = None,
+        knowledge_guard: EngineeringRuntimeGuard | None = None,
+        knowledge_repository: Any | None = None,
     ) -> None:
         super().__init__(
             name=ENGINEERING_AGENT_NAME,
@@ -91,6 +113,18 @@ class EngineeringAgent(BaseAgent):
         self._validator: EngineeringValidation = (
             validator if validator is not None else PendingEngineeringValidation()
         )
+        # 任务(3.4.4) 知识消费守卫接入（计算前过 guard；缺省懒构建，零副作用）。
+        # 不修改任何既有计算逻辑；仅在 invoke 提供 knowledge_items 时生效。
+        self._knowledge_guard: EngineeringRuntimeGuard = (
+            knowledge_guard or EngineeringRuntimeGuard()
+        )
+        self._knowledge_repository: Any | None = knowledge_repository
+
+    @property
+    def knowledge_guard(self) -> EngineeringRuntimeGuard:
+        """返回当前知识消费守卫（供测试与运行时替换检查）。"""
+
+        return self._knowledge_guard
 
     @property
     def tools(self) -> Sequence[str]:
@@ -116,38 +150,117 @@ class EngineeringAgent(BaseAgent):
     def analyze_wind_pressure(
         self, context_data: Mapping[str, Any]
     ) -> dict[str, Any]:
-        """风压分析接口（骨架）：不产出任何风压数值。"""
+        """风压分析接口（Sprint C）：调用 WindPressureCalculator，返回统一四字段。
 
-        del context_data  # 骨架阶段不消费输入，仅锁定签名
-        return build_skeleton_output()
+        红线：calculator 不产出真实风压数值，verification_status 恒 pending；
+        validator 流程不变（invoke 仍调用 self._validator.validate）。
+        """
+
+        calculator = WindPressureCalculator()
+        wp_result = calculator.calculate(context_data)
+        return wp_result.as_interface()
 
     def analyze_glass_safety(
         self, context_data: Mapping[str, Any]
     ) -> dict[str, Any]:
-        """玻璃安全接口（骨架）：不产出任何玻璃配置结论。"""
+        """玻璃安全接口（Sprint E）：调用 GlassSafetyCalculator，返回统一四字段。
 
-        del context_data
-        return build_skeleton_output()
+        红线：calculator 不产出真实玻璃安全数值，verification_status 恒 pending；
+        validator 流程不变（invoke 仍调用 self._validator.validate）。
+        跨模块链路（任务4）：calculator 内部消费 wind_pressure_result 的 w_k，
+        上游未 approved 时强制 pending 并登记 w_k: upstream_pending。
+        """
+
+        calculator = GlassSafetyCalculator()
+        gs_result = calculator.calculate(context_data)
+        return gs_result.as_interface()
 
     def analyze_profile(self, context_data: Mapping[str, Any]) -> dict[str, Any]:
-        """型材分析接口（骨架）：不产出任何型材选型结论。"""
+        """型材分析接口（Sprint G）：调用 ProfileCalculator，返回统一四字段。
 
-        del context_data
-        return build_skeleton_output()
+        红线：calculator 不产出真实型材数值，verification_status 恒 pending；
+        validator 流程不变（invoke 仍调用 self._validator.validate）。
+        跨模块链路（任务4）：calculator 内部消费 wind_pressure_result 的 w_k，
+        上游未 approved 时强制 pending 并登记 w_k: upstream_pending。
+        """
+
+        calculator = ProfileCalculator()
+        pf_result = calculator.calculate(context_data)
+        return pf_result.as_interface()
 
     def analyze_hardware(self, context_data: Mapping[str, Any]) -> dict[str, Any]:
-        """五金分析接口（骨架）：不产出任何五金选型结论。"""
+        """五金分析接口（Sprint I）：调用 HardwareCalculator，返回统一四字段。
 
-        del context_data
-        return build_skeleton_output()
+        红线：calculator 不产出真实五金选型/承载结论，verification_status 恒 pending；
+        validator 流程不变（invoke 仍调用 self._validator.validate）。
+        跨模块链路（任务4）：calculator 内部消费 profile_result 的审核态，
+        上游 profile 未 approved 时强制 pending 并登记 profile_result: upstream_pending；
+        **禁止**在本接口自行计算型材受力（型材受力归属 profile 模块）。
+        """
+
+        calculator = HardwareCalculator()
+        hw_result = calculator.calculate(context_data)
+        return hw_result.as_interface()
 
     def analyze_installation_risk(
         self, context_data: Mapping[str, Any]
     ) -> dict[str, Any]:
-        """安装风险接口（骨架）：不产出任何风险等级结论。"""
+        """安装风险接口（Sprint K）：调用 InstallationRiskCalculator，返回统一四字段。
 
-        del context_data
-        return build_skeleton_output()
+        红线：calculator 不产出真实风险评级/承载/距离结论，verification_status 恒 pending；
+        validator 流程不变（invoke 仍调用 self._validator.validate）。
+        跨模块链路（任务4，末端聚合）：calculator 内部消费 glass_safety_result /
+        profile_result / hardware_result 的审核态，任一上游未 approved 时强制 pending
+        并登记 upstream_pending；**禁止**在本接口自行计算玻璃重量/型材受力/五金承载。
+        """
+
+        calculator = InstallationRiskCalculator()
+        ir_result = calculator.calculate(context_data)
+        return ir_result.as_interface()
+
+    # ------------------------------------------------------------------ #
+    # 任务(3.4.4)：知识消费守卫接入（计算前过 guard，只读判定）              #
+    # ------------------------------------------------------------------ #
+
+    def consume_knowledge_for(
+        self, interface: str, items: Sequence[Any], decision: Any
+    ) -> "InterfaceGuardResult":
+        """计算前接入点：在某工程接口计算前，对其候选知识逐项过 guard 分区。
+
+        返回 ``InterfaceGuardResult``；仅 authoritative 可作权威依据，auxiliary
+        仅辅助须 pending_verification，blocked 一律不得进入。只读判定，不修改任何
+        既有计算逻辑；红线：不翻转 engineering_enabled / 不输出 engineering_approved。
+        """
+
+        return self._knowledge_guard.guard_interface(interface, list(items), decision)
+
+    def _consume_requested_knowledge(
+        self, requested: tuple[str, ...], input_data: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """invoke 内部：对 requested 接口提供的候选知识跑消费守卫分区。
+
+        无 ``knowledge_items`` 输入 → 返回空 dict（向后兼容，零副作用）。
+        未显式提供 ``unified_decision`` 时，由守卫按（可选）仓库解析系统级决策；
+        仓库缺失则 fail-closed 全部阻断。
+        """
+
+        knowledge_items_in = input_data.get("knowledge_items")
+        if not isinstance(knowledge_items_in, Mapping):
+            return {}
+        unified_decision = input_data.get("unified_decision")
+        if unified_decision is None:
+            unified_decision = self._knowledge_guard.resolve_decision(
+                self._knowledge_repository
+            )
+        out: dict[str, Any] = {}
+        for name in requested:
+            candidates = knowledge_items_in.get(name, []) or []
+            if not candidates:
+                continue
+            out[name] = self._knowledge_guard.guard_interface(
+                name, list(candidates), unified_decision
+            ).to_dict()
+        return out
 
     # ------------------------------------------------------------------ #
     # BaseAgent 契约                                                        #
@@ -225,6 +338,11 @@ class EngineeringAgent(BaseAgent):
             analyses[name] = output
             review_chain.append(record)
 
+        # 任务(3.4.4)：知识消费接入——若 input_data 提供候选知识，计算前过 guard。
+        knowledge_consumption: dict[str, Any] = self._consume_requested_knowledge(
+            requested, context.input_data
+        )
+
         gaps: list[str] = [
             f"{name}_analysis: {PENDING_VERIFICATION}" for name in requested
         ]
@@ -239,6 +357,7 @@ class EngineeringAgent(BaseAgent):
                 "review_chain": review_chain,
                 "pending_verification": True,
                 "gaps": gaps,
+                "knowledge_consumption": knowledge_consumption,
             },
             evidence=(
                 self._emit_evidence(

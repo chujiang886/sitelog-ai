@@ -118,9 +118,24 @@ def load_verified_thresholds(
     return _load(target)
 
 
+def load_engineering_enabled(
+    config_path: Path | str = DEFAULT_CONFIG_PATH,
+) -> bool:
+    """读取 ``orchestrator.engineering_enabled`` 开关（Phase 3.1 Sprint A 红线）。
+
+    缺省返回 ``False``（等价工程审核链未启用）。该开关是 Engineering 审核
+    是否允许输出 ``engineering_approved`` 的最终闸门；Sprint A 期间恒为
+    ``False``，任何双签阈值都不会使系统产出工程审核通过态。
+    """
+
+    section: Mapping[str, Any] = _load_section("orchestrator", config_path)
+    return bool(section.get("engineering_enabled", False))
+
+
 __all__ = [
     "DEFAULT_CONFIG_PATH",
     "load_environment_data_config",
     "load_llm_config",
     "load_verified_thresholds",
+    "load_engineering_enabled",
 ]

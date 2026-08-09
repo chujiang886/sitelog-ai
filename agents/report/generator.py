@@ -11,6 +11,7 @@
     "vision":     <Vision AgentResult.data dict 或 None>,
     "environment":<Environment AgentResult.data dict 或 None>,
     "design":     <Design AgentResult.data dict 或 None>,
+    "engineering":<{interface: EngineeringCalculationResult.as_full()} 或 as_full() 单对象/列表 或 None>,
 }
 
 设计原则（2.2.3 增强）
@@ -660,12 +661,232 @@ def _build_design_section(
     return flow
 
 
+def _build_engineering_section(
+    engineering: dict[str, Any], styles: dict[str, ParagraphStyle]
+) -> list[Any]:
+    """五、工程智能分析（Phase 3.2.2：消费 EngineeringCalculationResult.as_full()）。
+
+    严守红线：不渲染任何真实工程数值（result 在 pending 态恒空），
+    所有模块 verification_status 为 pending_verification → 统一标 [待确认]，
+    绝不误显为 [已验证]；仅透出 gaps / threshold_refs / provenance 作为待确认标记。
+    """
+
+    flow: list[Any] = [Paragraph("五、工程智能分析", styles["h1"])]
+
+    # 归一化：engineering 可为 {interface: as_full} 字典、as_full 单对象（含 interface 键）、
+    # 或 as_full 列表；统一转成结果 dict 列表。
+    results: list[dict[str, Any]] = []
+    if isinstance(engineering, Mapping):
+        if "interface" in engineering and "verification_status" in engineering:
+            results = [dict(engineering)]
+        else:
+            results = [dict(v) for v in engineering.values() if isinstance(v, Mapping)]
+    elif isinstance(engineering, (list, tuple)):
+        results = [dict(v) for v in engineering if isinstance(v, Mapping)]
+
+    if not results:
+        flow.append(
+            Paragraph(
+                "暂无数据/待补充（Engineering Agent 未返回结果）。", styles["body"]
+            )
+        )
+        return flow
+
+    # 固定五模块展示顺序。
+    _ORDER: tuple[str, str] = (
+        ("wind_pressure", "风压分析"),
+        ("glass_safety", "玻璃安全分析"),
+        ("profile", "型材分析"),
+        ("hardware", "五金分析"),
+        ("installation_risk", "安装风险分析"),
+    )
+    by_interface: dict[str, dict[str, Any]] = {
+        _section_safe(r).get("interface", ""): _section_safe(r) for r in results
+    }
+
+    flow.append(
+        Paragraph(
+            "本工程分析由 AI 骨架生成，所有数值与结论待工程批准，不构成施工依据。",
+            styles["warn"],
+        )
+    )
+    flow.append(Spacer(1, 4))
+
+    # --- 1. 工程模块状态总览 ---
+    flow.append(Paragraph("工程模块状态总览", styles["h2"]))
+    overview_rows: list[list[Any]] = [
+        [
+            Paragraph("模块", styles["cell_header"]),
+            Paragraph("接口", styles["cell_header"]),
+            Paragraph("可信状态", styles["cell_header"]),
+            Paragraph("结论摘要", styles["cell_header"]),
+        ]
+    ]
+    for iface, label in _ORDER:
+        r = by_interface.get(iface, {})
+        pending = str(r.get("verification_status", "pending_verification")).lower() in (
+            "pending_verification",
+            "pending",
+            "",
+        )
+        badge_text, badge_style = (
+            (BADGE_PENDING, "badge_pending") if pending else (BADGE_VERIFIED, "badge_verified")
+        )
+        summary = _as_str(r.get("result"), "待确认（pending_verification）")
+        overview_rows.append(
+            [
+                Paragraph(label, styles["cell"]),
+                Paragraph(_escape(iface), styles["cell"]),
+                Paragraph(badge_text, styles["cell_badge"]),
+                Paragraph(_escape(summary), styles["cell"]),
+            ]
+        )
+    overview_table = Table(overview_rows, colWidths=[32 * mm, 38 * mm, 28 * mm, 62 * mm])
+    overview_table.setStyle(_badge_table_style())
+    flow.append(overview_table)
+    flow.append(Spacer(1, 8))
+
+    # --- 2. 五模块详情 ---
+    flow.append(Paragraph("五模块详情", styles["h2"]))
+    for iface, label in _ORDER:
+        r = by_interface.get(iface)
+        if r is None:
+            flow.append(Paragraph(f"{label}（{iface}）", styles["h2"]))
+            flow.append(
+                Paragraph("暂无数据/待补充。", styles["body"])
+            )
+            flow.append(Spacer(1, 4))
+            continue
+
+        flow.append(Paragraph(f"{label}（{_escape(iface)}）", styles["h2"]))
+
+        # 结论 + 证据
+        result_val = _as_str(r.get("result"), "待确认（pending_verification）")
+        evidence_val = _as_str(r.get("evidence"), "暂无证据/待补充")
+        detail_rows = [
+            [
+                Paragraph("结论", styles["cell_header"]),
+                Paragraph(_escape(result_val), styles["cell"]),
+            ],
+            [
+                Paragraph("证据", styles["cell_header"]),
+                Paragraph(_escape(evidence_val), styles["cell"]),
+            ],
+        ]
+        detail_table = Table(detail_rows, colWidths=[30 * mm, 130 * mm])
+        detail_table.setStyle(_kv_table_style())
+        flow.append(detail_table)
+        flow.append(Spacer(1, 4))
+
+        # 待确认项（gaps）
+        gaps = _as_list(r.get("gaps"))
+        flow.append(Paragraph("待确认项", styles["warn"]))
+        flow.extend(_list_flowable(gaps, styles["warn"]))
+
+        # 阈值引用（threshold_refs，如 E-TH-0x）
+        thr = _as_list(r.get("threshold_refs"))
+        if thr:
+            flow.append(Paragraph("阈值引用", styles["body"]))
+            flow.extend(_list_flowable(thr, styles["body"]))
+
+        # 上游 pending 提示
+        if any("upstream_pending" in str(g) for g in gaps):
+            flow.append(
+                Paragraph(
+                    "注：上游模块尚未批准，本模块结论强制待确认。",
+                    styles["small"],
+                )
+            )
+
+        # 字段溯源（provenance）
+        provenance: Mapping[str, Any] = r.get("provenance", {}) or {}
+        if isinstance(provenance, Mapping) and provenance:
+            prov_text = "；".join(
+                f"{_escape(str(k))}={_escape(str(v))}"
+                for k, v in provenance.items()
+                if k not in (None, "")
+            )
+            flow.append(
+                Paragraph(f"字段溯源：{prov_text}", styles["small"])
+            )
+        flow.append(Spacer(1, 6))
+
+    # --- 3. 可信等级 ---
+    flow.append(Paragraph("可信等级", styles["h2"]))
+    flow.append(
+        Paragraph(
+            "工程结论的可信等级遵循全局 Level 模型（见「三、数据可信等级说明」）。"
+            "当前阶段（Phase 3.2.2）：工程批准（Level 3）尚未启用，engineering_enabled=false，"
+            "故全部工程模块为待确认，不构成施工依据。",
+            styles["small"],
+        )
+    )
+
+    # --- 4. 审核链状态 ---
+    flow.append(Paragraph("审核链状态", styles["h2"]))
+    any_signed = False
+    chain_rows: list[list[Any]] = [
+        [
+            Paragraph("模块", styles["cell_header"]),
+            Paragraph("签署 ID", styles["cell_header"]),
+            Paragraph("审核状态", styles["cell_header"]),
+        ]
+    ]
+    for iface, label in _ORDER:
+        r = by_interface.get(iface, {})
+        sign_off = r.get("sign_off_id")
+        signed = bool(sign_off)
+        if signed:
+            any_signed = True
+        chain_rows.append(
+            [
+                Paragraph(label, styles["cell"]),
+                Paragraph(_escape(_as_str(sign_off, "未签署")), styles["cell"]),
+                Paragraph(
+                    "已签署" if signed else "待工程批准",
+                    styles["cell"],
+                ),
+            ]
+        )
+    chain_table = Table(chain_rows, colWidths=[40 * mm, 60 * mm, 60 * mm])
+    chain_table.setStyle(_kv_table_style())
+    flow.append(chain_table)
+    if not any_signed:
+        flow.append(
+            Paragraph("当前全部模块 sign_off_id 为 None，审核链未签署。", styles["small"])
+        )
+    flow.append(Spacer(1, 6))
+
+    # --- 5. 待确认事项（汇总） ---
+    flow.append(Paragraph("待确认事项", styles["h2"]))
+    all_pending: list[str] = []
+    for iface, label in _ORDER:
+        r = by_interface.get(iface, {})
+        for g in _as_list(r.get("gaps")):
+            gs = str(g)
+            if gs and gs not in all_pending:
+                all_pending.append(gs)
+        for t in _as_list(r.get("threshold_refs")):
+            ts = f"阈值引用待签：{t}"
+            if ts not in all_pending:
+                all_pending.append(ts)
+    if all_pending:
+        for item in all_pending:
+            flow.append(Paragraph("· " + _escape(item), styles["warn"]))
+    else:
+        flow.append(
+            Paragraph("· 暂无显式待确认项（仍须工程师复核）", styles["small"])
+        )
+
+    return flow
+
+
 def _build_disclaimer_section(
     dossier: dict[str, Any], styles: dict[str, ParagraphStyle]
 ) -> list[Any]:
-    """五、免责与待确认声明（醒目，标注各 Agent pending_verification 状态）。"""
+    """六、免责与待确认声明（醒目，标注各 Agent pending_verification 状态）。"""
 
-    flow: list[Any] = [Paragraph("五、免责与待确认声明", styles["h1"])]
+    flow: list[Any] = [Paragraph("六、免责与待确认声明", styles["h1"])]
     flow.append(
         Paragraph(
             "【重要提示】本报告由 AI 多 Agent 运行时自动生成，结构安全、"
@@ -679,6 +900,7 @@ def _build_disclaimer_section(
         ("vision", "视觉分析（Vision Agent）"),
         ("environment", "环境分析（Environment Agent）"),
         ("design", "设计方案（Design Agent）"),
+        ("engineering", "工程智能分析（Engineering Agent）"),
     ]
     for key, label in labels:
         section = _section_safe(dossier.get(key))
@@ -747,6 +969,7 @@ def generate_project_report(dossier: dict) -> bytes:
     vision = _section_safe(dossier.get("vision"))
     environment = _section_safe(dossier.get("environment"))
     design = _section_safe(dossier.get("design"))
+    engineering = _section_safe(dossier.get("engineering"))
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -766,10 +989,16 @@ def generate_project_report(dossier: dict) -> bytes:
     story += _build_environment_section(environment, styles)
     story += _build_credibility_section(dossier, styles)
     story += _build_design_section(design, styles)
+    story += _build_engineering_section(engineering, styles)
     story += _build_disclaimer_section(dossier, styles)
 
     doc.build(story)
     return buffer.getvalue()
 
 
-__all__ = ["BADGE_PENDING", "BADGE_VERIFIED", "generate_project_report"]
+__all__ = [
+    "BADGE_PENDING",
+    "BADGE_VERIFIED",
+    "generate_project_report",
+    "_build_engineering_section",
+]

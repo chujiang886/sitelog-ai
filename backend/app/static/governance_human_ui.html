@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>企业智能体治理 · 人工操作界面（Phase 3.8.26）</title>
+<style>
+  :root { --bg:#0f172a; --panel:#1e293b; --line:#334155; --txt:#e2e8f0; --muted:#94a3b8;
+          --accent:#38bdf8; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,Segoe UI,Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+         background:var(--bg); color:var(--txt); padding:20px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:16px; }
+  .redline { background:#3b1d1d; border:1px solid var(--bad); color:#fecaca; padding:8px 12px;
+             border-radius:8px; font-size:12.5px; margin-bottom:18px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:14px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:8px 0 4px; }
+  input, textarea, select { width:100%; background:#0b1220; color:var(--txt); border:1px solid var(--line);
+            border-radius:6px; padding:8px; font-size:13px; }
+  textarea { min-height:60px; resize:vertical; }
+  button { cursor:pointer; border:none; border-radius:6px; padding:8px 14px; font-size:13px; font-weight:600; }
+  .btn-primary { background:var(--accent); color:#06283d; }
+  .btn-ok { background:var(--ok); color:#052e16; }
+  .btn-warn { background:var(--warn); color:#452701; }
+  .btn-ghost { background:transparent; border:1px solid var(--line); color:var(--txt); }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media(max-width:720px){ .grid2 { grid-template-columns:1fr; } }
+  .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; margin-left:6px; }
+  .st-created{background:#1e3a5f;color:#93c5fd;} .st-under_review{background:#4a3a1e;color:#fcd34d;}
+  .st-human_confirmed{background:#14532d;color:#86efac;} .st-in_progress{background:#164e63;color:#67e8f9;}
+  .st-waiting_result{background:#3b2f4a;color:#d8b4fe;} .st-completed{background:#1f2937;color:#9ca3af;}
+  .wf { border:1px solid var(--line); border-radius:8px; padding:10px; margin-top:10px; }
+  .wf h3 { margin:0 0 6px; font-size:14px; }
+  .actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .detail { font-size:12px; color:var(--muted); white-space:pre-wrap; margin-top:6px;
+            background:#0b1220; border:1px solid var(--line); border-radius:6px; padding:8px; }
+  .hidden { display:none; }
+  .log { font-size:12px; color:var(--muted); margin-top:6px; }
+  .ok { color:var(--ok); } .err { color:var(--bad); }
+  hr { border:none; border-top:1px solid var(--line); margin:16px 0; }
+</style>
+</head>
+<body>
+  <h1>企业智能体治理 · 人工操作界面</h1>
+  <div class="sub">Phase 3.8.26 — Persistence &amp; Human Operation Interface Layer（Workflow → Database → Human UI → Audit）</div>
+  <div class="redline">
+    ⚠️ 红线：本界面<b>仅提供人工操作入口</b>，<b>没有任何自动按钮</b>（无 auto-confirm / auto-execute / auto-close / 定时器自动动作）。
+    所有写操作都必须由真实责任人手动点击，并携带 <code>x-actor-id</code> + <code>x-actor-kind: user</code>。
+    AI 无法越权（红线③/④/⑥）。
+  </div>
+
+  <div class="card">
+    <div class="grid2">
+      <div>
+        <label>API 基地址</label>
+        <input id="apiBase" value="http://127.0.0.1:8000" />
+      </div>
+      <div>
+        <label>组织 ID（org-id 请求头）</label>
+        <input id="orgId" value="demo-org" />
+      </div>
+    </div>
+    <div style="margin-top:8px">
+      <label>真实责任人 ID（x-actor-id，手动填写，代表你本人）</label>
+      <input id="actorId" placeholder="例如 user-chen" />
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">① 上报治理事项（人工登记）</h3>
+    <label>来源 ID</label><input id="repSource" placeholder="例如 src-001" />
+    <label>标题</label><input id="repTitle" placeholder="例如 某 Agent 越权调用外部工具" />
+    <label>描述</label><textarea id="repDesc" placeholder="事实描述……"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="btn-primary" onclick="reportWorkflow()">手动提交上报</button>
+      <span id="repLog" class="log"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">② 治理工作流列表</h3>
+    <div class="row">
+      <button class="btn-ghost" onclick="loadList()">手动刷新列表</button>
+      <span id="listLog" class="log"></span>
+    </div>
+    <div id="list" style="margin-top:10px"></div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+function headers(extra={}) {
+  return Object.assign({
+    "Content-Type":"application/json",
+    "x-actor-id": $("actorId").value || "anonymous",
+    "x-actor-kind":"user",
+    "org-id": $("orgId").value || "demo-org"
+  }, extra);
+}
+function base() { return $("apiBase").value.replace(/\/$/,""); }
+
+async function api(method, path, body) {
+  const res = await fetch(base() + path, {
+    method, headers: headers(),
+    body: body ? JSON.stringify(body) : undefined
+  });
+  let data = null;
+  try { data = await res.json(); } catch(e) {}
+  return { res, data };
+}
+
+async function reportWorkflow() {
+  const log = $("repLog"); log.textContent = ""; log.className = "log";
+  if (!$("actorId").value) { log.textContent = "请先填写真实责任人 ID"; log.className = "log err"; return; }
+  const { res, data } = await api("POST", "/governance/ops/workflows", {
+    source_id: $("repSource").value, title: $("repTitle").value, description: $("repDesc").value
+  });
+  if (res.ok) { log.textContent = "已上报：" + (data && data.workflow_id); log.className = "log ok"; loadList(); }
+  else { log.textContent = "失败(" + res.status + ")：" + JSON.stringify(data); log.className = "log err"; }
+}
+
+async function loadList() {
+  const log = $("listLog"); log.textContent = "加载中…"; log.className = "log";
+  const { res, data } = await api("GET", "/governance/ops/workflows");
+  if (!res.ok) { log.textContent = "失败(" + res.status + ")"; log.className = "log err"; return; }
+  log.textContent = "共 " + data.length + " 条"; log.className = "log ok";
+  const box = $("list"); box.innerHTML = "";
+  if (data.length === 0) { box.innerHTML = '<div class="log">暂无工作流（请先上报）</div>'; return; }
+  for (const w of data) box.appendChild(renderCard(w));
+}
+
+function renderCard(w) {
+  const d = document.createElement("div"); d.className = "wf";
+  d.innerHTML = `<h3>${escapeHtml(w.title)} <span class="badge st-${w.status}">${w.status}</span></h3>
+    <div class="log">ID: ${w.workflow_id} · 来源: ${escapeHtml(w.source_id)} · 上报人: ${escapeHtml(w.created_by||"-")}</div>`;
+  const acts = document.createElement("div"); acts.className = "actions";
+
+  const btnView = mkBtn("查看", "btn-ghost", () => viewWorkflow(w.workflow_id, d));
+  const btnConfirm = mkBtn("研判确认", "btn-ok", () => confirmReview(w.workflow_id, d));
+  const btnSubmit = mkBtn("提交结果", "btn-warn", () => submitResult(w.workflow_id, d));
+  const btnClose = mkBtn("闭环", "btn-primary", () => closeWorkflow(w.workflow_id, d));
+  acts.append(btnView, btnConfirm, btnSubmit, btnClose);
+  d.appendChild(acts);
+  return d;
+}
+
+function mkBtn(text, cls, fn) {
+  const b = document.createElement("button"); b.textContent = text; b.className = cls;
+  b.onclick = fn; return b;
+}
+
+async function viewWorkflow(wid, card) {
+  const { res, data } = await api("GET", "/governance/ops/workflows/" + wid);
+  if (!res.ok) { alert("查看失败(" + res.status + ")"); return; }
+  const block = document.createElement("div"); block.className = "detail";
+  block.textContent =
+    `状态: ${data.workflow.status}\n标题: ${data.workflow.title}\n描述: ${data.workflow.description}\n` +
+    `确认人: ${data.workflow.confirmed_by || "-"}  完成人: ${data.workflow.completed_by || "-"}\n` +
+    `执行记录(${data.executions.length}):\n` +
+    data.executions.map(e => ` - [${e.action}] ${e.actor} / decision=${e.decision} / result=${e.result}`).join("\n");
+  const old = card.querySelector(".detail"); if (old) old.remove();
+  card.appendChild(block);
+}
+
+function promptDecision() {
+  const d = prompt("研判结论（confirmed / rejected / need_more_info）：", "confirmed");
+  return d;
+}
+
+async function confirmReview(wid, card) {
+  const decision = prompt("研判结论（confirmed / rejected / need_more_info）：", "confirmed");
+  if (!decision) return;
+  const reason = prompt("研判理由：", "") || "";
+  const { res, data } = await api("POST", `/governance/ops/workflows/${wid}/confirm-review`,
+    { decision, reason });
+  if (res.ok) { flash(card, "研判已提交 → " + data.status, true); loadList(); }
+  else flash(card, "失败(" + res.status + ")", false);
+}
+
+async function submitResult(wid, card) {
+  const result = prompt("执行结果：", "");
+  if (result === null) return;
+  const note = prompt("备注：", "") || "";
+  const { res, data } = await api("POST", `/governance/ops/workflows/${wid}/submit-result`,
+    { result, note });
+  if (res.ok) { flash(card, "结果已提交 → " + data.status, true); loadList(); }
+  else flash(card, "失败(" + res.status + ")", false);
+}
+
+async function closeWorkflow(wid, card) {
+  if (!confirm("确认人工闭环该工作流？（需真实责任人操作）")) return;
+  const note = prompt("闭环说明：", "") || "";
+  const { res, data } = await api("POST", `/governance/ops/workflows/${wid}/close`, { note });
+  if (res.ok) { flash(card, "已闭环 → " + data.status, true); loadList(); }
+  else flash(card, "失败(" + res.status + ")", false);
+}
+
+function flash(card, msg, ok) {
+  let el = card.querySelector(".op-log");
+  if (!el) { el = document.createElement("div"); el.className = "op-log log"; card.appendChild(el); }
+  el.textContent = msg; el.className = "op-log log " + (ok ? "ok" : "err");
+}
+
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
+    {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+</script>
+</body>
+</html>

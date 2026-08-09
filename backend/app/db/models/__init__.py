@@ -7,6 +7,13 @@
 from app.db.models.agent import Agent
 from app.db.models.audit import AuditLog
 from app.db.models.conversation import Conversation
+from app.db.models.governance_workflow import (
+    GOVERNANCE_REVIEW_DECISION_VALUES,
+    GOVERNANCE_WORKFLOW_FORBIDDEN_STATUS_VALUES,
+    GOVERNANCE_WORKFLOW_STATUS_VALUES,
+    GovernanceExecutionRecordDB,
+    GovernanceWorkflowRecord,
+)
 from app.db.models.image import (
     Image,
     VISION_STATUS_DONE,
@@ -27,6 +34,11 @@ __all__ = [
     "Agent",
     "AuditLog",
     "Conversation",
+    "GOVERNANCE_REVIEW_DECISION_VALUES",
+    "GOVERNANCE_WORKFLOW_FORBIDDEN_STATUS_VALUES",
+    "GOVERNANCE_WORKFLOW_STATUS_VALUES",
+    "GovernanceExecutionRecordDB",
+    "GovernanceWorkflowRecord",
     "Image",
     "KnowledgeCase",
     "KnowledgeRule",
