@@ -909,7 +909,7 @@ def test_audit_has_three_new_knowledge_categories() -> None:
     assert "agent_governance_case" in values
     assert "agent_governance_knowledge" in values
     assert "agent_governance_improvement" in values
-    assert len(members) == 68
+    assert len(members) == 69
 
 
 def test_audit_records_case_and_knowledge_and_improvement() -> None:

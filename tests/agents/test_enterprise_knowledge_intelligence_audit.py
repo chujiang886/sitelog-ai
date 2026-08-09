@@ -45,7 +45,7 @@ def test_total_audit_categories_44() -> None:
     #  agent_governance_insight）= 53；3.8.21 新增 3 个
     # （agent_governance_task/agent_governance_action/
     #  agent_governance_closure）= 56
-    assert len(list(AuditActionCategory)) == 68
+    assert len(list(AuditActionCategory)) == 69
 
 
 def test_record_knowledge_search_action() -> None:

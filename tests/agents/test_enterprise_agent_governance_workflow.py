@@ -758,7 +758,7 @@ def test_audit_has_three_new_governance_categories() -> None:
     assert "agent_governance_task" in values
     assert "agent_governance_action" in values
     assert "agent_governance_closure" in values
-    assert len(members) == 68
+    assert len(members) == 69
 
 
 def test_audit_records_governance_task_action() -> None:

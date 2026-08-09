@@ -432,7 +432,7 @@ def test_audit_has_three_new_categories_total_53() -> None:
     # 3.8.20 +3（agent_governance_dashboard/report/insight）→ 累计 53；
     # 3.8.21 +3（agent_governance_task/action/closure）→ 累计 56；
     # 3.8.22 +3 → 59；3.8.23 +3 → 62。
-    assert len(list(AuditActionCategory)) == 68
+    assert len(list(AuditActionCategory)) == 69
 
 
 def test_audit_security_event_actor_is_ai() -> None:

@@ -747,7 +747,7 @@ def test_audit_has_three_new_categories_total_53() -> None:
         "AGENT_GOVERNANCE_REPORT",
         "AGENT_GOVERNANCE_INSIGHT",
     } <= names
-    assert len(list(AuditActionCategory)) == 68
+    assert len(list(AuditActionCategory)) == 69
 
 
 def test_audit_category_values() -> None:

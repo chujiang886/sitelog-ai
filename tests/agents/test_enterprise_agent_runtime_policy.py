@@ -373,7 +373,7 @@ def test_audit_categories_count_53_with_3_8_20() -> None:
     # 3.8.20 再 +3（agent_governance_dashboard/report/insight）→ 累计 53；
     # 3.8.21 再 +3（agent_governance_task/action/closure）→ 累计 56；
     # 3.8.22 +3 → 59；3.8.23 +3 → 62。
-    assert len(list(AuditActionCategory)) == 68
+    assert len(list(AuditActionCategory)) == 69
     for cat, val in (
         ("AGENT_POLICY", "agent_policy"),
         ("AGENT_RUNTIME_CHECK", "agent_runtime_check"),

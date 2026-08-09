@@ -65,13 +65,15 @@ EXPECTED_CATEGORIES = {
     # Phase 3.8.25：企业智能体治理工作流编排层（+3）
     "agent_governance_workflow_create", "agent_governance_workflow_review",
     "agent_governance_workflow_execution",
+    # Phase 3.8.26：企业智能体治理持久化与人工操作界面层（+1）
+    "agent_governance_workflow_view",
 }
 
 
 def test_audit_action_category_has_knowledge_members() -> None:
     members = {c.value for c in AuditActionCategory}
     assert members == EXPECTED_CATEGORIES
-    assert len(members) == 68
+    assert len(members) == 69
     # 程序化校验：枚举每个成员名均存在（规避手写元组形近污染，3.8.11 教训）。
     for name in AuditActionCategory.__members__:
         assert hasattr(AuditActionCategory, name)

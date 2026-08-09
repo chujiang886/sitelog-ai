@@ -442,7 +442,7 @@ def test_audit_categories_present_and_count_53() -> None:
     # 3.8.20 +3（agent_governance_dashboard/report/insight）→ 53；
     # 3.8.21 +3（agent_governance_task/action/closure）→ 累计 56；
     # 3.8.22 +3 → 59；3.8.23 +3 → 62。
-    assert len(list(AuditActionCategory)) == 68
+    assert len(list(AuditActionCategory)) == 69
     for cat in ("AGENT_RESOURCE", "AGENT_COST", "AGENT_COST_REPORT"):
         assert hasattr(AuditActionCategory, cat)
         assert getattr(AuditActionCategory, cat).value in (

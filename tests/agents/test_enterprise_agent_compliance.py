@@ -619,7 +619,7 @@ def test_audit_has_three_new_categories_total_50() -> None:
         "AGENT_COMPLIANCE_CHECK",
         "AGENT_COMPLIANCE_RISK",
     } <= names
-    assert len(list(AuditActionCategory)) == 68
+    assert len(list(AuditActionCategory)) == 69
 
 
 def test_audit_rule_register_actor_is_ai_confirm_is_user() -> None:
