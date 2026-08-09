@@ -33,3 +33,32 @@ backend/storage/
 # IDE
 .idea/
 .vscode/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 3.8.27 T4 仓库治理：以下条目均为「运行时可再生产物」，一律不入库。
+# 判定标准（写死，后续新增条目须同样自证）：
+#   1. 由程序运行/测试执行自动生成；
+#   2. 删除后可通过重跑复现，不含唯一人工输入；
+#   3. 内容随机（哈希名/时间戳）或体量持续膨胀。
+# 不满足以上三条的一律**必须追踪**，尤其是源码、测试、治理文档。
+# ─────────────────────────────────────────────────────────────────────────────
+
+# 测试临时产物（历史债：曾堆积数百个 _tmp_* 文件导致 threshold 系列测试雪崩式失败）
+tests/_tmp_*
+tests/intake_snapshots/
+
+# 构建缓存（tsbuildinfo 每次 tsc 都变更，入库只会制造无意义 diff）
+*.tsbuildinfo
+
+# agents 运行时状态与审计流水（属运行数据，应落审计系统/数据库，不进版本库）
+agents/engineering/knowledge/*_sessions.json
+agents/engineering/knowledge/knowledge_items_pending.json
+agents/engineering/thresholds/verified.json
+agents/engineering/**/*.jsonl
+
+# 发布流程运行时记录（由 scripts/release 生成）
+release_freeze_record.json
+release_candidate_record.json
+
+# 本地 AI 工作台数据（会话记忆等，属个人环境，不属项目资产）
+.workbuddy/

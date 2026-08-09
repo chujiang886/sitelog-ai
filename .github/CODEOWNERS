@@ -1,0 +1,58 @@
+# BOIP 代码归属与强制评审矩阵（Phase 3.8.27 T4 建立）
+#
+# 作用：GitHub 依据本文件自动指派 Reviewer，并可配合分支保护规则实现
+#       「治理红线相关改动必须由指定责任人评审」的硬约束。
+#
+# ⚠️ 本文件本身属于治理资产：修改 CODEOWNERS 等于修改评审权力结构，
+#     因此 /.github/CODEOWNERS 自身也被纳入 @boip/governance-owners 管辖。
+#
+# 说明：占位团队名（@boip/*）需在 GitHub 组织内创建后生效；
+#       单机/无远端阶段本文件作为**责任矩阵文档**使用，同样具备约束力。
+
+# ── 默认兜底 ────────────────────────────────────────────────────────────────
+*                                   @boip/maintainers
+
+# ── 治理红线区（最高保护级别，任何改动必须治理负责人评审）──────────────────
+# 这些路径直接决定「AI 能不能自己批准 / 自己执行 / 代替人担责」。
+/agents/enterprise/red_line.py                      @boip/governance-owners
+/agents/enterprise/audit.py                         @boip/governance-owners
+/agents/enterprise/governance_workflow/             @boip/governance-owners
+/agents/enterprise/agent_governance_workflow.py     @boip/governance-owners
+/agents/enterprise/agent_governance_center.py       @boip/governance-owners
+/agents/enterprise/agent_compliance.py              @boip/governance-owners
+/agents/config.yaml                                 @boip/governance-owners
+/.github/CODEOWNERS                                 @boip/governance-owners
+/.github/workflows/                                 @boip/governance-owners
+
+# ── 工程激活闸门（engineering_enabled 相关，误开即生产事故）────────────────
+/agents/engineering/gate/                           @boip/governance-owners @boip/engineering-owners
+/agents/engineering/approved_monitor.py             @boip/governance-owners @boip/engineering-owners
+/agents/config_loader.py                            @boip/governance-owners @boip/engineering-owners
+
+# ── 工程计算域（涉及真实工程参数，错算即安全事故）──────────────────────────
+/agents/engineering/                                @boip/engineering-owners
+/agents/engineering/calc/                           @boip/engineering-owners
+
+# ── 知识域 ─────────────────────────────────────────────────────────────────
+/agents/enterprise/knowledge*                       @boip/knowledge-owners
+/agents/engineering/knowledge/                      @boip/knowledge-owners @boip/engineering-owners
+
+# ── 后端 ───────────────────────────────────────────────────────────────────
+/backend/                                           @boip/backend-owners
+/backend/app/db/                                    @boip/backend-owners
+/backend/alembic/                                   @boip/backend-owners @boip/governance-owners
+
+# ── 前端 ───────────────────────────────────────────────────────────────────
+/frontend/                                          @boip/frontend-owners
+# 身份适配层决定「谁能代表人做治理动作」，属治理红线延伸区
+/frontend/src/lib/identity/                         @boip/frontend-owners @boip/governance-owners
+/frontend/src/app/governance-dashboard/             @boip/frontend-owners @boip/governance-owners
+
+# ── 测试（红线测试不得被随意放宽）──────────────────────────────────────────
+/tests/                                             @boip/maintainers
+/tests/agents/test_enterprise_*                     @boip/governance-owners
+
+# ── 文档与阶段评审 ─────────────────────────────────────────────────────────
+/.ai/                                               @boip/maintainers
+/.ai/reviews/                                       @boip/governance-owners
+/docs/                                              @boip/maintainers
