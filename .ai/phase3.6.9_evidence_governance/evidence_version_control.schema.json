@@ -1,0 +1,43 @@
+{
+  "id": "boip://evidence-governance/evidence_version_control.schema.json",
+  "title": "Evidence Version Control",
+  "description": "Phase 3.6.9 任务3：真实人工证据版本控制。管理 version / hash / previous_version，构建不可篡改哈希链，并与 3.6.6 冻结基线建立锚定关系。",
+  "version": "1.0.0",
+  "version_control": {
+    "fields": {
+      "version": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "同证据主题下单调递增版本号；首版=1。"
+      },
+      "hash": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "description": "本版本证据内容 SHA-256 哈希，覆盖（previous_version_hash + files[] 内容 + metadata）。"
+      },
+      "previous_version": {
+        "type": ["string", "null"],
+        "pattern": "^BOIP-ESL-[0-9a-f]{16}$",
+        "description": "上一版本 submission_id 指针；首版为 null。"
+      }
+    },
+    "chain_integrity": {
+      "rule": "hash = SHA256( previous_version_hash || files_content || metadata )",
+      "immutability": "previous_version 与历史版本哈希不可变；改写历史须以新 submission_id 重开，禁止原地 mutate。",
+      "tamper_detection": "若某版本 hash 不能由其 previous_version_hash + 当前 files 重算得出，则判定篡改/漂移，审核队列立即暂停并告警。",
+      "audit": "每次版本跃迁须追加 EvidenceSubmissionLog 审计行（含 submitter.signed + timestamp）。"
+    },
+    "freeze_baseline_link": {
+      "baseline_id": "BOIP-ACF-e00a7df54621257a",
+      "baseline_bundle_hash": "aa397a20bfb6eec70472c4958353342b8e3746d5224d5438a184eee919499af6",
+      "role": "0 号锚点",
+      "note": "证据版本链以 3.6.6 冻结基线为起点锚；任何新证据版本必须从基线派生，不回溯改写基线。提交窗口（ESW, 3.6.8）受理前须校验版本匹配该基线，任一安全关键哈希漂移 → 暂停并告警。",
+      "verified_at": "2026-08-03 (3.6.8 重算比对 all_critical_match=True)"
+    },
+    "red_lines": {
+      "no_fabricated_params": "version/hash 仅描述真实提交；AI 不得填充真实参数值（红线①）。",
+      "no_auto_bump": "版本号递增仅由人类提交触发，AI 不得自动 bump 或伪造版本。",
+      "no_engineering_enabled": "版本链不含、也不影响 engineering_enabled（红线⑤）。"
+    }
+  }
+}

@@ -1,0 +1,308 @@
+{
+  "meta": {
+    "phase": "3.6.0",
+    "title": "Controlled Human Activation Execution (DRILL)",
+    "drill_dir": "/Users/chujiangai/WorkBuddy仓库/初匠Ai应用开发/BOIP/.ai/phase3.6.0_drill",
+    "engineering_enabled_at_start": false,
+    "note": "All human-supplied inputs are DRILL placeholders; AI only runs mechanisms & validation."
+  },
+  "task1": {
+    "per_threshold": {
+      "E-TH-01": {
+        "authorized": true,
+        "verified": true,
+        "steps": [
+          "submit",
+          "review_approve",
+          "expert_recheck",
+          "threshold_verified"
+        ],
+        "gate_allowed": false,
+        "engineering_enabled": false,
+        "verification_status": "pending_verification",
+        "source_passed": true,
+        "message": "已双签转正（仍受 engineering_enabled 闸门约束）"
+      },
+      "E-TH-02": {
+        "authorized": true,
+        "verified": true,
+        "steps": [
+          "submit",
+          "review_approve",
+          "expert_recheck",
+          "threshold_verified"
+        ],
+        "gate_allowed": false,
+        "engineering_enabled": false,
+        "verification_status": "pending_verification",
+        "source_passed": true,
+        "message": "已双签转正（仍受 engineering_enabled 闸门约束）"
+      },
+      "E-TH-03": {
+        "authorized": true,
+        "verified": true,
+        "steps": [
+          "submit",
+          "review_approve",
+          "expert_recheck",
+          "threshold_verified"
+        ],
+        "gate_allowed": false,
+        "engineering_enabled": false,
+        "verification_status": "pending_verification",
+        "source_passed": true,
+        "message": "已双签转正（仍受 engineering_enabled 闸门约束）"
+      }
+    },
+    "all_verified": true
+  },
+  "task2": {
+    "per_threshold": {
+      "E-TH-01": {
+        "verified_by": "DRILL-PRINCIPAL-001",
+        "expert_verified_by": "DRILL-EXPERT-002",
+        "sod_principal_ne_expert": true
+      },
+      "E-TH-02": {
+        "verified_by": "DRILL-PRINCIPAL-001",
+        "expert_verified_by": "DRILL-EXPERT-002",
+        "sod_principal_ne_expert": true
+      },
+      "E-TH-03": {
+        "verified_by": "DRILL-PRINCIPAL-001",
+        "expert_verified_by": "DRILL-EXPERT-002",
+        "sod_principal_ne_expert": true
+      }
+    },
+    "sod_ok": true,
+    "all_signed": true,
+    "principal_identity": "DRILL-PRINCIPAL-001",
+    "expert_identity": "DRILL-EXPERT-002",
+    "sod_rule": "expert_verified_by 必须与 verified_by 为不同身份"
+  },
+  "task3": {
+    "event_count": 12,
+    "chain_intact": true,
+    "required_actions_present": true,
+    "present_actions": [
+      "expert_recheck",
+      "review",
+      "submit",
+      "verified"
+    ],
+    "per_threshold_actions": {
+      "E-TH-01": [
+        "expert_recheck",
+        "review",
+        "submit",
+        "verified"
+      ],
+      "E-TH-02": [
+        "expert_recheck",
+        "review",
+        "submit",
+        "verified"
+      ],
+      "E-TH-03": [
+        "expert_recheck",
+        "review",
+        "submit",
+        "verified"
+      ]
+    },
+    "all_thresholds_have_full_chain": true,
+    "g4_pass": true
+  },
+  "task4": {
+    "approval_validated_by_ai": true,
+    "approval_created_by_ai": false,
+    "seven_fields_present": true,
+    "validation_errors": [],
+    "is_effective": true,
+    "sod_authorized_by_ne_rollback_owner": true,
+    "g6_mechanism_ready": true,
+    "note": "AI 仅校验；真实 ReleaseApproval 须由主理人书面创建并落盘 release_approvals.jsonl"
+  },
+  "task5": {
+    "run_mode": "fail-closed (no external conditions injected)",
+    "allowed": false,
+    "verdict": "NO-GO",
+    "safety_invariants_ok": true,
+    "domain_results": {
+      "knowledge": {
+        "allowed": false,
+        "gate_results": {
+          "G1": false,
+          "G2": false,
+          "G3": false,
+          "G4": true,
+          "G5": false,
+          "G6": false
+        },
+        "blocking_reasons": [
+          "G1_knowledge_governance_incomplete:no_Engineering_Approved_candidate",
+          "G2_dual_sign_incomplete",
+          "G3_ci_not_green",
+          "G5_rollback_not_ready",
+          "G6_authorization_missing"
+        ]
+      },
+      "threshold": {
+        "allowed": false,
+        "gate_results": {
+          "G1": false,
+          "G2": false,
+          "G3": false,
+          "G4": true,
+          "G5": false,
+          "G6": false
+        },
+        "blocking_reasons": [
+          "G1_threshold_governance_incomplete:threshold_status 非 verified（draft/review）不纳入工程判定",
+          "G2_dual_sign_incomplete",
+          "G3_ci_not_green",
+          "G5_rollback_not_ready",
+          "G6_authorization_missing"
+        ]
+      },
+      "publishing": {
+        "allowed": false,
+        "gate_results": {
+          "G1": true,
+          "G2": false,
+          "G3": false,
+          "G4": true,
+          "G5": false,
+          "G6": false
+        },
+        "blocking_reasons": [
+          "G2_dual_sign_incomplete",
+          "G3_ci_not_green",
+          "G5_rollback_not_ready",
+          "G6_authorization_missing"
+        ]
+      }
+    },
+    "blocking_reasons": [
+      "[knowledge] G1_knowledge_governance_incomplete:no_Engineering_Approved_candidate",
+      "[knowledge] G2_dual_sign_incomplete",
+      "[knowledge] G3_ci_not_green",
+      "[knowledge] G5_rollback_not_ready",
+      "[knowledge] G6_authorization_missing",
+      "[threshold] G1_threshold_governance_incomplete:threshold_status 非 verified（draft/review）不纳入工程判定",
+      "[threshold] G2_dual_sign_incomplete",
+      "[threshold] G3_ci_not_green",
+      "[threshold] G5_rollback_not_ready",
+      "[threshold] G6_authorization_missing",
+      "[publishing] G2_dual_sign_incomplete",
+      "[publishing] G3_ci_not_green",
+      "[publishing] G5_rollback_not_ready",
+      "[publishing] G6_authorization_missing"
+    ],
+    "diagnostic_whatif": {
+      "note": "仅用于展示机制：假设 CI 绿/回滚就绪/授权到位，仍因 knowledge 域无 Approved 候选 + engineering_enabled 须保持 False 而受阻",
+      "threshold_domain_gate_results": {
+        "G1": false,
+        "G2": false,
+        "G3": true,
+        "G4": true,
+        "G5": true,
+        "G6": true
+      },
+      "publishing_domain_gate_results": {
+        "G1": true,
+        "G2": true,
+        "G3": true,
+        "G4": true,
+        "G5": true,
+        "G6": true
+      },
+      "knowledge_domain_allowed": false
+    },
+    "diagnostic_interface_scoped": {
+      "note": "仅取 wind_pressure 接口所需 E-TH-01/02/03 注入（排除全局表中仍 draft 的 D-TH），假设 CI/回滚/授权到位",
+      "threshold_domain_gate_results": {
+        "G1": true,
+        "G2": true,
+        "G3": true,
+        "G4": true,
+        "G5": true,
+        "G6": true
+      },
+      "threshold_domain_blocking": [],
+      "publishing_domain_gate_results": {
+        "G1": true,
+        "G2": true,
+        "G3": true,
+        "G4": true,
+        "G5": true,
+        "G6": true
+      },
+      "knowledge_domain_allowed": false,
+      "verdict": "NO-GO"
+    }
+  },
+  "task6": {
+    "global_gate_engineering_enabled": false,
+    "gray_allowed_before_dryrun": false,
+    "snapshot": {
+      "default_enabled": true,
+      "entry_enabled": true
+    },
+    "disable": {
+      "success": true,
+      "action": "disable",
+      "interface": "wind_pressure",
+      "message": "已关闭接口灰度（恢复 pending_verification）",
+      "allowed": false,
+      "reasons": [],
+      "approval_id": "",
+      "snapshot_path": ""
+    },
+    "rollback": {
+      "success": true,
+      "action": "rollback",
+      "interface": "*",
+      "message": "已回滚（熔断/接口关闭，恢复 pending_verification）",
+      "allowed": false,
+      "reasons": [],
+      "approval_id": "",
+      "snapshot_path": ""
+    },
+    "restore": {
+      "success": true,
+      "action": "restore",
+      "interface": "*",
+      "message": "已从快照恢复灰度配置",
+      "allowed": false,
+      "reasons": [],
+      "approval_id": "",
+      "snapshot_path": "/Users/chujiangai/WorkBuddy仓库/初匠Ai应用开发/BOIP/.ai/phase3.6.0_drill/snapshots/gray_release.2026-08-02T11-23-20.779188+00-00.snapshot.json"
+    },
+    "config_after_restore": {
+      "schema_version": "1.0",
+      "default_enabled": true,
+      "entries": [
+        {
+          "interface": "wind_pressure",
+          "enabled": false,
+          "allowed_project_tags": [
+            "DRILL-proj-a"
+          ],
+          "rollout_pct": 100.0
+        }
+      ]
+    },
+    "gray_allowed_after_dryrun": false,
+    "review_log_untouched": true,
+    "mechanism_ok": true
+  },
+  "red_lines": {
+    "engineering_enabled_still_false": true,
+    "engineering_approved_never_written": true,
+    "release_approval_not_created_by_ai": true,
+    "real_params_not_generated": true,
+    "expert_signature_not_faked": true,
+    "principal_authorization_not_faked": true
+  }
+}

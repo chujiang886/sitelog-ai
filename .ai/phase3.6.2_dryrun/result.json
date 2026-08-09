@@ -1,0 +1,98 @@
+{
+  "phase": "3.6.2",
+  "task": "Activation Evidence Validation Dry Run",
+  "generated_at": "2026-08-02T16:32:05.362681+00:00",
+  "interface": "wind_pressure",
+  "task1_evidence_bundle_completeness": {
+    "all_complete": true,
+    "threshold_evidence": {
+      "complete": true,
+      "missing": {}
+    },
+    "expert_evidence": {
+      "complete": true,
+      "missing": []
+    },
+    "approval_evidence": {
+      "complete": true,
+      "missing": []
+    },
+    "rollback_evidence": {
+      "complete": true,
+      "missing": []
+    }
+  },
+  "task2_g1_g6_input_format": {
+    "threshold_domain_allowed": true,
+    "threshold_domain_reasons": [],
+    "threshold_domain_gate_format_accepted": true,
+    "unified_decision_well_formed": true,
+    "unified_verdict": "NO-GO",
+    "unified_domain_results": {
+      "knowledge": {
+        "G1": null,
+        "G2": null,
+        "G3": null,
+        "G4": null,
+        "G5": null,
+        "G6": null
+      },
+      "threshold": {
+        "G1": true,
+        "G2": true,
+        "G3": true,
+        "G4": true,
+        "G5": true,
+        "G6": true
+      },
+      "publishing": {
+        "G1": true,
+        "G2": true,
+        "G3": true,
+        "G4": false,
+        "G5": true,
+        "G6": true
+      }
+    },
+    "real_data_present": false,
+    "structure_vs_realness_note": "bundle 结构满足 G1-G6 输入要求（G1 治理/G2 双签不读 value）；但 value/unit 仍为 pending_verification（代码库自身'待人工填入'标记），real_data_present=False 表明尚未填入真实工程参数（红线 1 守约）。"
+  },
+  "task3_sod": {
+    "sod_ok": true,
+    "checks": {
+      "expert_ne_principal": true,
+      "authorized_ne_rollback": true,
+      "expert_ne_authorized": true,
+      "principal_ne_rollback": true
+    },
+    "roles": {
+      "verified_by": "DRILL-PRINCIPAL-001",
+      "expert_verified_by": "DRILL-EXPERT-002",
+      "authorized_by": "DRILL-AUTHORIZER-004",
+      "rollback_owner": "DRILL-ROLLBACK-003"
+    }
+  },
+  "task4_traceability": {
+    "traceable": true,
+    "issues": [],
+    "events_checked": 12,
+    "hash_algorithm": "sha256 (64-hex)"
+  },
+  "task_g6_approval_validate_only": {
+    "validate_only": true,
+    "seven_fields_valid": true,
+    "errors": [],
+    "approval_created_by_ai": false
+  },
+  "red_lines": {
+    "engineering_enabled_still_false": true,
+    "real_params_not_generated": true,
+    "expert_identity_not_fabricated": true,
+    "release_approval_not_created_by_ai": true,
+    "engineering_approved_not_output": true,
+    "real_files_untouched": true
+  },
+  "verdict": "NO-GO",
+  "engineering_enabled": false,
+  "note": "本演练仅验证证据包结构满足 G1-G6 输入要求，未填入真实工程参数、未代签/代授权、未创建 ReleaseApproval、未开启 engineering_enabled。"
+}

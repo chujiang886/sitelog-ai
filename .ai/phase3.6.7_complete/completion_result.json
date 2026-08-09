@@ -1,0 +1,148 @@
+{
+  "phase": "3.6.7",
+  "task": "Human Activation Evidence Completion",
+  "run_timestamp": "2026-08-03T03:53:15.215326+00:00",
+  "human_evidence_received_this_turn": false,
+  "task1_threshold_intake": {
+    "interface": "wind_pressure",
+    "per_threshold": {
+      "E-TH-01": {
+        "intake_status": "NOT_RECEIVED_PENDING",
+        "value_real": false,
+        "unit_real": true,
+        "source_ref_real": false,
+        "version_real": false,
+        "dual_signed": false,
+        "verified_flag": false,
+        "missing_fields": [
+          "value",
+          "source_ref",
+          "version",
+          "dual_sign"
+        ],
+        "ai_completed": false
+      },
+      "E-TH-02": {
+        "intake_status": "NOT_RECEIVED_PENDING",
+        "value_real": false,
+        "unit_real": false,
+        "source_ref_real": false,
+        "version_real": false,
+        "dual_signed": false,
+        "verified_flag": false,
+        "missing_fields": [
+          "value",
+          "unit",
+          "source_ref",
+          "version",
+          "dual_sign"
+        ],
+        "ai_completed": false
+      },
+      "E-TH-03": {
+        "intake_status": "NOT_RECEIVED_PENDING",
+        "value_real": false,
+        "unit_real": false,
+        "source_ref_real": false,
+        "version_real": false,
+        "dual_signed": false,
+        "verified_flag": false,
+        "missing_fields": [
+          "value",
+          "unit",
+          "source_ref",
+          "version",
+          "dual_sign"
+        ],
+        "ai_completed": false
+      }
+    },
+    "all_received": false
+  },
+  "task2_expert_intake": {
+    "expert_count": 0,
+    "received": false,
+    "intake_status": "NOT_RECEIVED_PENDING",
+    "per_expert_summary": [],
+    "sod_checked": true,
+    "sod_ok": true,
+    "ai_created_identity": false
+  },
+  "task3_audit_chain": {
+    "review_log_present": true,
+    "chain_ok": false,
+    "missing_event_types": [],
+    "required_event_types": [
+      "submit",
+      "review",
+      "expert_recheck",
+      "verified"
+    ],
+    "intake_status": "NOT_RECEIVED_PENDING"
+  },
+  "task4_g6_intake": {
+    "release_approvals_present": false,
+    "received": false,
+    "intake_status": "NOT_RECEIVED_PENDING",
+    "ai_created": false,
+    "validate_only": true
+  },
+  "task5_freeze_integrity": {
+    "baseline_frozen_at": "2026-08-03T03:30:37.507076+00:00",
+    "code_hash": {
+      "current": "e00a7df54621257a3786c1d23bbc1e3ea27d2b492675e1054ceaab09260d6cdd",
+      "baseline": "e00a7df54621257a3786c1d23bbc1e3ea27d2b492675e1054ceaab09260d6cdd",
+      "match": true
+    },
+    "config_hash": {
+      "current": "9aa005aa598dedf75969d12a17f155aa6e27d86dec33cb1c173a7d5b6a0ff2cc",
+      "baseline": "9aa005aa598dedf75969d12a17f155aa6e27d86dec33cb1c173a7d5b6a0ff2cc",
+      "match": true
+    },
+    "evidence_hash": {
+      "current": "97fb2a47d367c9dc8cd6db3801f3bc3e1f87f51a359505cac725a0b26f381ab4",
+      "baseline": "97fb2a47d367c9dc8cd6db3801f3bc3e1f87f51a359505cac725a0b26f381ab4",
+      "match": true,
+      "note": "证据文件本身未变（仍全 pending），哈希一致"
+    },
+    "gate_version_hashes": {
+      "UnifiedActivationGate": {
+        "current": "9b697a8b288af09143493689a3d504e68aa7b406aad8269dc6e7f26eb57d3456",
+        "baseline": "9b697a8b288af09143493689a3d504e68aa7b406aad8269dc6e7f26eb57d3456",
+        "match": true
+      },
+      "ConsumptionPolicy": {
+        "current": "96c7afd4a5a191ec5334f338321ef9d20f0909421744cd8704152fa6f6557dc0",
+        "baseline": "96c7afd4a5a191ec5334f338321ef9d20f0909421744cd8704152fa6f6557dc0",
+        "match": true
+      },
+      "RuntimeGuard": {
+        "current": "55b635e08f5d575b5404f8f77e4254003343fc7bb941fcff5bfa2b5aaa8645ba",
+        "baseline": "55b635e08f5d575b5404f8f77e4254003343fc7bb941fcff5bfa2b5aaa8645ba",
+        "match": true
+      }
+    },
+    "runbook_hash": {
+      "current": "8435703ff2d16daedeb84db418a93fe8a83552d7968bae05194da6d9b28d6d48",
+      "baseline": "84b4cf101e81e8baeaf586d35f1839bfebee6b20e5475fc72f3bbe59cf3bf8d1",
+      "match": false,
+      "note": "比对集为 3.6.6 同款（roadmap_v6 + 3.6.0~3.6.5 报告）；本阶段 3.6.7 报告与 roadmap §11 为预期文档演进，于校验后追加，不计入漂移。"
+    },
+    "all_critical_match": true,
+    "engineering_enabled": false,
+    "engineering_enabled_expected_false": true
+  },
+  "red_lines": {
+    "no_real_params": true,
+    "no_expert_identity": true,
+    "no_proxy_signature": true,
+    "no_release_approval_created": true,
+    "engineering_enabled_false": true,
+    "no_engineering_approved": true,
+    "real_evidence_files_untouched": true,
+    "freeze_not_drifted": true
+  },
+  "verdict": "NO_GO_EVIDENCE_INCOMPLETE",
+  "ai_authority": "NONE — AI 无权开启 engineering_enabled；仅人工终端可显式置 true",
+  "summary": "3.6.7 已建立「真实证据补齐」机制并核对真实仓库：E-TH/专家/审核链/G6 四类证据本回合均为 NOT_RECEIVED_PENDING（无真实人工证据载荷）。冻结完整性验证：code/config/gate 三类安全关键哈希与 3.6.6 基线完全一致（未漂移），engineering_enabled 真实读取仍为 False。裁决 NO_GO；AI 不自动激活。"
+}

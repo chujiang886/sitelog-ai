@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "default_enabled": true,
+  "entries": [
+    {
+      "interface": "wind_pressure",
+      "enabled": false,
+      "allowed_project_tags": [
+        "DRILL-proj-a"
+      ],
+      "rollout_pct": 100.0
+    }
+  ]
+}

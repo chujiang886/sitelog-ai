@@ -1,0 +1,67 @@
+{
+  "window_id": "BOIP-ESW-747f8b2d7847ba7c",
+  "opened_at": "2026-08-03T04:09:12.360245+00:00",
+  "status": "OPEN",
+  "definition": "Evidence Submission Window（ESW）— 真实人工证据进入激活决策系统的正式窗口",
+  "submitter": {
+    "allowed_roles": [
+      "principal_maintainer",
+      "domain_expert",
+      "release_owner"
+    ],
+    "forbidden_actors": [
+      "AI_agent",
+      "automated_script"
+    ],
+    "identity_requirement": "真实人类身份，须可核实署名；禁止 AI 代填/代签",
+    "sod_hard": "domain_expert 不得兼任 principal_maintainer"
+  },
+  "submission_time": {
+    "window_open": "2026-08-03T04:09:12.360245+00:00",
+    "validity": "持续开放，直到主理人显式关闭；每次提交须带 UTC 时间戳",
+    "each_submission_requires_timestamp": true,
+    "unsigned_or_untimestamped": "拒绝受理"
+  },
+  "file_scope": {
+    "accepted_targets": [
+      "agents/engineering/thresholds/verified.json（按 E-TH-id 增补 value/unit/source_ref/version + 双签）",
+      "agents/engineering/knowledge/experts.json（真实专家条目）",
+      "agents/engineering/release/release_approvals.jsonl（G6 授权，七字段 + effective_time）",
+      "agents/engineering/review_log.jsonl（追加 submit/review/expert_recheck/verified 事件）"
+    ],
+    "rejected_targets": [
+      "任何由 AI 生成/补全的字段",
+      "engineering_enabled 翻转",
+      "verified.json 的 verified 标志由 AI 置 true",
+      "AI 创建的 ReleaseApproval 记录"
+    ]
+  },
+  "version_requirements": {
+    "must_match_frozen_baseline": true,
+    "baseline_bundle_id": "BOIP-ACF-e00a7df54621257a",
+    "baseline_bundle_hash": "aa397a20bfb6eec70472c4958353342b8e3746d5224d5438a184eee919499af6",
+    "baseline_code_hash": "e00a7df54621257a3786c1d23bbc1e3ea27d2b492675e1054ceaab09260d6cdd",
+    "baseline_config_hash": "9aa005aa598dedf75969d12a17f155aa6e27d86dec33cb1c173a7d5b6a0ff2cc",
+    "baseline_gate_hashes": {
+      "UnifiedActivationGate": "9b697a8b288af09143493689a3d504e68aa7b406aad8269dc6e7f26eb57d3456",
+      "ConsumptionPolicy": "96c7afd4a5a191ec5334f338321ef9d20f0909421744cd8704152fa6f6557dc0",
+      "RuntimeGuard": "55b635e08f5d575b5404f8f77e4254003343fc7bb941fcff5bfa2b5aaa8645ba"
+    },
+    "drift_policy": "若冻结基线任一安全关键哈希漂移，窗口自动暂停并告警，须重新冻结后方可继续"
+  },
+  "intake_checks": {
+    "threshold": "value/unit/source_ref/version 齐全 + dual_sign(主理人+专家) + 初态 verified=false",
+    "expert": "专家身份真实 + SoD(expert≠principal)",
+    "approval": "release_approvals.jsonl 七字段齐全 + effective_time + SoD(authorized≠rollback_owner)",
+    "rollback": "release_audit.jsonl 须含真实 approval_id 的 disable/rollback/restore 实证",
+    "audit": "review_log 链式 submit→review→expert_recheck→verified 完整无断裂"
+  },
+  "red_lines_enforced": [
+    "①AI 不生成真实工程参数",
+    "②AI 不生成专家身份",
+    "③AI 不代签",
+    "④AI 不创建 ReleaseApproval",
+    "⑤AI 不自动开启 engineering_enabled",
+    "⑥AI 不输出 engineering_approved"
+  ]
+}

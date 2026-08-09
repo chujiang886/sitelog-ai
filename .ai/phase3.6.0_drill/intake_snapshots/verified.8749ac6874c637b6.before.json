@@ -1,0 +1,28 @@
+{
+  "schema_version": 2,
+  "note": "BOIP Engineering 阈值签字库（经 3.2.4-F 录入工作流写入）。",
+  "thresholds": {
+    "E-TH-01": {
+      "param": "E-TH-01",
+      "value": "__DRILL_PLACEHOLDER__",
+      "unit": "DRILL-UNIT",
+      "threshold_status": "review",
+      "version": "1.0.0",
+      "verified": false,
+      "verified_by": null,
+      "verified_at": null,
+      "expert_verified_by": null,
+      "expert_verified_at": null,
+      "source_ref": {
+        "standard": "DRILL-GB50009-E-TH-01",
+        "clause": "DRILL-7.1.1-E-TH-01",
+        "edition": "2012",
+        "url": "https://drill.boip.example/spec/E-TH-01",
+        "hash": "e7a2de727fc791572d1002d9875bdfef50c2c2ba9f437c969b6b9ac776ef3320"
+      },
+      "applies_to": [],
+      "submitted_by": "DRILL-SUBMITTER-000",
+      "submitted_at": "2026-08-02T11:23:20.752696+00:00"
+    }
+  }
+}

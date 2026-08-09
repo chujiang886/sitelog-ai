@@ -1,0 +1,42 @@
+{
+  "id": "boip://evidence-governance/gate_association.verification.json",
+  "title": "Gate Association Verification (Evidence vs engineering_enabled)",
+  "description": "Phase 3.6.9 任务5：验证「Evidence 状态变化不会自动开启 engineering_enabled」。基于真实仓库代码溯源（fail-closed 架构实证），结论为 TRUE。",
+  "version": "1.0.0",
+  "claim": "Evidence 状态变化（OPEN→SUBMITTED→VALIDATING→VERIFIED→ACCEPTED 任一跃迁）不会自动开启 engineering_enabled；engineering_enabled=True 仅能由人类在 config.yaml 显式置位。",
+  "verdict": "TRUE_FAIL_CLOSED",
+  "real_code_evidence": [
+    {
+      "file": "agents/config_loader.py",
+      "line": 121,
+      "symbol": "load_engineering_enabled(config_path) -> bool",
+      "fact": "只读读取 orchestrator.engineering_enabled（config.yaml 缺省 False）；返回 bool(section.get('engineering_enabled', False))。无写入路径。",
+      "implication": "AI 仅能读取该开关，无法写入。"
+    },
+    {
+      "file": "agents/engineering/knowledge/activation/read_boundary.py",
+      "line": 45,
+      "symbol": "KnowledgeReadBoundary.can_write_engineering_enabled() -> bool",
+      "fact": "注释『AI 不得写 engineering_enabled（仅可读断言）』，返回 False。",
+      "implication": "读取边界显式禁止任何写 engineering_enabled 的行为，AI 触发跃迁时受此约束。"
+    },
+    {
+      "file": "agents/engineering/gate/unified_activation_gate.py",
+      "line": 141,
+      "symbol": "safety_ok = load_engineering_enabled() is False",
+      "fact": "顶层安全不变量：engineering_enabled 必须保持 False，否则 fail-closed；allowed = safety_ok and all(domains allowed)。",
+      "implication": "任何证据状态到达 ACCEPTED 都不会改变 safety_ok 判定；True 必须满足『人类显式置位』前提。"
+    },
+    {
+      "file": "agents/engineering/gate/enable_gate.py",
+      "symbol": "EnableGate (判定器)",
+      "fact": "仅判定『是否允许开启 engineering_enabled』，绝不自翻、绝不输出 engineering_approved。",
+      "implication": "证据状态机与 EnableGate 之间无自动置位代码路径。"
+    }
+  ],
+  "conclusion": "真实代码不存在『证据状态→engineering_enabled』的写入链路：config_loader 只读、read_boundary.can_write_engineering_enabled()=False、unified_activation_gate 强制 is False、enable_gate 仅判定。因此任务5 结论确立：证据状态变化不会自动开启 engineering_enabled；True 仅能由人类在 config.yaml 显式置位。",
+  "red_lines_kept": [
+    "红线⑤未开启 engineering_enabled（真实读取 False；证据状态机无写入路径）",
+    "红线⑥未输出 engineering_approved（仅 NO-GO / 状态机描述，无 approved 产出）"
+  ]
+}

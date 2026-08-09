@@ -1,0 +1,163 @@
+{
+  "phase": "3.6.6",
+  "task": "Activation Candidate Freeze",
+  "freeze_timestamp": "2026-08-03T03:30:37.507076+00:00",
+  "task1_code_freeze": {
+    "commit_hash": "543c3c7a651b158b6c8f76ad99666aef058a1502",
+    "commit_short": "543c3c7",
+    "branch": "master",
+    "commit_timestamp": "2026-07-28T16:09:32+08:00",
+    "code_hash": "e00a7df54621257a3786c1d23bbc1e3ea27d2b492675e1054ceaab09260d6cdd",
+    "code_file_count": 15,
+    "working_tree_dirty": true,
+    "dirty_files_sample": [
+      "M .ai/project_status.json",
+      " M .ai/roadmap_v2.md",
+      " M agents/config_loader.py",
+      " M agents/engineering/agent.py",
+      " M agents/engineering/validation.py",
+      " M agents/report/generator.py",
+      " M scripts/lint/check_fabrication.py",
+      "?? .ai/phase3.6.0_drill/",
+      "?? .ai/phase3.6.0_drill_run.py",
+      "?? .ai/phase3.6.2_dryrun/",
+      "?? .ai/phase3.6.2_validation_run.py",
+      "?? .ai/phase3.6.3_intake/",
+      "?? .ai/phase3.6.3_intake_run.py",
+      "?? .ai/phase3.6.4_verification_run.py",
+      "?? .ai/phase3.6.4_verify/",
+      "?? .ai/phase3.6.5_final_review_run.py",
+      "?? .ai/phase3.6.5_review/",
+      "?? .ai/phase3.6.6_freeze/",
+      "?? .ai/phase3.6.6_freeze_run.py",
+      "?? .ai/reviews/phase3.1_final_integration_report.md",
+      "?? .ai/reviews/phase3.1_glass_safety_design_report.md",
+      "?? .ai/reviews/phase3.1_hardware_design_report.md",
+      "?? .ai/reviews/phase3.1_installation_risk_design_report.md",
+      "?? .ai/reviews/phase3.1_profile_design_report.md",
+      "?? .ai/reviews/phase3.1_sprintA_report.md"
+    ]
+  },
+  "task2_config_freeze": {
+    "config_path": "agents/config.yaml",
+    "config_hash": "9aa005aa598dedf75969d12a17f155aa6e27d86dec33cb1c173a7d5b6a0ff2cc",
+    "engineering_enabled": false,
+    "engineering_enabled_expected_false": true,
+    "note": "未对 .env 取哈希（含密钥，避免泄露）；config.yaml 为 engineering_enabled 权威源。"
+  },
+  "task3_evidence_bundle_freeze": {
+    "evidence_hash": "97fb2a47d367c9dc8cd6db3801f3bc3e1f87f51a359505cac725a0b26f381ab4",
+    "evidence_file_hashes": {
+      "verified": "c4b44713a37529551fe9c8069b1ce069e1b9fc77cad357a70349349ece223845",
+      "review_log": "a4251636bd7726c06de36bb5a736ff909a5881352357d10f2ccf5f6375a6bb44",
+      "experts": "b84b1b7377ec4d9bfe883394912a195abb8b6ed8b5903aa182407b0a4ef928c5",
+      "release_approvals": null
+    },
+    "evidence_present": {
+      "verified": true,
+      "review_log": true,
+      "experts": true,
+      "release_approvals": false
+    },
+    "immutable_evidence_bundle_id": "BOIP-EB-FROZEN-97fb2a47d367c9dc",
+    "immutable_bundle_threshold_hash": "c4b44713a37529551fe9c8069b1ce069e1b9fc77cad357a70349349ece223845",
+    "immutable_bundle_review_hash": "a4251636bd7726c06de36bb5a736ff909a5881352357d10f2ccf5f6375a6bb44",
+    "immutable_bundle_rollback_hash": null,
+    "immutable_bundle_authorization_hash": null,
+    "immutable_bundle_complete": false,
+    "state": "ALL_PENDING_NO_REAL_EVIDENCE"
+  },
+  "task4_gate_version_freeze": {
+    "UnifiedActivationGate": {
+      "module": "agents/engineering/gate/unified_activation_gate.py",
+      "present": true,
+      "version_hash": "9b697a8b288af09143493689a3d504e68aa7b406aad8269dc6e7f26eb57d3456"
+    },
+    "ConsumptionPolicy": {
+      "module": "agents/engineering/knowledge/activation/consumption.py",
+      "present": true,
+      "version_hash": "96c7afd4a5a191ec5334f338321ef9d20f0909421744cd8704152fa6f6557dc0"
+    },
+    "RuntimeGuard": {
+      "module": "agents/engineering/knowledge/activation/runtime_integration.py",
+      "present": true,
+      "version_hash": "55b635e08f5d575b5404f8f77e4254003343fc7bb941fcff5bfa2b5aaa8645ba"
+    }
+  },
+  "task5_runbook_freeze": {
+    "runbook_hash": "84b4cf101e81e8baeaf586d35f1839bfebee6b20e5475fc72f3bbe59cf3bf8d1",
+    "runbook_docs_present": [
+      ".ai/roadmap_v6.md",
+      ".ai/reviews/phase3.6.0_controlled_activation_execution_report.md",
+      ".ai/reviews/phase3.6.1_real_activation_evidence_preparation.md",
+      ".ai/reviews/phase3.6.2_activation_evidence_validation_dry_run.md",
+      ".ai/reviews/phase3.6.3_real_activation_evidence_intake_report.md",
+      ".ai/reviews/phase3.6.4_real_evidence_submission_verification.md",
+      ".ai/reviews/phase3.6.5_final_human_activation_review.md"
+    ],
+    "runbook_docs_missing": [],
+    "refs": {
+      ".ai/roadmap_v6.md": {
+        "present": true,
+        "hash": "3d23fd39ddc68a0a21cea3ee0cbf73d7878ddd0fbdf9781c3ca1e6ce50283fe1"
+      },
+      ".ai/reviews/phase3.6.0_controlled_activation_execution_report.md": {
+        "present": true,
+        "hash": "d3593100798dd8720a733786969324a98cf3328f91987a0b3ff6b6165669b677"
+      },
+      ".ai/reviews/phase3.6.1_real_activation_evidence_preparation.md": {
+        "present": true,
+        "hash": "ef1552428520f0e537d6a10ce006e47d1e32465f3f330bdfa1b6aae5d290c5be"
+      },
+      ".ai/reviews/phase3.6.2_activation_evidence_validation_dry_run.md": {
+        "present": true,
+        "hash": "26d21a20589cb48e8302faff9f646c5c5ea53ea9e2b4cdefc57ea069f30878f9"
+      },
+      ".ai/reviews/phase3.6.3_real_activation_evidence_intake_report.md": {
+        "present": true,
+        "hash": "b66e1c6b337abd7bacb4898d903c9e7ca90d48c5f46e312aa6970021f4dfc2db"
+      },
+      ".ai/reviews/phase3.6.4_real_evidence_submission_verification.md": {
+        "present": true,
+        "hash": "4e9e9b5a6c94e2b08df11efd954f0e3cf9fe764dcb537f8af786559799850893"
+      },
+      ".ai/reviews/phase3.6.5_final_human_activation_review.md": {
+        "present": true,
+        "hash": "0c6bb96235fba3e7bcf1295e342794d74818eb9c3648887ecbde063f8aac167d"
+      }
+    }
+  },
+  "activation_candidate_bundle": {
+    "bundle_id": "BOIP-ACF-e00a7df54621257a",
+    "frozen_at": "2026-08-03T03:30:37.507076+00:00",
+    "code_hash": "e00a7df54621257a3786c1d23bbc1e3ea27d2b492675e1054ceaab09260d6cdd",
+    "config_hash": "9aa005aa598dedf75969d12a17f155aa6e27d86dec33cb1c173a7d5b6a0ff2cc",
+    "evidence_hash": "97fb2a47d367c9dc8cd6db3801f3bc3e1f87f51a359505cac725a0b26f381ab4",
+    "gate_version_hashes": {
+      "UnifiedActivationGate": "9b697a8b288af09143493689a3d504e68aa7b406aad8269dc6e7f26eb57d3456",
+      "ConsumptionPolicy": "96c7afd4a5a191ec5334f338321ef9d20f0909421744cd8704152fa6f6557dc0",
+      "RuntimeGuard": "55b635e08f5d575b5404f8f77e4254003343fc7bb941fcff5bfa2b5aaa8645ba"
+    },
+    "runbook_hash": "84b4cf101e81e8baeaf586d35f1839bfebee6b20e5475fc72f3bbe59cf3bf8d1",
+    "engineering_enabled_at_freeze": false,
+    "evidence_state": {
+      "verified_present": true,
+      "review_log_present": true,
+      "experts_present": true,
+      "release_approvals_present": false
+    },
+    "note": "冻结仅锚定当前仓库真实状态；真实证据当前为 pending_verification / 未提交，激活态恒 NO-GO。",
+    "bundle_hash": "aa397a20bfb6eec70472c4958353342b8e3746d5224d5438a184eee919499af6"
+  },
+  "red_lines": {
+    "no_real_params": true,
+    "no_expert_identity": true,
+    "no_proxy_signature": true,
+    "no_release_approval_created": true,
+    "engineering_enabled_false": true,
+    "no_engineering_approved": true,
+    "real_evidence_files_untouched": true
+  },
+  "verdict": "FROZEN_NO_GO",
+  "summary": "激活候选版本已冻结：commit 543c3c7 / config False / 证据全 pending / gate 代码版本已锚定。未来人工激活须在同一冻结基线上补齐真实证据并显式置 engineering_enabled=true，AI 不自动激活。"
+}

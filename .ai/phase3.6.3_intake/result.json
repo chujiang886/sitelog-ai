@@ -1,0 +1,191 @@
+{
+  "phase": "3.6.3",
+  "task": "Real Activation Evidence Intake",
+  "generated_at": "2026-08-02T17:05:21.095024+00:00",
+  "interface": "wind_pressure",
+  "human_evidence_received_this_turn": false,
+  "task1_threshold_intake": {
+    "per_threshold": {
+      "E-TH-01": {
+        "received_real_value": false,
+        "value": "pending_verification",
+        "unit": "Pa",
+        "source_ref": "待行业专家签字填入规范/标准号 pending_verification",
+        "version": "1.0.0",
+        "verified": false,
+        "dual_signed": false,
+        "intake_status": "NOT_RECEIVED_PENDING"
+      },
+      "E-TH-02": {
+        "received_real_value": false,
+        "value": "pending_verification",
+        "unit": "pending_verification",
+        "source_ref": "待行业专家签字填入规范/标准号 pending_verification",
+        "version": "1.0.0",
+        "verified": false,
+        "dual_signed": false,
+        "intake_status": "NOT_RECEIVED_PENDING"
+      },
+      "E-TH-03": {
+        "received_real_value": false,
+        "value": "pending_verification",
+        "unit": "pending_verification",
+        "source_ref": "待行业专家签字填入规范/标准号 pending_verification",
+        "version": "1.0.0",
+        "verified": false,
+        "dual_signed": false,
+        "intake_status": "NOT_RECEIVED_PENDING"
+      }
+    },
+    "all_received": false
+  },
+  "task2_expert_intake": {
+    "real_expert_count": 0,
+    "received": false,
+    "sod_applicable": false,
+    "sod_ok": true,
+    "note": "未收到真实专家证据（experts.json 专家数为 0）；SoD 校验不适用，亦不构成红线违规。"
+  },
+  "task3_g6_intake": {
+    "release_approval_file_exists": false,
+    "received": false,
+    "ai_created": false,
+    "validate_only": true,
+    "fields_valid": null,
+    "validity_iso8601": null,
+    "sod_ok": true,
+    "note": "ReleaseApproval 文件不存在 → 未收到真实 G6 授权；AI 仅做「若存在则校验」的占位设计，未调用 append_approval_record。"
+  },
+  "task4_real_evidence_bundle": {
+    "bundle_version": "1.0.0",
+    "bundle_timestamp": "2026-08-02T17:05:21.060501+00:00",
+    "bundle_hash": "1a9af4b76a828102fe142a4f80cfde3471e24edc25e015e66ff33c75d8bf658f",
+    "evidence": {
+      "threshold_evidence": {
+        "E-TH-01": {
+          "received_real_value": false,
+          "value": "pending_verification",
+          "unit": "Pa",
+          "source_ref": "待行业专家签字填入规范/标准号 pending_verification",
+          "version": "1.0.0",
+          "verified": false,
+          "dual_signed": false,
+          "intake_status": "NOT_RECEIVED_PENDING"
+        },
+        "E-TH-02": {
+          "received_real_value": false,
+          "value": "pending_verification",
+          "unit": "pending_verification",
+          "source_ref": "待行业专家签字填入规范/标准号 pending_verification",
+          "version": "1.0.0",
+          "verified": false,
+          "dual_signed": false,
+          "intake_status": "NOT_RECEIVED_PENDING"
+        },
+        "E-TH-03": {
+          "received_real_value": false,
+          "value": "pending_verification",
+          "unit": "pending_verification",
+          "source_ref": "待行业专家签字填入规范/标准号 pending_verification",
+          "version": "1.0.0",
+          "verified": false,
+          "dual_signed": false,
+          "intake_status": "NOT_RECEIVED_PENDING"
+        }
+      },
+      "expert_evidence": {
+        "received": false,
+        "count": 0
+      },
+      "approval_evidence": {
+        "received": false,
+        "ai_created": false
+      }
+    },
+    "provenance_note": "bundle_hash/version/timestamp 为证据包本身的溯源标记，非真实工程参数；证据内容未收到者一律 pending_verification。"
+  },
+  "task5_unified_activation_gate": {
+    "verdict": "NO-GO",
+    "engineering_enabled": false,
+    "domain_results": {
+      "knowledge": {
+        "allowed": false,
+        "gate_results": {},
+        "blocking_reasons": [
+          "G0_repository_required"
+        ]
+      },
+      "threshold": {
+        "allowed": false,
+        "gate_results": {
+          "G1": false,
+          "G2": false,
+          "G3": false,
+          "G4": false,
+          "G5": false,
+          "G6": false
+        },
+        "blocking_reasons": [
+          "G1_threshold_governance_incomplete:threshold_status 非 verified（draft/review）不纳入工程判定",
+          "G2_dual_sign_incomplete",
+          "G3_ci_not_green",
+          "G4_audit_chain_incomplete",
+          "G5_rollback_not_ready",
+          "G6_authorization_missing"
+        ]
+      },
+      "publishing": {
+        "allowed": false,
+        "gate_results": {
+          "G1": true,
+          "G2": false,
+          "G3": false,
+          "G4": false,
+          "G5": false,
+          "G6": false
+        },
+        "blocking_reasons": [
+          "G2_dual_sign_incomplete",
+          "G3_ci_not_green",
+          "G4_audit_chain_incomplete",
+          "G5_rollback_not_ready",
+          "G6_authorization_missing"
+        ]
+      }
+    },
+    "blocking_reasons": [
+      "[knowledge] G0_repository_required",
+      "[threshold] G1_threshold_governance_incomplete:threshold_status 非 verified（draft/review）不纳入工程判定",
+      "[threshold] G2_dual_sign_incomplete",
+      "[threshold] G3_ci_not_green",
+      "[threshold] G4_audit_chain_incomplete",
+      "[threshold] G5_rollback_not_ready",
+      "[threshold] G6_authorization_missing",
+      "[publishing] G2_dual_sign_incomplete",
+      "[publishing] G3_ci_not_green",
+      "[publishing] G4_audit_chain_incomplete",
+      "[publishing] G5_rollback_not_ready",
+      "[publishing] G6_authorization_missing"
+    ],
+    "gate_labels": [
+      "G1",
+      "G2",
+      "G3",
+      "G4",
+      "G5",
+      "G6"
+    ]
+  },
+  "red_lines": {
+    "real_params_not_generated": true,
+    "expert_identity_not_fabricated": true,
+    "release_approval_not_created_by_ai": true,
+    "engineering_enabled_still_false": true,
+    "engineering_approved_not_output": true,
+    "real_files_untouched": true,
+    "note": "③AI 代签不适用（未收到任何真实签署请求，未生成签名）。"
+  },
+  "verdict": "NO-GO",
+  "engineering_enabled": false,
+  "note": "本回合指令未附带真实人工提供的激活证据；intake 机制已建立，各类证据插槽保持 pending_verification / not_received。UnifiedActivationGate 在真实仓库状态下返回 NO-GO。AI 未伪造真实参数/专家身份/签字/授权，未创建 ReleaseApproval，未开启 engineering_enabled，未输出 engineering_approved。"
+}

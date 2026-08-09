@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "boip://evidence-governance/evidence_submission_log.schema.json",
+  "title": "EvidenceSubmissionLog",
+  "description": "Phase 3.6.9 任务1：真实人工证据提交审计日志条目 Schema。每条记录代表一次（或一次重提交版本）真实证据提交流转的不可变审计行。所有提交必须由人类实体完成，AI/agent/script 不得作为 submitter。",
+  "type": "object",
+  "required": [
+    "submission_id",
+    "submitter",
+    "timestamp",
+    "files",
+    "hash",
+    "status"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "submission_id": {
+      "type": "string",
+      "pattern": "^BOIP-ESL-[0-9a-f]{16}$",
+      "description": "提交审计行唯一 ID（每个版本递增一次）。"
+    },
+    "submitter": {
+      "type": "object",
+      "required": ["role", "identity", "signed"],
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": ["principal_maintainer", "domain_expert", "release_owner"],
+          "description": "提交人角色（硬 SoD：expert 不得兼任 approval_reviewer）。"
+        },
+        "identity": {
+          "type": "string",
+          "minLength": 1,
+          "description": "真人可识别标识（姓名/工号），由人类提供，AI 不得生成（红线②）。"
+        },
+        "signed": {
+          "type": "boolean",
+          "description": "true 表示人类已显式签署。AI 不得代签（红线③）。"
+        },
+        "auth_method": {
+          "type": "string",
+          "description": "人类签署的认证方式（如线下签名/数字签名），由人工提供。"
+        }
+      }
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "提交 UTC 时间戳（ISO-8601），每次提交必须带，缺失拒绝受理（ESW 规则）。"
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["path", "kind", "file_hash"],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "真实证据文件路径，相对仓库根。"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "verified_threshold",
+              "expert_register",
+              "release_approval",
+              "review_log",
+              "rollback_audit",
+              "other"
+            ]
+          },
+          "file_hash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "description": "该证据文件内容的 SHA-256 哈希，用于版本链与完整性校验。"
+          }
+        }
+      }
+    },
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "整条提交包哈希：覆盖 submitter(不含敏感)+timestamp+files[] 内容，作为审计行指纹。"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["OPEN", "SUBMITTED", "VALIDATING", "VERIFIED", "ACCEPTED", "REJECTED", "RETURNED"],
+      "description": "证据生命周期当前态（详见 evidence_lifecycle.statemachine.json）。"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "同证据主题下单调递增版本号（见 evidence_version_control.schema.json）。"
+    },
+    "previous_version": {
+      "type": ["string", "null"],
+      "pattern": "^BOIP-ESL-[0-9a-f]{16}$",
+      "description": "上一版本 submission_id 指针；首版为 null。"
+    },
+    "lifecycle_ref": {
+      "type": "string",
+      "const": "boip://evidence-governance/evidence_lifecycle.statemachine.json"
+    },
+    "engineering_enabled_touch": {
+      "type": "boolean",
+      "const": false,
+      "description": "本审计行对 engineering_enabled 的影响恒为 false（红线⑤）：证据提交/状态变化绝不翻转该开关。"
+    },
+    "red_lines_checked": {
+      "type": "object",
+      "required": ["no_fabricated_params", "no_fabricated_expert", "no_proxy_sign", "no_release_approval_created", "no_engineering_enabled_set", "no_engineering_approved_output"],
+      "properties": {
+        "no_fabricated_params": { "type": "boolean", "const": true },
+        "no_fabricated_expert": { "type": "boolean", "const": true },
+        "no_proxy_sign": { "type": "boolean", "const": true },
+        "no_release_approval_created": { "type": "boolean", "const": true },
+        "no_engineering_enabled_set": { "type": "boolean", "const": true },
+        "no_engineering_approved_output": { "type": "boolean", "const": true }
+      },
+      "description": "六条红线逐项自检，全部恒 true。"
+    }
+  }
+}

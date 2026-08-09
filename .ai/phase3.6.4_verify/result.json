@@ -1,0 +1,255 @@
+{
+  "phase": "3.6.4",
+  "task": "Real Evidence Submission & Verification",
+  "generated_at": "2026-08-03T03:00:15.788861+00:00",
+  "interface": "wind_pressure",
+  "human_evidence_received_this_turn": false,
+  "task1_threshold_verification": {
+    "per_threshold": {
+      "E-TH-01": {
+        "submission_verified": false,
+        "value_real": false,
+        "unit_real": true,
+        "source_ref_complete": false,
+        "version_present": false,
+        "dual_signed": false,
+        "missing": [
+          "value",
+          "source_ref",
+          "version",
+          "dual_sign"
+        ],
+        "status": "NOT_SUBMITTED_PENDING"
+      },
+      "E-TH-02": {
+        "submission_verified": false,
+        "value_real": false,
+        "unit_real": false,
+        "source_ref_complete": false,
+        "version_present": false,
+        "dual_signed": false,
+        "missing": [
+          "value",
+          "unit",
+          "source_ref",
+          "version",
+          "dual_sign"
+        ],
+        "status": "NOT_SUBMITTED_PENDING"
+      },
+      "E-TH-03": {
+        "submission_verified": false,
+        "value_real": false,
+        "unit_real": false,
+        "source_ref_complete": false,
+        "version_present": false,
+        "dual_signed": false,
+        "missing": [
+          "value",
+          "unit",
+          "source_ref",
+          "version",
+          "dual_sign"
+        ],
+        "status": "NOT_SUBMITTED_PENDING"
+      }
+    },
+    "all_submitted_verified": false,
+    "source": "check_e_th_realization(verified.json)"
+  },
+  "task2_expert_verification": {
+    "real_expert_count": 0,
+    "submission_verified": false,
+    "sod_applicable": false,
+    "sod_ok": true,
+    "note": "未收到真实专家证据（experts.json 专家数为 0）；SoD 校验不适用，亦不构成红线违规。"
+  },
+  "task3_g6_verification": {
+    "release_approval_file_exists": false,
+    "submission_verified": false,
+    "ai_created": false,
+    "validate_only": true,
+    "fields_valid": null,
+    "effective_time_valid": null,
+    "sod_ok": true,
+    "note": "ReleaseApproval 文件不存在 → 未收到真实 G6 授权；AI 仅做「若存在则校验」的占位设计，未调用 append_approval_record。"
+  },
+  "task4_real_evidence_bundle": {
+    "bundle_version": "1.0.0",
+    "bundle_timestamp": "2026-08-03T03:00:15.774914+00:00",
+    "bundle_hash": "483811bd8e284dc68e636c19bb21e34d39839c1c35e7da188290a5ad0a08cc9d",
+    "evidence_refs": {
+      "verified_json": "/Users/chujiangai/WorkBuddy仓库/初匠Ai应用开发/BOIP/agents/engineering/thresholds/verified.json",
+      "experts_json": "/Users/chujiangai/WorkBuddy仓库/初匠Ai应用开发/BOIP/agents/engineering/knowledge/experts.json",
+      "release_approvals_jsonl": "/Users/chujiangai/WorkBuddy仓库/初匠Ai应用开发/BOIP/agents/engineering/release/release_approvals.jsonl",
+      "review_log_jsonl": "/Users/chujiangai/WorkBuddy仓库/初匠Ai应用开发/BOIP/agents/engineering/review_log.jsonl"
+    },
+    "evidence": {
+      "threshold_evidence": {
+        "E-TH-01": {
+          "submission_verified": false,
+          "value_real": false,
+          "unit_real": true,
+          "source_ref_complete": false,
+          "version_present": false,
+          "dual_signed": false,
+          "missing": [
+            "value",
+            "source_ref",
+            "version",
+            "dual_sign"
+          ],
+          "status": "NOT_SUBMITTED_PENDING"
+        },
+        "E-TH-02": {
+          "submission_verified": false,
+          "value_real": false,
+          "unit_real": false,
+          "source_ref_complete": false,
+          "version_present": false,
+          "dual_signed": false,
+          "missing": [
+            "value",
+            "unit",
+            "source_ref",
+            "version",
+            "dual_sign"
+          ],
+          "status": "NOT_SUBMITTED_PENDING"
+        },
+        "E-TH-03": {
+          "submission_verified": false,
+          "value_real": false,
+          "unit_real": false,
+          "source_ref_complete": false,
+          "version_present": false,
+          "dual_signed": false,
+          "missing": [
+            "value",
+            "unit",
+            "source_ref",
+            "version",
+            "dual_sign"
+          ],
+          "status": "NOT_SUBMITTED_PENDING"
+        }
+      },
+      "expert_evidence": {
+        "submission_verified": false,
+        "count": 0,
+        "sod_ok": true
+      },
+      "approval_evidence": {
+        "submission_verified": false,
+        "ai_created": false,
+        "fields_valid": null,
+        "effective_time_valid": null,
+        "sod_ok": true
+      }
+    },
+    "provenance_note": "bundle_hash/version/timestamp 为证据包本身的溯源标记，非真实工程参数；证据内容未收到者一律 pending_verification。"
+  },
+  "task5_unified_activation_gate": {
+    "verdict": "NO-GO",
+    "engineering_enabled": false,
+    "domain_results": {
+      "knowledge": {
+        "allowed": false,
+        "gate_results": {},
+        "blocking_reasons": [
+          "G0_repository_required"
+        ]
+      },
+      "threshold": {
+        "allowed": false,
+        "gate_results": {
+          "G1": false,
+          "G2": false,
+          "G3": false,
+          "G4": false,
+          "G5": false,
+          "G6": false
+        },
+        "blocking_reasons": [
+          "G1_threshold_governance_incomplete:threshold_status 非 verified（draft/review）不纳入工程判定",
+          "G2_dual_sign_incomplete",
+          "G3_ci_not_green",
+          "G4_audit_chain_incomplete",
+          "G5_rollback_not_ready",
+          "G6_authorization_missing"
+        ]
+      },
+      "publishing": {
+        "allowed": false,
+        "gate_results": {
+          "G1": true,
+          "G2": false,
+          "G3": false,
+          "G4": false,
+          "G5": false,
+          "G6": false
+        },
+        "blocking_reasons": [
+          "G2_dual_sign_incomplete",
+          "G3_ci_not_green",
+          "G4_audit_chain_incomplete",
+          "G5_rollback_not_ready",
+          "G6_authorization_missing"
+        ]
+      }
+    },
+    "blocking_reasons": [
+      "[knowledge] G0_repository_required",
+      "[threshold] G1_threshold_governance_incomplete:threshold_status 非 verified（draft/review）不纳入工程判定",
+      "[threshold] G2_dual_sign_incomplete",
+      "[threshold] G3_ci_not_green",
+      "[threshold] G4_audit_chain_incomplete",
+      "[threshold] G5_rollback_not_ready",
+      "[threshold] G6_authorization_missing",
+      "[publishing] G2_dual_sign_incomplete",
+      "[publishing] G3_ci_not_green",
+      "[publishing] G4_audit_chain_incomplete",
+      "[publishing] G5_rollback_not_ready",
+      "[publishing] G6_authorization_missing"
+    ],
+    "gate_labels": [
+      "G1",
+      "G2",
+      "G3",
+      "G4",
+      "G5",
+      "G6"
+    ]
+  },
+  "task6_audit_chain": {
+    "chain_ok": false,
+    "empty": false,
+    "broken": false,
+    "missing_actions": [
+      "submit",
+      "review",
+      "expert_recheck",
+      "verified"
+    ],
+    "event_count": 1,
+    "required_actions": [
+      "submit",
+      "review",
+      "expert_recheck",
+      "verified"
+    ],
+    "source": "check_review_log_chain(review_log.jsonl)"
+  },
+  "red_lines": {
+    "real_params_not_generated": true,
+    "expert_identity_not_fabricated": true,
+    "release_approval_not_created_by_ai": true,
+    "engineering_enabled_still_false": true,
+    "engineering_approved_not_output": true,
+    "real_files_untouched": true,
+    "note": "③AI 代签不适用（未收到任何真实签署请求，未生成签名）。"
+  },
+  "verdict": "NO-GO",
+  "engineering_enabled": false,
+  "note": "本回合指令未附带真实人工提供的激活证据；提交后验证闭环已建立，各类证据插槽保持 pending_verification / not_received。UnifiedActivationGate 在真实仓库状态下返回 NO-GO。AI 未伪造真实参数/专家身份/签字/授权，未创建 ReleaseApproval，未开启 engineering_enabled，未输出 engineering_approved。"
+}

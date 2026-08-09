@@ -1,0 +1,185 @@
+{
+  "phase": "3.6.5",
+  "task": "Final Human Activation Approval Review",
+  "generated_at": "2026-08-03T03:14:07.441925+00:00",
+  "interface": "wind_pressure",
+  "ai_authority": "NONE — AI 无权开启 engineering_enabled，仅人工终端显式置 true",
+  "human_evidence_received_this_turn": false,
+  "task1_evidence_bundle_summary": {
+    "interface": "wind_pressure",
+    "commit_hash": "543c3c7a651b158b6c8f76ad99666aef058a1502",
+    "threshold": {
+      "per_threshold": {
+        "E-TH-01": {
+          "present": true,
+          "value_real": false,
+          "unit_real": true,
+          "source_ref_complete": false,
+          "version_present": false,
+          "dual_signed": false,
+          "realized": false,
+          "missing": [
+            "value",
+            "source_ref",
+            "version",
+            "dual_sign"
+          ]
+        },
+        "E-TH-02": {
+          "present": true,
+          "value_real": false,
+          "unit_real": false,
+          "source_ref_complete": false,
+          "version_present": false,
+          "dual_signed": false,
+          "realized": false,
+          "missing": [
+            "value",
+            "unit",
+            "source_ref",
+            "version",
+            "dual_sign"
+          ]
+        },
+        "E-TH-03": {
+          "present": true,
+          "value_real": false,
+          "unit_real": false,
+          "source_ref_complete": false,
+          "version_present": false,
+          "dual_signed": false,
+          "realized": false,
+          "missing": [
+            "value",
+            "unit",
+            "source_ref",
+            "version",
+            "dual_sign"
+          ]
+        }
+      },
+      "all_realized": false
+    },
+    "expert": {
+      "real_expert_count": 0,
+      "submission_verified": false
+    },
+    "approval": {
+      "release_approval_file_exists": false,
+      "submission_verified": false
+    },
+    "rollback": {
+      "controller_script_exists": true,
+      "dry_run_executed": false,
+      "ready": false
+    },
+    "audit": {
+      "chain_ok": false,
+      "missing_actions": [
+        "submit",
+        "review",
+        "expert_recheck",
+        "verified"
+      ],
+      "event_count": 1
+    },
+    "immutable_bundle": {
+      "bundle_id": "BOIP-EB-fb5469bfb0430e2c",
+      "threshold_evidence_hash": "c4b44713a37529551fe9c8069b1ce069e1b9fc77cad357a70349349ece223845",
+      "review_log_hash": "a4251636bd7726c06de36bb5a736ff909a5881352357d10f2ccf5f6375a6bb44",
+      "authorization_hash": null,
+      "ci_evidence_hash": "50e40e3e3e5f81f2e885c85f7aed29bdf657aada6c4819def3d50488fded847d",
+      "rollback_evidence_hash": "bbeb58d05456af4be667a9d3c7e10f46efb1a3d923dcdf402e9e4dfe49014af0",
+      "threshold_evidence_present": true,
+      "review_evidence_present": false,
+      "authorization_present": false,
+      "complete": false,
+      "notes": [
+        "review_evidence_incomplete: review_log 缺少完整四类审核事件链 (submit/review/expert_recheck/verified) (submit/review/expert_recheck/verified)",
+        "authorization_missing: EngineeringReleaseApproval 文件不存在 (G6 缺位)"
+      ]
+    }
+  },
+  "task2_gate_review": {
+    "verdict": "NO-GO",
+    "engineering_enabled": false,
+    "gate_status": {
+      "knowledge": "N/A (no candidate / G0)",
+      "threshold": {
+        "G1": "FAIL",
+        "G2": "FAIL",
+        "G3": "FAIL",
+        "G4": "FAIL",
+        "G5": "FAIL",
+        "G6": "FAIL"
+      },
+      "publishing": {
+        "G1": "PASS",
+        "G2": "FAIL",
+        "G3": "FAIL",
+        "G4": "FAIL",
+        "G5": "FAIL",
+        "G6": "FAIL"
+      }
+    },
+    "blocking_reasons": [
+      "[knowledge] G0_repository_required",
+      "[threshold] G1_threshold_governance_incomplete:threshold_status 非 verified（draft/review）不纳入工程判定",
+      "[threshold] G2_dual_sign_incomplete",
+      "[threshold] G3_ci_not_green",
+      "[threshold] G4_audit_chain_incomplete",
+      "[threshold] G5_rollback_not_ready",
+      "[threshold] G6_authorization_missing",
+      "[publishing] G2_dual_sign_incomplete",
+      "[publishing] G3_ci_not_green",
+      "[publishing] G4_audit_chain_incomplete",
+      "[publishing] G5_rollback_not_ready",
+      "[publishing] G6_authorization_missing"
+    ],
+    "blocking_count": 12
+  },
+  "task3_sod_check": {
+    "roles": {
+      "verified_by": null,
+      "expert_verified_by": null,
+      "authorized_by": null,
+      "rollback_owner": null
+    },
+    "hard_separation_expert_ne_principal": true,
+    "soft_separation_authorized_ne_rollback": true,
+    "extra_expert_ne_authorized": true,
+    "principal_ne_rollback": true,
+    "sod_ok": true,
+    "note": "真实角色标识全缺（无真实签署/授权记录）→ 无可分离对象，不违反 SoD；一旦收到真实证据，闭环将校验 expert_verified_by ≠ verified_by（硬）且 authorized_by ≠ rollback_owner（软）。"
+  },
+  "task4_rollback_confirmation": {
+    "controller_script_exists": true,
+    "actions": {
+      "snapshot": false,
+      "disable": false,
+      "rollback": false,
+      "restore": false
+    },
+    "dry_run_executed": false,
+    "ready": false,
+    "note": "回滚控制器机制（scripts/release/gray_release_ctl.py）存在 → 机制可利用；但无任何 Rollback Dry Run 执行实证（snapshot/disable/rollback/restore 均未记录执行），故回滚就绪 = NOT CONFIRMED。G5 在真实 gate 中默认 rollback_ready=False。"
+  },
+  "task5_final_human_decision": {
+    "decision": "NO-GO",
+    "engineering_enabled": false,
+    "ai_may_enable": false,
+    "required_human_action": "由主理人 + 专家线下补齐真实证据并经 G1-G6 全过 + 人类终端显式置 orchestrator.engineering_enabled=true；AI 不自动激活。"
+  },
+  "red_lines": {
+    "real_params_not_generated": true,
+    "expert_identity_not_fabricated": true,
+    "release_approval_not_created_by_ai": true,
+    "engineering_enabled_still_false": true,
+    "engineering_approved_not_output": true,
+    "real_files_untouched": true,
+    "note": "③AI 代签不适用（未收到任何真实签署请求，未生成签名）。"
+  },
+  "verdict": "NO-GO",
+  "engineering_enabled": false,
+  "note": "本回合指令未附带真实人工证据；最终复核基于真实仓库状态（驱动真实 gate 代码）输出 NO-GO。AI 未伪造真实参数/专家身份/签字/授权，未创建 ReleaseApproval，未开启 engineering_enabled，未输出 engineering_approved。AI 无权开启激活。"
+}

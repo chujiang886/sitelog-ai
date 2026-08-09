@@ -1,0 +1,22 @@
+{
+  "bundle_id": "BOIP-ACF-e00a7df54621257a",
+  "frozen_at": "2026-08-03T03:30:37.507076+00:00",
+  "code_hash": "e00a7df54621257a3786c1d23bbc1e3ea27d2b492675e1054ceaab09260d6cdd",
+  "config_hash": "9aa005aa598dedf75969d12a17f155aa6e27d86dec33cb1c173a7d5b6a0ff2cc",
+  "evidence_hash": "97fb2a47d367c9dc8cd6db3801f3bc3e1f87f51a359505cac725a0b26f381ab4",
+  "gate_version_hashes": {
+    "UnifiedActivationGate": "9b697a8b288af09143493689a3d504e68aa7b406aad8269dc6e7f26eb57d3456",
+    "ConsumptionPolicy": "96c7afd4a5a191ec5334f338321ef9d20f0909421744cd8704152fa6f6557dc0",
+    "RuntimeGuard": "55b635e08f5d575b5404f8f77e4254003343fc7bb941fcff5bfa2b5aaa8645ba"
+  },
+  "runbook_hash": "84b4cf101e81e8baeaf586d35f1839bfebee6b20e5475fc72f3bbe59cf3bf8d1",
+  "engineering_enabled_at_freeze": false,
+  "evidence_state": {
+    "verified_present": true,
+    "review_log_present": true,
+    "experts_present": true,
+    "release_approvals_present": false
+  },
+  "note": "冻结仅锚定当前仓库真实状态；真实证据当前为 pending_verification / 未提交，激活态恒 NO-GO。",
+  "bundle_hash": "aa397a20bfb6eec70472c4958353342b8e3746d5224d5438a184eee919499af6"
+}

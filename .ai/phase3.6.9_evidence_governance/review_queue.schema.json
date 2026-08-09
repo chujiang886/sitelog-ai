@@ -1,0 +1,64 @@
+{
+  "id": "boip://evidence-governance/review_queue.schema.json",
+  "title": "Review Queue (Human Review Pipeline)",
+  "description": "Phase 3.6.9 任务4：真实人工证据审核队列。三阶段：pending reviewer（形式审查）→ expert review（领域专家复核）→ approval review（双签授权终验）。含强职责分离（SoD）与拒绝/退回路径。AI 不得担任任何审核角色（红线②专家身份 / 红线③代签）。",
+  "version": "1.0.0",
+  "review_queue": {
+    "stages": [
+      {
+        "stage": "pending_reviewer",
+        "order": 1,
+        "role": "reviewer",
+        "actor_human": true,
+        "entry_state": "SUBMITTED",
+        "exit_state": "VALIDATING",
+        "description": "形式审查：提交完整性 / 真人签名 / UTC 时间戳 / 版本匹配冻结基线 / 红线扫描（六条）。",
+        "pass_action": "推入 expert_review",
+        "fail_action": "退回 RETURNED（validation_fail）"
+      },
+      {
+        "stage": "expert_review",
+        "order": 2,
+        "role": "domain_expert",
+        "actor_human": true,
+        "entry_state": "VALIDATING",
+        "description": "领域专家复核 E-TH 数值真实性 / 计算逻辑 / 规范引用；专家身份必须由人提供，AI 不生成（红线②）。",
+        "pass_action": "expert_check_ok=true，进入 approval_review 前置",
+        "fail_action": "退回 RETURNED（validation_fail）"
+      },
+      {
+        "stage": "approval_review",
+        "order": 3,
+        "role": "approval_reviewer",
+        "actor_human": true,
+        "entry_state": "VERIFIED",
+        "exit_state": "ACCEPTED",
+        "description": "双签授权复核（principal_maintainer + 第二独立人）+ 发布域 G6 终验；不翻转 engineering_enabled。",
+        "pass_action": "状态→ACCEPTED（仅代表人工审核链完成，不开启工程态）",
+        "fail_action": "退回 RETURNED（approval_reject）"
+      }
+    ],
+    "sod": {
+      "rule": "submitter ≠ reviewer ≠ expert ≠ approval_reviewer（强职责分离）",
+      "exception": "domain_expert 可与 human_submitter 重叠，但不得与 approval_reviewer 重叠",
+      "ai_forbidden_roles": ["reviewer", "domain_expert", "approval_reviewer", "submitter"],
+      "rationale": "防 AI 代审/代签/代专家（红线②③），保证人工责任链可追溯。"
+    },
+    "reject_path": {
+      "from": "VALIDATING",
+      "to": "RETURNED",
+      "by": ["reviewer", "domain_expert"],
+      "effect": "证据退回提交人，须以新版本号重开 OPEN；原版本哈希链保留为审计。"
+    },
+    "return_path": {
+      "from": "VERIFIED",
+      "to": "RETURNED",
+      "by": ["approval_reviewer"],
+      "effect": "批准复核驳回，退回提交人重开。"
+    },
+    "engineering_enabled_isolation": {
+      "fact": "审核队列任一阶段通过/驳回均不修改 engineering_enabled（红线⑤）。ACCEPTED 仅表示审核链完成。",
+      "evidence_ref": "boip://evidence-governance/gate_association.verification.json"
+    }
+  }
+}

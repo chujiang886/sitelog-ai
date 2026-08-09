@@ -1,0 +1,82 @@
+{
+  "id": "boip://evidence-governance/evidence_lifecycle.statemachine.json",
+  "title": "Evidence Lifecycle State Machine",
+  "description": "Phase 3.6.9 任务2：真实人工证据五态生命周期状态机。OPEN→SUBMITTED→VALIDATING→VERIFIED→ACCEPTED。所有跃迁必须由人类角色触发，AI/agent/script 禁止触发任何跃迁（含到达 ACCEPTED）。任一态均不修改 engineering_enabled。",
+  "version": "1.0.0",
+  "state_machine": {
+    "initial": "OPEN",
+    "states": ["OPEN", "SUBMITTED", "VALIDATING", "VERIFIED", "ACCEPTED", "REJECTED", "RETURNED"],
+    "core_states": ["OPEN", "SUBMITTED", "VALIDATING", "VERIFIED", "ACCEPTED"],
+    "terminal_states": ["ACCEPTED", "REJECTED"],
+    "transitions": [
+      {
+        "from": "OPEN",
+        "to": "SUBMITTED",
+        "trigger": "human_submit",
+        "actor": "human_submitter",
+        "auto": false,
+        "condition": "submission 满足 EvidenceSubmissionLog Schema 且 signed=true 且带 UTC 时间戳"
+      },
+      {
+        "from": "SUBMITTED",
+        "to": "VALIDATING",
+        "trigger": "reviewer_pickup",
+        "actor": "human_reviewer",
+        "auto": false,
+        "condition": "进入人工审核队列 pending_reviewer 阶段"
+      },
+      {
+        "from": "VALIDATING",
+        "to": "VERIFIED",
+        "trigger": "validation_pass",
+        "actor": "human_reviewer + domain_expert",
+        "auto": false,
+        "condition": "形式审查 + 领域专家复核通过（红线②：专家身份由人提供，AI 不生成）"
+      },
+      {
+        "from": "VALIDATING",
+        "to": "RETURNED",
+        "trigger": "validation_fail",
+        "actor": "human_reviewer",
+        "auto": false,
+        "condition": "形式/实质审查不通过，退回提交人"
+      },
+      {
+        "from": "VERIFIED",
+        "to": "ACCEPTED",
+        "trigger": "approval_sign",
+        "actor": "approval_reviewer",
+        "auto": false,
+        "condition": "双签授权复核 + 发布域 G6 终验通过；仍不翻转 engineering_enabled"
+      },
+      {
+        "from": "VERIFIED",
+        "to": "RETURNED",
+        "trigger": "approval_reject",
+        "actor": "approval_reviewer",
+        "auto": false,
+        "condition": "批准复核驳回，退回"
+      },
+      {
+        "from": "RETURNED",
+        "to": "OPEN",
+        "trigger": "resubmit",
+        "actor": "human_submitter",
+        "auto": false,
+        "condition": "提交人修正后以新版本号重新进入 OPEN"
+      }
+    ],
+    "forbidden_transitions": {
+      "auto_transitions": "NONE — 所有跃迁 auto=false，AI/agent/script 不得触发",
+      "ai_triggered": "禁止任何由 ai/agent/automation 角色触发的跃迁",
+      "engineering_enabled_side_effect": "任一跃迁（含 OPEN→ACCEPTED）均不得修改 engineering_enabled（红线⑤）"
+    },
+    "invariants": [
+      "I1: 任何态跃迁均不得修改 engineering_enabled；该字段仅由人类在 config.yaml 显式置位，AI 仅可读断言（load_engineering_enabled()）。",
+      "I2: 所有合法跃迁 actor ∈ {human_submitter, human_reviewer, domain_expert, approval_reviewer}；禁止 ai/agent/script。",
+      "I3: ACCEPTED 态不触发 engineering_enabled 翻转（fail-closed）；到达 ACCEPTED 仅代表人工审核链完成，不表示工程态开启。",
+      "I4: REJECTED 为终态，须由人类显式决策是否重新开启新 submission。",
+      "I5: 每次合法跃迁须写入 EvidenceSubmissionLog 新审计行（含时间戳+真人签署），保证不可变审计链。"
+    ]
+  }
+}
