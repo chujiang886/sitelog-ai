@@ -10,6 +10,7 @@ from app.api import (
     analysis_router,
     auth_router,
     conversations_router,
+    governance_dashboard_router,
     health_router,
     knowledge_router,
     projects_router,
@@ -42,5 +43,6 @@ app.include_router(report_router)
 app.include_router(rag_router)
 app.include_router(auth_router)
 app.include_router(analysis_router)
+app.include_router(governance_dashboard_router)
 register_cors(app)
 register_exception_handlers(app)

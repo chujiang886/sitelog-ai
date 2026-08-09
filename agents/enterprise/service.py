@@ -254,6 +254,10 @@ from agents.enterprise.governance_workflow.models import (
     GovernanceWorkflowReview,
     GovernanceExecutionRecord,
 )
+# Phase 3.8.26：企业智能体治理驾驶舱层（只读查询 + 单一人工确认入口）。
+from agents.enterprise.governance_dashboard import (
+    GovernanceDashboardService,
+)
 
 
 class EnterpriseOperationLayer:
@@ -605,6 +609,15 @@ class EnterpriseOperationLayer:
             permission_policy=self.agent_permission_policy,
             governance_workflow=self.agent_governance_workflow,
             assistant=self.agent_governance_knowledge_assistant,
+        )
+        # Phase 3.8.26：企业智能体治理驾驶舱层。在编排层之上提供「只读查询 + 单一人工确认
+        # 入口」的驾驶舱 API，供真实责任人查看/审核/确认/追踪/归档；默认拒绝 + 组织隔离 +
+        # 强制 USER + 审计留痕，AI 无法越权（红线③/④/⑤/⑥）。
+        self.agent_governance_dashboard = GovernanceDashboardService(
+            org_id=org_id, orchestrator=self.agent_governance_workflow_orchestrator,
+            audit=self.audit, identity=self.identity,
+            visibility=self.knowledge_visibility,
+            permission_policy=self.agent_permission_policy,
         )
 
     def is_activation_safe(self) -> bool:

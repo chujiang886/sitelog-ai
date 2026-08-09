@@ -382,7 +382,7 @@ from agents.enterprise.agent_governance_knowledge_assistant import (
     GovernanceAssistantStage,
 )
 # Phase 3.8.25：企业智能体治理工作流编排层
-from agents.enterprise.governance_workflow.orchestrator import (
+from agents.enterprise.governance_workflow import (
     GovernanceWorkflowOrchestrator,
 )
 from agents.enterprise.governance_workflow.models import (
@@ -392,6 +392,14 @@ from agents.enterprise.governance_workflow.models import (
     WorkflowReviewDecision,
     GovernanceWorkflowReview,
     GovernanceExecutionRecord,
+)
+# Phase 3.8.26：企业智能体治理驾驶舱层
+from agents.enterprise.governance_dashboard import (
+    GovernanceDashboardService,
+    DashboardUser,
+    ExecutionStatusView,
+    RiskAlert,
+    DashboardSummary,
 )
 
 __all__ = [
@@ -699,6 +707,12 @@ __all__ = [
     "GovernanceWorkflowReview",
     "GovernanceExecutionRecord",
     "GovernanceWorkflowOrchestrator",
+    # Phase 3.8.26 治理驾驶舱层
+    "GovernanceDashboardService",
+    "DashboardUser",
+    "ExecutionStatusView",
+    "RiskAlert",
+    "DashboardSummary",
     # aggregate
     "EnterpriseOperationLayer",
 ]
