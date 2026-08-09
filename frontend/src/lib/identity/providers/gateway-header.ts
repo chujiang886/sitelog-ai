@@ -13,7 +13,10 @@
  */
 
 import { IdentityProviderNotConfiguredError } from "@/lib/identity/errors";
-import { assertHumanIdentity, toActorHeaders } from "@/lib/identity/guards";
+import {
+  assertHumanIdentity,
+  toGovernanceHeaders,
+} from "@/lib/identity/guards";
 import type {
   AuthScheme,
   GovernanceIdentity,
@@ -79,7 +82,14 @@ export class GatewayHeaderIdentityProvider implements IdentityProvider {
     return assertHumanIdentity({ ...claims, scheme: this.scheme });
   }
 
+  /**
+   * 网关模式下浏览器**不需要**自己带凭据：凭据由网关在边缘注入。
+   *
+   * 因此这里只复述组织，绝不补发 ``x-actor-*``。若真让前端补发，等于把
+   * "网关已鉴权"这个前提降级成"谁都能声明自己是谁"，本适配器的全部安全性
+   * 都建立在浏览器无法绕过网关直连之上（见构造函数的 gatewayVerified 确认）。
+   */
   async getAuthHeaders(): Promise<Readonly<Record<string, string>>> {
-    return toActorHeaders(await this.getIdentity());
+    return toGovernanceHeaders(await this.getIdentity());
   }
 }

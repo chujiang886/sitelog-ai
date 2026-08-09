@@ -31,8 +31,30 @@ from app.db.base import Base
 from app.db.models.tenant import GUID
 
 
+#: 角色白名单（写死在 CHECK 约束里的那份）。
+#:
+#: 业务角色来自 Phase 2.2；治理角色来自 Phase 3.8.28，两组**不共用命名空间**，
+#: 一个业务 admin 不因此获得任何治理权限。
+#:
+#: 为什么这里是字面量而不是 ``from app.identity.permissions import GOVERNANCE_ROLES``：
+#: ``app.identity`` 的包初始化会拉起 ``verifier`` → ``app.core.security`` →
+#: ``app.db.models.rbac``，在模型模块里反向 import 会形成环。词表一致性改由
+#: 测试钉死（``test_governance_rbac.py::test_role_check_constraint_matches_catalog``
+#: 断言本元组 == ``RBAC_ROLES + GOVERNANCE_ROLES``），而不是靠人眼同步。
+BUSINESS_ROLE_NAMES: tuple[str, ...] = ("admin", "designer", "viewer")
+GOVERNANCE_ROLE_NAMES: tuple[str, ...] = (
+    "governance-admin",
+    "governance-reviewer",
+    "governance-auditor",
+    "governance-viewer",
+)
+ALLOWED_ROLE_NAMES: tuple[str, ...] = BUSINESS_ROLE_NAMES + GOVERNANCE_ROLE_NAMES
+
+_ROLE_NAME_CHECK = "name in (" + ", ".join(f"'{n}'" for n in ALLOWED_ROLE_NAMES) + ")"
+
+
 class Role(Base):
-    """全局角色目录。本阶段固定三种：admin / designer / viewer。"""
+    """全局角色目录：3 个业务角色 + 4 个治理角色。"""
 
     __tablename__ = "roles"
 
@@ -45,7 +67,7 @@ class Role(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "name in ('admin', 'designer', 'viewer')",
+            _ROLE_NAME_CHECK,
             name="role_name_valid",
         ),
     )

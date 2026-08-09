@@ -13,8 +13,8 @@
 ③ **状态白名单（status whitelist）**：``update_status`` 只允许六态值，任何
    ``auto_*`` / ``approved_by_ai`` 等被拒（红线③/④，与 DB ``status_valid`` 约束双保险）。
 
-说明：主闸门在 Task 5 的 Human Operation API 层（请求头 ``x-actor-kind: user`` 由真人
-携带）；本层是防御性二次校验，即使有人绕过 API 直接持 Session 调用，也过不了
+说明：主闸门在 Task 5 的 Human Operation API 层（身份只来自 ``Authorization: Bearer``
+凭据，由真人携带）；本层是防御性二次校验，即使有人绕过 API 直接持 Session 调用，也过不了
 ``require_human_actor`` 与 org 隔离。
 """
 

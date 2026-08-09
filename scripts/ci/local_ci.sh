@@ -67,4 +67,7 @@ printf '%s\n' '[7/8] Fabricated business-number scan'
 printf '%s\n' '[8/8] Hard-coded business-configuration scan'
 "${BACKEND_PYTHON}" "${PROJECT_ROOT}/scripts/lint/check_hardcoded.py" --root "${PROJECT_ROOT}"
 
+printf '%s\n' '[9/9] Legacy identity-header trust-regression scan (Phase 3.8.28)'
+"${BACKEND_PYTHON}" "${PROJECT_ROOT}/scripts/lint/check_legacy_identity_headers.py" --root "${PROJECT_ROOT}"
+
 printf '%s\n' 'Local CI passed.'

@@ -54,9 +54,26 @@ export type GovernancePermission =
   | "governance:review:confirm" // 有权"提交"人工研判，不等于自动通过
   | "governance:execution:read"
   | "governance:audit:read"
-  | "governance:summary:read";
+  | "governance:summary:read"
+  | "governance:workflow:report"
+  | "governance:execution:submit"
+  | "governance:workflow:close";
 
-/** 全部合法权限（运行时白名单，用于校验适配器返回值）。 */
+/**
+ * 全部合法权限（运行时白名单，用于校验适配器返回值）。
+ *
+ * 【必须与后端逐字一致】对应 ``backend/app/identity/permissions.py`` 的
+ * ``GovernancePermission``。3.8.27 时这里只有 6 项，后端 3.8.28 落地了 9 项 ——
+ * 少的那三项（report / submit / close）正是 ``/governance/ops/*`` 的写动作。
+ *
+ * 词表对不上会产生两种故障，后一种更危险：
+ *   - 前端算出"能点"、后端判"不能做" → 按钮亮着却永远失败，运维只能靠猜；
+ *   - 前端算出"不能点"把按钮灰掉，团队据此以为该动作被管住了，而后端因为
+ *     词表对不上根本没挂校验 → **权限在视觉上存在，在执行上缺席**。
+ *
+ * 由 ``backend/tests/test_governance_identity_security.py`` 的词表对齐用例钉死：
+ * 改了任何一侧而不改另一侧，后端测试直接失败。
+ */
 export const ALL_GOVERNANCE_PERMISSIONS: readonly GovernancePermission[] = [
   "governance:workflow:read",
   "governance:review:read",
@@ -64,6 +81,21 @@ export const ALL_GOVERNANCE_PERMISSIONS: readonly GovernancePermission[] = [
   "governance:execution:read",
   "governance:audit:read",
   "governance:summary:read",
+  "governance:workflow:report",
+  "governance:execution:submit",
+  "governance:workflow:close",
+] as const;
+
+/**
+ * 已废止的身份请求头（Phase 3.8.28 起后端一律 400）。
+ *
+ * 保留这个常量不是为了使用它，是为了**能断言它不再被发出**：
+ * 3.8.27 的 ``toActorHeaders`` 就是靠这两个头充当身份，前端只要还在发，
+ * 整条治理链路就会全线 400。测试用它做回归哨兵。
+ */
+export const LEGACY_IDENTITY_HEADERS: readonly string[] = [
+  "x-actor-id",
+  "x-actor-kind",
 ] as const;
 
 /**
@@ -88,10 +120,14 @@ export const FORBIDDEN_PERMISSION_PATTERNS: readonly string[] = [
   "bypass-human",
   "skip_review",
   "skip-review",
+  "skip_human",
+  "skip-human",
   "without_human",
   "no_human",
   "ai_approve",
+  "ai-approve",
   "agent_approve",
+  "self_approve",
   "engineering_approved",
   "engineering_enabled",
 ] as const;
@@ -165,8 +201,11 @@ export interface IdentityProvider {
   /**
    * 取用于调用治理 API 的请求头。
    *
-   * 至少包含 x-actor-id / x-actor-kind（后端 require_user 依赖），
-   * JWT / SSO 适配器另需附带 Authorization。
+   * 【3.8.28 契约变更】只允许返回**凭据**（``Authorization: Bearer …``）。
+   * 严禁再返回 x-actor-id / x-actor-kind —— 身份由后端从凭据派生，
+   * 请求头无法指定责任人，带上旧头后端直接 400。
+   *
+   * 换句话说：适配器不再"告诉后端我是谁"，只负责"把凭据递过去"。
    */
   getAuthHeaders(): Promise<Readonly<Record<string, string>>>;
 

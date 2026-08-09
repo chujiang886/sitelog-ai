@@ -13,6 +13,7 @@
  * - 取不到合法身份时页面**不降级**：直接显示错误并禁用一切治理动作。
  */
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -145,7 +146,12 @@ export default function GovernanceDashboardPage(): JSX.Element {
             : " · 未分配角色"}
         </p>
       ) : (
-        <p className="mt-3 text-xs text-slate-400">未取得责任人身份，治理动作已全部禁用。</p>
+        <p className="mt-3 text-xs text-slate-400">
+          未取得责任人身份，治理动作已全部禁用。
+          <Link href="/login" className="ml-1 text-boip-primary-main underline">
+            去登录
+          </Link>
+        </p>
       )}
 
       {error ? (

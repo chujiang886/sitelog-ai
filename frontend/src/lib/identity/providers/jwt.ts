@@ -12,14 +12,24 @@
  * 未配置时 getIdentity() 抛 IdentityProviderNotConfiguredError（fail-closed），
  * 绝不退化成匿名或默认责任人。
  *
- * 【后续阶段需补齐（写在这里避免遗忘）】
- *   - 后端新增 JWT 中间件：验签 + 校验 iss/aud/exp + 解析 actor_id/actor_kind/roles；
- *   - 后端 require_user 改为信任中间件解析结果，不再直接信任 x-actor-* 头；
- *   - 前端 tokenSource 接实际登录态（Cookie / SSO 回调 / 刷新令牌）。
+ * 【3.8.28 现状：本适配器已退居次要位置】
+ * 后端验签链路（verifier → resolver → dependencies）已落地，
+ * ``x-actor-*`` 头一律 400，身份只能来自 Bearer 凭据。因此推荐使用
+ * ``BackendSessionIdentityProvider``：它直接问后端要主体，
+ * 前端不再自己解 payload 猜身份。
+ *
+ * 本适配器保留给两类场景：
+ *   1. 后端 ``/governance/me`` 不可达但仍需渲染骨架的离线/演示环境；
+ *   2. 需要自定义 claim 映射的第三方 IdP 直连试验。
+ * 两种场景都必须清楚：**这里算出的 roles/permissions 只是 token 快照**，
+ * 授权变更要等 token 过期才反映，与后端每请求重算的结果可能不一致。
  */
 
 import { IdentityProviderNotConfiguredError } from "@/lib/identity/errors";
-import { assertHumanIdentity, toActorHeaders } from "@/lib/identity/guards";
+import {
+  assertHumanIdentity,
+  toGovernanceHeaders,
+} from "@/lib/identity/guards";
 import type {
   ActorKind,
   AuthScheme,
@@ -51,7 +61,10 @@ const DEFAULT_CLAIM_MAP: JwtClaimMap = {
   actorId: "sub",
   actorKind: "actor_kind",
   displayName: "name",
-  orgId: "org_id",
+  // 与后端一致：Phase 2.2 的 create_access_token 写的是 tenant_id，
+  // 后端 JwtTokenVerifier 也以 tenant_id 为组织声明（org_claim 默认值）。
+  // 这里若写 org_id，前端会一直读到 undefined 而"看起来正常"。
+  orgId: "tenant_id",
   roles: "roles",
 };
 
@@ -146,9 +159,10 @@ export class JwtIdentityProvider implements IdentityProvider {
   async getAuthHeaders(): Promise<Readonly<Record<string, string>>> {
     const token = await this.readToken();
     const identity = assertHumanIdentity(this.toClaims(token));
+    // 只递凭据 + 复述组织。3.8.28 起前端不再声明"我是谁"（见 toGovernanceHeaders）。
     return {
-      ...toActorHeaders(identity),
       Authorization: `Bearer ${token}`,
+      ...toGovernanceHeaders(identity),
     };
   }
 }

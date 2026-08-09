@@ -6,6 +6,7 @@ from app.api.auth import router as auth_router
 from app.api.conversations import router as conversations_router
 from app.api.health import router as health_router
 from app.api.governance_dashboard import router as governance_dashboard_router
+from app.api.governance_identity import router as governance_identity_router
 from app.api.governance_operations import router as governance_operations_router
 from app.api.knowledge import router as knowledge_router
 from app.api.projects import router as projects_router
@@ -21,6 +22,7 @@ __all__ = [
     "conversations_router",
     "health_router",
     "governance_dashboard_router",
+    "governance_identity_router",
     "governance_operations_router",
     "knowledge_router",
     "projects_router",

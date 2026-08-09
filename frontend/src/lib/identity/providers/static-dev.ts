@@ -11,8 +11,14 @@
  *   3. 与 JWT / SSO 走同一个端口，未来替换零改页面。
  */
 
-import { IdentityInsecureEnvironmentError } from "@/lib/identity/errors";
-import { assertHumanIdentity, toActorHeaders } from "@/lib/identity/guards";
+import {
+  IdentityInsecureEnvironmentError,
+  IdentityProviderNotConfiguredError,
+} from "@/lib/identity/errors";
+import {
+  assertHumanIdentity,
+  toGovernanceHeaders,
+} from "@/lib/identity/guards";
 import type {
   AuthScheme,
   GovernanceIdentity,
@@ -28,6 +34,14 @@ export interface StaticDevProviderOptions {
   readonly nodeEnv?: string;
   /** 显式放行开关（仅用于测试断言场景）。 */
   readonly allowInProduction?: boolean;
+  /**
+   * 开发态凭据（可选）。
+   *
+   * 3.8.28 起后端只认 Bearer 凭据，一个"固定责任人"没有凭据就调不通治理接口。
+   * 本地联调时可把 ``POST /api/auth/login`` 拿到的真实 token 传进来，
+   * 页面便能以这个人的名义走通完整链路；不传则 ``getAuthHeaders()`` 抛错。
+   */
+  readonly devToken?: string;
 }
 
 const DEFAULT_ACTOR_ID = "governor-1";
@@ -43,6 +57,7 @@ export class StaticDevIdentityProvider implements IdentityProvider {
   private readonly roles: readonly string[];
   private readonly nodeEnv: string;
   private readonly allowInProduction: boolean;
+  private readonly devToken?: string;
 
   constructor(options: StaticDevProviderOptions = {}) {
     this.actorId = options.actorId?.trim() || DEFAULT_ACTOR_ID;
@@ -51,6 +66,7 @@ export class StaticDevIdentityProvider implements IdentityProvider {
     this.roles = options.roles ?? DEFAULT_ROLES;
     this.nodeEnv = options.nodeEnv ?? process.env.NODE_ENV ?? "development";
     this.allowInProduction = options.allowInProduction ?? false;
+    this.devToken = options.devToken?.trim() || undefined;
   }
 
   /** 固定责任人天然"已配置"，但是否**允许使用**由环境决定。 */
@@ -77,7 +93,27 @@ export class StaticDevIdentityProvider implements IdentityProvider {
     });
   }
 
+  /**
+   * 【3.8.28 行为变更】没有凭据就发不出治理请求头。
+   *
+   * 旧实现把 ``x-actor-id: governor-1`` 当身份发出去 —— 那正是本阶段修掉的漏洞：
+   * 请求头即身份。现在后端见到这两个头直接 400，见不到 Bearer 直接 401。
+   *
+   * 与其返回一组注定失败的头、让人在 Network 面板里排查半天，
+   * 不如在这里就说清楚：固定责任人只能用于渲染，行动需要真实凭据。
+   */
   async getAuthHeaders(): Promise<Readonly<Record<string, string>>> {
-    return toActorHeaders(await this.getIdentity());
+    const identity = await this.getIdentity();
+    if (!this.devToken) {
+      throw new IdentityProviderNotConfiguredError(
+        this.id,
+        "固定责任人没有可用凭据：治理接口自 Phase 3.8.28 起只接受 Bearer 凭据，" +
+          "请改用 backend-session 适配器登录，或为本适配器注入 devToken。"
+      );
+    }
+    return {
+      Authorization: `Bearer ${this.devToken}`,
+      ...toGovernanceHeaders(identity),
+    };
   }
 }

@@ -16,19 +16,29 @@ import {
 import {
   ALL_GOVERNANCE_PERMISSIONS,
   FORBIDDEN_PERMISSION_PATTERNS,
+  LEGACY_IDENTITY_HEADERS,
   type GovernanceIdentity,
   type GovernancePermission,
   type RawActorClaims,
 } from "@/lib/identity/types";
 
 /**
- * 企业角色 → 治理权限映射（RBAC 接入位）。
+ * 企业角色 → 治理权限映射。
  *
- * 本阶段只给出**默认映射骨架**；真实企业角色体系（AD 组 / SSO 属性 / IAM 角色）
- * 接入时替换此表即可，页面与适配器均不受影响。
+ * 【这张表只用于渲染，不产生授权效力】
+ * 后端对每个请求独立判权，前端算错了顶多是按钮该亮没亮（或该灰没灰），
+ * 不会放行任何越权动作。之所以仍要求它与后端逐项一致，是因为**灰错了
+ * 会骗人**：团队会以为某个动作被管住了，而实际管没管住取决于后端。
  *
- * 注意：即使是 governance-admin，也**没有**任何"自动通过"能力——
- * 最高权限也只是"有资格提交人工研判"，决定权仍在真人手上（红线②）。
+ * 对应后端 ``GOVERNANCE_ROLE_PERMISSIONS``（``app/identity/permissions.py``），
+ * 由词表对齐用例钉死。注意两处刻意的不对称，改动前先理解原因：
+ *   - admin 与 reviewer 只差 ``audit:read``；
+ *   - auditor 有 ``audit:read`` 但**没有**任何写权限。
+ * 审计者看得见一切却不能下判断，判断者能下判断却看不到全量审计 ——
+ * 防止同一个人既做判断、又掌握对自己判断的审计视角。
+ *
+ * 即使是 governance-admin 也**没有**任何"自动通过"能力：最高权限也只是
+ * "有资格提交人工研判"，决定权仍在真人手上（红线②）。
  */
 export const ROLE_PERMISSIONS: Readonly<
   Record<string, readonly GovernancePermission[]>
@@ -40,6 +50,9 @@ export const ROLE_PERMISSIONS: Readonly<
     "governance:execution:read",
     "governance:audit:read",
     "governance:summary:read",
+    "governance:workflow:report",
+    "governance:execution:submit",
+    "governance:workflow:close",
   ],
   "governance-reviewer": [
     "governance:workflow:read",
@@ -47,6 +60,9 @@ export const ROLE_PERMISSIONS: Readonly<
     "governance:review:confirm",
     "governance:execution:read",
     "governance:summary:read",
+    "governance:workflow:report",
+    "governance:execution:submit",
+    "governance:workflow:close",
   ],
   "governance-auditor": [
     "governance:workflow:read",
@@ -173,20 +189,42 @@ export function requirePermission(
 }
 
 /**
- * 生成治理 API 所需的主体请求头。
+ * 生成治理 API 的非凭据请求头。
  *
- * 只有通过 assertHumanIdentity 的身份才能走到这里，
- * 因此 x-actor-kind 恒为 "user"——前端不存在"伪造成 user"的构造路径。
+ * 【3.8.28 取代了 toActorHeaders】旧函数发的是 ``x-actor-id`` /
+ * ``x-actor-kind``，那两个头**就是**当时的身份来源 —— 也就是那个漏洞本身。
+ * 现在身份只能来自 Bearer 凭据，前端连"声明自己是谁"的字段都不该有。
+ *
+ * 这里唯一剩下的头是 ``org-id``，而且它**不是**在指定组织：后端以主体
+ * 携带的组织为准，请求里的值只被允许"复述"（对不上直接 403）。保留它是
+ * 为了让越权尝试在服务端留下明确痕迹，而不是让前端自己去猜该访问谁的数据。
  */
-export function toActorHeaders(
+export function toGovernanceHeaders(
   identity: GovernanceIdentity
 ): Readonly<Record<string, string>> {
-  const headers: Record<string, string> = {
-    "x-actor-id": identity.actorId,
-    "x-actor-kind": identity.actorKind,
-  };
+  const headers: Record<string, string> = {};
   if (identity.orgId) {
-    headers["org_id"] = identity.orgId;
+    // 注意是连字符：后端 Header(alias="org-id")，下划线版本会被静默忽略。
+    headers["org-id"] = identity.orgId;
   }
   return headers;
+}
+
+/**
+ * 断言一组请求头里不含已废止的身份头（回归哨兵）。
+ *
+ * 前端只要还在发这两个头，整条治理链路会全线 400。与其等联调时才发现，
+ * 不如在构造请求头的位置就炸掉。
+ */
+export function assertNoLegacyIdentityHeaders(
+  headers: Readonly<Record<string, string>>
+): void {
+  const lowered = Object.keys(headers).map((k) => k.toLowerCase());
+  const offenders = LEGACY_IDENTITY_HEADERS.filter((h) => lowered.includes(h));
+  if (offenders.length > 0) {
+    throw new IdentityRedLineViolationError(
+      `请求头包含已废止的身份头 ${offenders.join(" / ")}：` +
+        "自 Phase 3.8.28 起治理身份只能来自 Bearer 凭据，请求头无法指定责任人。"
+    );
+  }
 }

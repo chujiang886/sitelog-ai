@@ -21,8 +21,6 @@ import sys
 from pathlib import Path
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
@@ -52,8 +50,6 @@ from app.db.repositories.governance_workflow_repository import (  # noqa: E402
     GovernanceWorkflowRepository,
     OrgScopeError,
 )
-from app.api.governance_operations import router  # noqa: E402
-from app.db.session import get_db  # noqa: E402
 
 
 @pytest.fixture
@@ -82,24 +78,16 @@ def dbsession(db_maker):
 
 
 @pytest.fixture
-def api_client(db_maker):
-    app = FastAPI()
-    app.include_router(router)
+def api_client(governance_env):
+    """API 层客户端。
 
-    def _override():
-        s = db_maker()
-        try:
-            yield s
-        finally:
-            s.close()
+    3.8.28 之前这里自己拼一个只挂 ops 路由的 FastAPI 应用，并用
+    ``x-actor-*`` 头扮演责任人。身份改造后这条捷径不存在了：ops 路由的
+    身份依赖要回库确认账号有效并重读治理角色，因此测试必须跑在真实装配上
+    （``governance_env`` 提供隔离库 + 真实登录 token）。
+    """
 
-    app.dependency_overrides[get_db] = _override
-    with TestClient(app) as c:
-        yield c
-
-
-USER = {"x-actor-id": "user-chen", "x-actor-kind": "user"}
-AI = {"x-actor-id": "ai-bot", "x-actor-kind": "ai"}
+    return governance_env
 
 
 # --------------------------------------------------------------------------- #
@@ -217,9 +205,91 @@ def test_repo_rejects_ai_actor(dbsession):
                            actor_id="ai-bot", actor_kind=AuditActorKind.AI)
 
 
-def test_api_rejects_ai_actor(api_client):
-    r = api_client.get("/governance/ops/workflows", headers=AI)
+def test_api_rejects_forged_ai_actor_header(api_client):
+    """改造前：发 AI 头 → 403（被人类门控挡住）。改造后：400。
+
+    差别不是状态码换了个数字，是拦截点变了 —— 从"我们判断你是 AI 所以
+    拒绝"变成"请求里根本没有能声明主体类别的字段"。旧头一律 400 且不静默
+    忽略，避免调用方误以为自己指定成功了责任人（红线③/④/⑥）。
+    """
+
+    r = api_client["client"].get(
+        "/governance/ops/workflows",
+        headers={"x-actor-id": "ai-bot", "x-actor-kind": "ai"},
+    )
+    assert r.status_code == 400
+    assert "x-actor" in r.text
+
+
+def test_api_requires_credentials(api_client):
+    """无凭据 → 401：没有身份就没有治理动作。"""
+
+    r = api_client["client"].get("/governance/ops/workflows")
+    assert r.status_code == 401
+
+
+def test_api_denies_user_without_governance_role(api_client):
+    """合法登录的业务管理员，治理端点默认拒绝（红线⑥的最小权限侧）。"""
+
+    r = api_client["client"].get(
+        "/governance/ops/workflows",
+        headers=api_client["bearer"](api_client["business_only_token"]),
+    )
     assert r.status_code == 403
+
+
+def test_api_write_path_records_real_human_actor(api_client):
+    """人工登记 → 执行记录里的 actor 是 token 持有者，且 actor_kind='user'。
+
+    这条把 API 层与 DB 层的两道防线接上了：③ 证明 DB 拒绝 AI 写执行记录，
+    这里证明 API 写进去的确实是真实自然人 —— 两者缺一，链路就有缺口。
+    """
+
+    client = api_client["client"]
+    auth = api_client["bearer"](api_client["admin_token"])
+    r = client.post(
+        "/governance/ops/workflows",
+        headers=auth,
+        json={"source_id": "s-1", "title": "外窗渗漏复核"},
+    )
+    assert r.status_code == 201, r.text
+    wid = r.json()["workflow_id"]
+
+    r2 = client.post(
+        f"/governance/ops/workflows/{wid}/confirm-review",
+        headers=auth,
+        json={"decision": "confirmed", "reason": "现场已核实"},
+    )
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["status"] == "human_confirmed"
+
+    r3 = client.get(f"/governance/ops/workflows/{wid}", headers=auth)
+    assert r3.status_code == 200
+    execs = r3.json()["executions"]
+    assert execs, "人工研判未落执行记录"
+    assert all(e["actor_kind"] == "user" for e in execs)
+    assert all(e["actor"] == api_client["ids"]["gov_admin"] for e in execs)
+
+
+def test_api_cross_org_workflow_is_invisible(api_client):
+    """A 租户登记的工作流，B 租户治理管理员取不到（红线⑤，404 而非 403）。
+
+    这里刻意是 404 不是 403：告诉对方"这条存在但你无权看"本身就是信息
+    泄漏 —— 越权者能借此枚举出别的组织有哪些治理事实。
+    """
+
+    client = api_client["client"]
+    wid = client.post(
+        "/governance/ops/workflows",
+        headers=api_client["bearer"](api_client["admin_token"]),
+        json={"source_id": "s-x", "title": "仅 A 租户可见"},
+    ).json()["workflow_id"]
+
+    r = client.get(
+        f"/governance/ops/workflows/{wid}",
+        headers=api_client["bearer"](api_client["admin_b_token"]),
+    )
+    assert r.status_code == 404
 
 
 # --------------------------------------------------------------------------- #

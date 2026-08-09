@@ -42,6 +42,12 @@
 /backend/app/db/                                    @boip/backend-owners
 /backend/alembic/                                   @boip/backend-owners @boip/governance-owners
 
+# ── 企业身份认证与权限治理（Phase 3.8.28，治理红线延伸区）─────────────────────
+# 身份链路决定「谁有资格对治理事实负责」，任何改动必须由治理负责人评审。
+/backend/app/identity/                             @boip/governance-owners
+/backend/app/api/governance_identity.py             @boip/governance-owners @boip/backend-owners
+/backend/tests/test_governance_identity_security.py @boip/governance-owners
+
 # ── 前端 ───────────────────────────────────────────────────────────────────
 /frontend/                                          @boip/frontend-owners
 # 身份适配层决定「谁能代表人做治理动作」，属治理红线延伸区

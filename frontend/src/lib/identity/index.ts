@@ -10,8 +10,9 @@
  *     requirePermission(identity, "governance:review:confirm");
  *     const headers = await provider.getAuthHeaders();
  *
- * 本阶段交付边界：**只有接口抽象与 fail-closed 闸门**。
- * JWT 验签、SSO 回调、RBAC 真实角色源均属 Phase 3.8.28+ 范畴。
+ * 【3.8.28 交付边界更新】JWT 验签、RBAC 真实角色源已在后端落地，
+ * 前端缺省走 ``backend-session``：凭据来自登录，主体来自 ``GET /governance/me``。
+ * 仍属后续范畴的是 SSO/OIDC 回调与网关模式的真实部署确认。
  */
 
 export {
@@ -28,16 +29,26 @@ export {
   ROLE_PERMISSIONS,
   assertHumanIdentity,
   assertNoForbiddenPermission,
+  assertNoLegacyIdentityHeaders,
   hasPermission,
   normalizePermissions,
   permissionsFromRoles,
   requirePermission,
-  toActorHeaders,
+  toGovernanceHeaders,
 } from "@/lib/identity/guards";
 
+export { BackendSessionIdentityProvider } from "@/lib/identity/providers/backend-session";
 export { GatewayHeaderIdentityProvider } from "@/lib/identity/providers/gateway-header";
 export { JwtIdentityProvider, decodeJwtPayload } from "@/lib/identity/providers/jwt";
 export { StaticDevIdentityProvider } from "@/lib/identity/providers/static-dev";
+
+export {
+  GOVERNANCE_TOKEN_KEY,
+  clearGovernanceToken,
+  readGovernanceToken,
+  sessionTokenSource,
+  writeGovernanceToken,
+} from "@/lib/identity/token-store";
 
 export {
   getIdentityProvider,
@@ -51,6 +62,7 @@ export {
 export {
   ALL_GOVERNANCE_PERMISSIONS,
   FORBIDDEN_PERMISSION_PATTERNS,
+  LEGACY_IDENTITY_HEADERS,
   type ActorKind,
   type AuthScheme,
   type GovernanceIdentity,

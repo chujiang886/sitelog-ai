@@ -3,8 +3,12 @@
 暴露真实责任人（USER）对持久化治理工作流的「登记 / 查看 / 研判确认 / 结果提交 / 闭环」五类操作。
 
 红线（fail-closed，全程）：
-- 所有端点强制真实 USER：请求头 ``x-actor-id`` + ``x-actor-kind: user``，否则 403
-  （红线③/④/⑥：AI 无法自动操作治理流程、无法修改治理状态、无法代替人工）。
+- 所有端点强制真实 USER，且身份**只能**来自 ``Authorization: Bearer <token>``：
+  后端验签 → 回库确认账号仍 active → 重读治理角色 → 判权限（Phase 3.8.28 T3）。
+  3.8.28 之前这里读的是**旧式身份请求头**，任何人都能
+  凭两个自填的头成为"真实责任人"；现在请求里不存在任何可声明身份的字段，
+  携带旧头一律 400（红线③/④/⑥）。
+- 每个端点声明所需治理权限，默认拒绝：无治理角色的合法登录用户同样进不来。
 - 写操作全部经 ``GovernanceWorkflowRepository`` 落库，并由 ``AuditService`` 如实留痕
   （复用 AGENT_GOVERNANCE_WORKFLOW_CREATE/REVIEW/EXECUTION 三类审计；不提供
   record_human_approval，红线②/⑥）。
@@ -21,7 +25,7 @@ import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import FileResponse
@@ -44,10 +48,18 @@ from app.db.repositories.governance_workflow_repository import (  # noqa: E402
     GovernanceRepositoryError,
     GovernanceWorkflowRepository,
 )
+from app.identity import (  # noqa: E402
+    GovernancePermission,
+    GovernancePrincipal,
+    accountability_context,
+    format_accountability,
+    record_accountability,
+    require_governance_permission,
+    require_same_org,
+)
 
 router = APIRouter(prefix="/governance/ops", tags=["governance-human-ops"])
 
-_DEMO_ORG = "demo-org"  # 与 governance_dashboard.py 保持一致的演示组织
 
 # 人工操作界面静态页（仅含人工入口，无任何自动按钮，红线③/④/⑥）。
 _UI_PATH = Path(__file__).resolve().parents[1] / "static" / "governance_human_ui.html"
@@ -56,22 +68,32 @@ _UI_PATH = Path(__file__).resolve().parents[1] / "static" / "governance_human_ui
 # --------------------------------------------------------------------------- #
 # 真实人工门控（红线⑥）                                                        #
 # --------------------------------------------------------------------------- #
-def require_user(
-    x_actor_id: str = Header(..., description="真实责任人 id"),
-    x_actor_kind: str = Header(default="user", description="必须为 user"),
-) -> str:
-    """人工操作 API 仅对真实 USER 开放；AI 或非 user 一律 403。"""
+OrgHeader = Annotated[Optional[str], Header(alias="org-id")]
 
-    if not x_actor_id or x_actor_kind != "user":
-        raise HTTPException(
-            status_code=403,
-            detail="治理人工操作仅对真实责任人（USER）开放；AI 不得越权（红线③/④/⑥）。",
-        )
-    return x_actor_id
+
+def _org(principal: GovernancePrincipal, requested: Optional[str]) -> str:
+    """组织标识以主体为准；客户端只能复述，不能指定（跨组织访问 403）。"""
+
+    return require_same_org(principal, requested or "")
 
 
 def _ts() -> str:
     return datetime.now().isoformat(timespec="seconds")
+
+
+def _view_detail(
+    principal: GovernancePrincipal, *, action: str, resource: str
+) -> str:
+    """只读动作的审计 detail：直接携带责任五元组。
+
+    读动作不另起一条问责记录（读没有"责任后果"，只有"知情范围"），但它同样
+    需要能回答"谁以什么身份看过哪些治理事实" —— 组织内部审查最常问的正是
+    这个。因此把五元组塞进本就要写的 VIEW 审计 detail 里，零额外记录。
+    """
+
+    return format_accountability(
+        accountability_context(principal, action=action, resource=resource)
+    )
 
 
 def _wf_to_dict(rec: GovernanceWorkflowRecord) -> dict:
@@ -155,7 +177,7 @@ class CloseWorkflowRequest(BaseModel):
 def human_operation_ui():
     """返回人工操作界面静态页（仅含人工入口，无自动按钮）。
 
-    页面本身公开可访问（如同登录页），但所有写操作仍须经 API 的 require_user 门控。
+    页面本身公开可访问（如同登录页），但所有读写操作仍须持 Bearer 凭据并通过治理权限校验。
     """
 
     if not _UI_PATH.exists():
@@ -166,12 +188,16 @@ def human_operation_ui():
 @router.post("/workflows", status_code=201)
 def report_workflow(
     body: ReportWorkflowRequest,
-    org_id: str = Header(default=_DEMO_ORG),
-    actor_id: str = Depends(require_user),
+    org_id: OrgHeader = None,
+    principal: GovernancePrincipal = Depends(
+        require_governance_permission(GovernancePermission.WORKFLOW_REPORT)
+    ),
     db=Depends(get_db),
 ):
     """真实人工上报/登记一条治理工作流（status=created）。"""
 
+    actor_id = principal.actor_id
+    org_id = _org(principal, org_id)
     repo = GovernanceWorkflowRepository(db)
     wid = "wf-" + uuid.uuid4().hex[:12]
     rec = GovernanceWorkflowRecord(
@@ -200,18 +226,33 @@ def report_workflow(
         detail=f"title={body.title}",
         ts=_ts(),
     )
+    # T4：责任五元组独立成条，动作名固定，便于一次捞全某人全部治理动作。
+    record_accountability(
+        audit,
+        principal,
+        action="report_workflow",
+        resource=wid,
+        kind="create",
+        detail=f"title={body.title}",
+        record_id="acct-" + uuid.uuid4().hex[:12],
+        ts=_ts(),
+    )
     return {"workflow_id": wid, "status": "created"}
 
 
 @router.get("/workflows")
 def list_workflows(
-    org_id: str = Header(default=_DEMO_ORG),
+    org_id: OrgHeader = None,
     status: Optional[str] = None,
-    actor_id: str = Depends(require_user),
+    principal: GovernancePrincipal = Depends(
+        require_governance_permission(GovernancePermission.WORKFLOW_READ)
+    ),
     db=Depends(get_db),
 ):
     """列出本组织治理工作流（默认排除已归档）。"""
 
+    actor_id = principal.actor_id
+    org_id = _org(principal, org_id)
     repo = GovernanceWorkflowRepository(db)
     rows = repo.list_workflows(org_id, status=status)
     audit = AuditService(org_id=org_id)
@@ -220,6 +261,7 @@ def list_workflows(
         actor_id=actor_id,
         action="list_workflows",
         target=org_id,
+        detail=_view_detail(principal, action="list_workflows", resource=org_id),
         ts=_ts(),
     )
     return [_wf_to_dict(r) for r in rows]
@@ -228,12 +270,16 @@ def list_workflows(
 @router.get("/workflows/{workflow_id}")
 def view_workflow(
     workflow_id: str,
-    org_id: str = Header(default=_DEMO_ORG),
-    actor_id: str = Depends(require_user),
+    org_id: OrgHeader = None,
+    principal: GovernancePrincipal = Depends(
+        require_governance_permission(GovernancePermission.EXECUTION_READ)
+    ),
     db=Depends(get_db),
 ):
     """查看单条工作流及其执行记录（组织隔离）。"""
 
+    actor_id = principal.actor_id
+    org_id = _org(principal, org_id)
     repo = GovernanceWorkflowRepository(db)
     wf = repo.get_workflow(workflow_id, org_id)
     if wf is None:
@@ -245,6 +291,9 @@ def view_workflow(
         actor_id=actor_id,
         action="view_workflow",
         target=workflow_id,
+        detail=_view_detail(
+            principal, action="view_workflow", resource=workflow_id
+        ),
         ts=_ts(),
     )
     return {"workflow": _wf_to_dict(wf), "executions": [_ex_to_dict(e) for e in execs]}
@@ -254,8 +303,10 @@ def view_workflow(
 def confirm_review(
     workflow_id: str,
     body: ConfirmReviewRequest,
-    org_id: str = Header(default=_DEMO_ORG),
-    actor_id: str = Depends(require_user),
+    org_id: OrgHeader = None,
+    principal: GovernancePrincipal = Depends(
+        require_governance_permission(GovernancePermission.REVIEW_CONFIRM)
+    ),
     db=Depends(get_db),
 ):
     """真实人工研判确认（红线③/④/⑥）。
@@ -265,6 +316,8 @@ def confirm_review(
     所有情形都落一条执行记录（actor_kind='user'）。
     """
 
+    actor_id = principal.actor_id
+    org_id = _org(principal, org_id)
     if body.decision not in GOVERNANCE_REVIEW_DECISION_VALUES:
         raise HTTPException(
             status_code=400,
@@ -305,6 +358,16 @@ def confirm_review(
         detail=f"decision={body.decision};reason={body.reason}",
         ts=_ts(),
     )
+    record_accountability(
+        audit,
+        principal,
+        action="confirm_review",
+        resource=workflow_id,
+        kind="review",
+        detail=f"decision={body.decision};reason={body.reason}",
+        record_id="acct-" + uuid.uuid4().hex[:12],
+        ts=_ts(),
+    )
     wf = repo.get_workflow(workflow_id, org_id)
     return {"workflow_id": workflow_id, "status": wf.status if wf else None}
 
@@ -313,8 +376,10 @@ def confirm_review(
 def submit_result(
     workflow_id: str,
     body: SubmitResultRequest,
-    org_id: str = Header(default=_DEMO_ORG),
-    actor_id: str = Depends(require_user),
+    org_id: OrgHeader = None,
+    principal: GovernancePrincipal = Depends(
+        require_governance_permission(GovernancePermission.EXECUTION_SUBMIT)
+    ),
     db=Depends(get_db),
 ):
     """真实人工提交执行结果（红线⑥）。
@@ -322,6 +387,8 @@ def submit_result(
     状态推进到 in_progress（真实人工正在处置）；结果文本落执行记录。
     """
 
+    actor_id = principal.actor_id
+    org_id = _org(principal, org_id)
     repo = GovernanceWorkflowRepository(db)
     try:
         repo.update_status(
@@ -355,6 +422,16 @@ def submit_result(
         detail=f"result={body.result[:120]}",
         ts=_ts(),
     )
+    record_accountability(
+        audit,
+        principal,
+        action="submit_result",
+        resource=workflow_id,
+        kind="execution",
+        detail=f"result={body.result[:120]}",
+        record_id="acct-" + uuid.uuid4().hex[:12],
+        ts=_ts(),
+    )
     wf = repo.get_workflow(workflow_id, org_id)
     return {"workflow_id": workflow_id, "status": wf.status if wf else None}
 
@@ -363,8 +440,10 @@ def submit_result(
 def close_workflow(
     workflow_id: str,
     body: CloseWorkflowRequest,
-    org_id: str = Header(default=_DEMO_ORG),
-    actor_id: str = Depends(require_user),
+    org_id: OrgHeader = None,
+    principal: GovernancePrincipal = Depends(
+        require_governance_permission(GovernancePermission.WORKFLOW_CLOSE)
+    ),
     db=Depends(get_db),
 ):
     """真实人工闭环工作流（→ completed，红线④/⑥）。
@@ -372,6 +451,8 @@ def close_workflow(
     这是人工责任闭环，不是 AI 自动关闭；必须由真实 USER 发起。
     """
 
+    actor_id = principal.actor_id
+    org_id = _org(principal, org_id)
     repo = GovernanceWorkflowRepository(db)
     try:
         repo.close_workflow(workflow_id, org_id, actor_id=actor_id, note=body.note)
@@ -384,6 +465,16 @@ def close_workflow(
         action="close_workflow",
         target=workflow_id,
         detail=f"note={body.note[:120]}",
+        ts=_ts(),
+    )
+    record_accountability(
+        audit,
+        principal,
+        action="close_workflow",
+        resource=workflow_id,
+        kind="execution",
+        detail=f"note={body.note[:120]}",
+        record_id="acct-" + uuid.uuid4().hex[:12],
         ts=_ts(),
     )
     wf = repo.get_workflow(workflow_id, org_id)
