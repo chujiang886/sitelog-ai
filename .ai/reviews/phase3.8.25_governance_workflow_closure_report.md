@@ -118,17 +118,21 @@ CREATED ──submit_for_review──▶ UNDER_REVIEW
 
 ---
 
-## 6. Git Commit 列表（待主理人审核后执行）
+## 6. Git Commit 列表（已执行）
 
 > 仓库异常：BOIP 根 `.git` 当前仅跟踪 `.ai/` 文档（约 282 文件），**整个 `agents/` Python 树未跟踪**。
 > **纪律**：精确 `git add` 仅提交 3.8.25 范畴文件，**绝不 `git add -A`**，不补提交整个未跟踪 `agents/` 树（避免污染历史、绕过 review）。
 
-计划提交（单一逻辑提交，独立 commit）：
+**实际提交**：`b07f3dd`（分支 `feat/phase3.8.25-governance-workflow`）
+- 15 files changed, 9016 insertions(+)
+- 因 `agents/` 整树此前未跟踪，本提交将上述精确路径**新建纳入跟踪**，未波及任何其他文件
+
+已提交文件清单（精确 add）：
 ```
-agents/enterprise/governance_workflow/orchestrator.py
-agents/enterprise/service.py
-agents/enterprise/__init__.py
-tests/agents/test_enterprise_agent_governance_workflow_orchestrator.py
+agents/enterprise/governance_workflow/orchestrator.py   （新增核心）
+agents/enterprise/service.py                            （3.8.24 + 3.8.25 接线）
+agents/enterprise/__init__.py                           （符号导出）
+tests/agents/test_enterprise_agent_governance_workflow_orchestrator.py  （新增 20 用例）
 tests/agents/test_enterprise_agent_quality_governance.py
 tests/agents/test_enterprise_agent_governance_center.py
 tests/agents/test_enterprise_knowledge_intelligence_audit.py
@@ -142,7 +146,7 @@ tests/agents/test_enterprise_agent_governance_knowledge.py
 .ai/reviews/phase3.8.25_governance_workflow_closure_report.md
 ```
 
-提交信息（建议）：
+提交信息：
 ```
 feat(governance): Phase 3.8.25 企业智能体治理工作流编排层（BUILT_NO_GO，停等审核）
 
