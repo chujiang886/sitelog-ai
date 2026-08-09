@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from app.api.governance_dashboard import (
     _build_demo_service,
+    reset_dashboard_service,
     set_dashboard_service,
 )
 
@@ -20,6 +21,15 @@ USER_HEADERS = {"x-actor-id": "governor-1", "x-actor-kind": "user"}
 
 @pytest.fixture
 def client():
+    """每个用例都拿到**全新装配**的驾驶舱服务（Phase 3.8.27 修正）。
+
+    ``_build_demo_service()`` 是进程级单例：不复位就会把上一个用例登记的
+    ``gw-1`` 带进下一个用例，而编排器依红线⑥ 拒绝重复 ``workflow_id``
+    （禁止覆盖既有治理事实），导致夹具从第二个用例起必然报错。这里在 setup
+    与 teardown 两侧显式复位装配 —— 复位的是**服务实例**而非治理事实，红线
+    不被放宽，同时用例之间彻底无顺序依赖。
+    """
+    reset_dashboard_service()
     app = FastAPI()
     # 局部引入以避免触发完整 app.main（含 DB 路由）的副作用。
     from app.api.governance_dashboard import router
@@ -34,6 +44,7 @@ def client():
     set_dashboard_service(svc)
     with TestClient(app) as c:
         yield c
+    reset_dashboard_service()
 
 
 def test_workflows_requires_user_header(client):

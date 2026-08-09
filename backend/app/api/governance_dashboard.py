@@ -52,6 +52,26 @@ def set_dashboard_service(svc: GovernanceDashboardService) -> None:
     _SHARED_SERVICE = svc
 
 
+def reset_dashboard_service() -> None:
+    """清空共享服务与演示实例（Phase 3.8.27 新增的**装配复位**入口）。
+
+    为什么需要它：``_DEMO_SERVICE`` 是进程级单例，一旦某个调用方（典型是测试
+    夹具）向它登记过治理工作流，这些治理事实会**跨调用泄漏**到后续所有使用者
+    身上；而编排器的 ``create_workflow`` 依红线⑥ **拒绝重复 workflow_id**
+    （禁止覆盖既有治理事实），于是第二次登记同一条线索必然失败。
+
+    正确的处理是复位**装配**，而不是放宽红线 —— 治理层宁可让调用方显式重建
+    上下文，也不允许「同一个 id 被悄悄覆盖」。因此本函数只丢弃服务实例引用，
+    **不删除、不改写任何治理事实**（红线⑥）：被丢弃的实例连同其内存态一起被
+    垃圾回收，不存在「抹除已落库留痕」的语义。
+
+    生产路径不调用本函数（服务由 ``EnterpriseOperationLayer`` 注入且长期存活）。
+    """
+    global _SHARED_SERVICE, _DEMO_SERVICE
+    _SHARED_SERVICE = None
+    _DEMO_SERVICE = None
+
+
 def _build_demo_service() -> GovernanceDashboardService:
     global _DEMO_SERVICE
     if _DEMO_SERVICE is None:
