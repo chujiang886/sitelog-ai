@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "note": "BOIP 真实规范来源登记表（Phase 3.3 Sprint 3.3.2 增强）。本文件为规范来源的元数据登记容器，使每条阈值 source_ref 可追溯到权威出处，并支撑 agents/engineering/thresholds/source_ref_validator.py 的 C1-C6 校验。相对 3.3.1 基座，本 Sprint 新增：source_type（来源类型枚举）、source_status（来源版本登记三态 draft/verified_source/deprecated）、mapping_convention（规范来源→ThresholdSourceRef→E-TH 阈值引用映射规则）。本 Sprint 仅完善结构与登记/校验约定，不登记任何真实规范条款参数；所有取值保持 pending_verification，真实规范内容须经人工确认后由正式流程登记。",
+  "c1_c6_support": {
+    "C1_standard": "standard 字段（规范/标准编号）",
+    "C2_clause": "clause_index 字段（本规范可用条款号清单；阈值 source_ref.clause 须落在其中）",
+    "C3_edition": "edition 字段（版本/年号，须为 4 位年份或显式版本标识 vX.Y）",
+    "C4_url": "official_url 字段（须为可公开复核的 http(s) 链接）",
+    "C5_hash": "由 source_ref 引用内容的 sha256 摘要派生（禁止手写，由脚本计算）；本登记表提供标准级元数据，条目级 hash 在录入时填充至 source_ref",
+    "C6_completeness": "C1 + C2 即 agents/engineering/thresholds/schema.py ThresholdSourceRef.is_complete() 语义"
+  },
+  "source_type_enum": {
+    "national_standard": "国家标准（如 GB / GB/T 系列，由国家级标准化机构发布）",
+    "enterprise_standard": "企业标准（门窗企业内控技术条件，须备案可查）",
+    "expert_document": "行业专家技术文档（经签署确认的专家资料，须关联 experts.json 的 expert_id）"
+  },
+  "source_status_enum": {
+    "draft": "规范来源草稿：已登记元数据但尚未经人工来源校验与 hash 登记，不可被阈值 source_ref 引用",
+    "verified_source": "已校验来源：经人工来源校验 + 内容 hash 登记，可作为阈值 source_ref 的可信出处",
+    "deprecated": "已失效来源：被新版本取代或撤销，拒绝被阈值 source_ref 引用，保留供审计与降级展示"
+  },
+  "mapping_convention": {
+    "description": "规范来源(spec_source) → ThresholdSourceRef → E-TH 阈值引用 的映射规则；继续使用 C1-C6 validator。",
+    "source_to_ref": "阈值录入时，由本条 source_id 生成结构化 ThresholdSourceRef：standard←standard、clause←clause_index 中对应条款号、edition←edition、url←official_url、retrieved_at←retrieved_at、hash←该条款内容 sha256 摘要（禁止手写）。",
+    "ref_to_threshold": "E-TH 条目 source_ref 引用某 source_id + 具体 clause；applies_to 标识归属方案（如 wind_pressure）。在 threshold_entry_plan 步骤1 经 build_source_verification_report 对该 ref 做 C1-C6 校验。",
+    "validation": "复用 agents/engineering/thresholds/source_ref_validator.py 的 validate_source_ref；C1-C6 全过方可进入 submit，任一不满足拒绝入库（pending_verification）。",
+    "rule_source_id_unique": "source_id 全局唯一；E-TH source_ref 必须指向 source_status=verified_source 的 source_id。",
+    "rule_clause_in_index": "被引用 clause 必须落在该 source 的 clause_index 清单内（C2 一致性，否则拒绝）。",
+    "rule_status_gating": "仅 verified_source 态 source 可被引用；draft / deprecated 态 source 拒绝被阈值引用。"
+  },
+  "sources": [],
+  "_example_entry": {
+    "source_id": "pending_verification",
+    "source_type": "pending_verification",
+    "standard": "pending_verification",
+    "title": "pending_verification",
+    "publisher": "pending_verification",
+    "edition": "pending_verification",
+    "official_url": "pending_verification",
+    "retrieved_at": "pending_verification",
+    "clause_index": [
+      "pending_verification"
+    ],
+    "source_status": "draft"
+  }
+}

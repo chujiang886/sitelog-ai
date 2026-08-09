@@ -1,0 +1,69 @@
+{
+  "schema_version": 2,
+  "note": "BOIP 专家资料登记表（Phase 3.3 Sprint 3.3.3 增强版）。本文件为可签署真实阈值/授权的专家资料容器，与 agents/engineering/review_log.py 的 signer 标识符体系及 verified.json 双签位（verified_by/expert_verified_by）和 G6 授权位（authorized_by/rollback_owner）对齐。相对 3.3.1 基座（schema_version=1），本 Sprint 新增：domains 专家领域能力模型六枚举（wind_engineering/structure/profile/glass/hardware/installation）、qualification_status 三态枚举（pending/verified/deprecated）、valid_until 资质有效期字段、verification_workflow 资质验证流程（提交→审核→verified→允许签署，禁止自动 verified）、sod_validation_rules SoD 校验规则集。本 Sprint 仅完善结构与流程约定，不登记真实专家身份（姓名/证书号/领域）；所有取值保持 pending_verification，真实专家资料须由人工经正式资质审核流程登记；qualification_status 翻转严禁自动化。",
+  "domains": {
+    "wind_engineering": "风工程领域：可验证风压/风荷载相关阈值与计算假设；对应计算域如 wind_pressure",
+    "structure": "结构领域：可验证门窗结构强度/挠度/连接相关阈值与假定",
+    "profile": "型材领域：可验证型材截面/壁厚/系列相关参数与假定",
+    "glass": "玻璃领域：可验证玻璃类型/厚度/安全相关阈值与假定",
+    "hardware": "五金领域：可验证五金件承载/耐久相关阈值与假定",
+    "installation": "安装领域：可验证安装工艺/锚固/密封相关阈值与假定"
+  },
+  "qualification_status_enum": {
+    "pending": "资质待审核：专家资料已提交但未经人工资质审核；禁止落任何签署位（verified_by/expert_verified_by/authorized_by）",
+    "verified": "资质已核验：经人工资质审核流程确认专家身份与执业资格有效；允许在 sign_scope 覆盖域内签署",
+    "deprecated": "资质已失效：有效期届满（valid_until 过期）或被撤销；立即撤销签署权限，保留审计"
+  },
+  "sod_roles": {
+    "principal": "主理人：可落 verified_by（主理人核准）与 authorized_by（G6 书面授权）；rollback_owner 须另选 principal 以满足 SoD（authorized_by 不等于 rollback_owner）",
+    "expert": "行业专家：可落 expert_verified_by（行业专家复核签）；须不等于 verified_by 主体"
+  },
+  "signer_alignment": {
+    "review_log_signer": "事件链 signer 标识符（principal-xxx / expert-xxx），与本表 expert_id 对应",
+    "verified_by": "主理人核准位（映射 sod_role=principal）",
+    "expert_verified_by": "行业专家复核签位（映射 sod_role=expert）",
+    "authorized_by": "G6 书面授权签署人位（映射 principal，且须不等于 rollback_owner）",
+    "rollback_owner": "回滚责任位（映射 principal，且须不等于 authorized_by）"
+  },
+  "verification_workflow": {
+    "description": "专家资质验证流程：严格人工驱动，AI 仅编排容器与校验，绝不代签/代授权/自动翻转 qualification_status。",
+    "steps": [
+      "submit：人工提交专家资料（expert_id/domains/qualification_ref/sign_scope/sod_role/valid_until），qualification_status 置 pending",
+      "review：人工资质审核（核验身份/执业资格/valid_until 有效性），AI 不介入判断",
+      "verified：审核通过后人工资质审核方将 qualification_status 翻 verified，方可签署",
+      "allow_signing：仅 qualification_status=verified 且 sign_scope 覆盖目标域的专家，允许落对应签署位",
+      "expire_or_revoke：valid_until 到期或主动撤销→翻 deprecated，签署权限立即吊销"
+    ],
+    "invariants": [
+      "qualification_status 翻转严禁自动化：pending→verified 与 verified→deprecated 必须人工显式操作",
+      "AI 不生成真实专家身份：expert_id/qualification_ref 等真实取值由人工提供，AI 仅留 pending_verification 占位",
+      "AI 不代签专家意见：expert_verified_by 由真实专家经正式流程落位",
+      "AI 不代授权：authorized_by（G6）由主理人书面创建"
+    ]
+  },
+  "sod_validation_rules": {
+    "description": "职责分离（SoD）校验规则集：防止同一主体既签署又核准、既授权又回滚，确保 G2/G6 双签与回滚独立性。",
+    "rules": [
+      "R1_expert_verified_by_neq_verified_by：行业专家复核签主体(expert_verified_by)必须不等于主理人核准主体(verified_by)，满足 G2 双签 SoD",
+      "R2_authorized_by_neq_rollback_owner：G6 授权主体(authorized_by)必须不等于回滚责任主体(rollback_owner)，两者均映射 sod_role=principal 且须为不同人",
+      "R3_g6_principal_independent：G6 主体（authorized_by）不得同时是本次审核链的签署专家(expert_verified_by)，确保主理人授权独立",
+      "R4_scope_coverage：落 expert_verified_by 的专家其 sign_scope 必须覆盖被签知识所属 domain，否则拒绝",
+      "R5_status_gate：qualification_status!=verified 的专家禁止落任何签署位",
+      "R6_no_self_approval：同一 expert_id 不得在同一知识条目上既担任 author 又担任 verified_by"
+    ]
+  },
+  "experts": [],
+  "_example_entry": {
+    "expert_id": "pending_verification",
+    "domains": [
+      "pending_verification"
+    ],
+    "qualification_ref": "pending_verification",
+    "sign_scope": [
+      "pending_verification"
+    ],
+    "sod_role": "pending_verification",
+    "valid_until": "pending_verification",
+    "qualification_status": "pending"
+  }
+}
