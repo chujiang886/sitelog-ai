@@ -2,26 +2,28 @@
 
 /**
  * Phase 3.8.26 企业智能体治理驾驶舱 —— 人工操作界面。
+ * Phase 3.8.27 T3 改造：移除硬编码责任人，改为依赖身份适配层（@/lib/identity）。
  *
  * 设计红线（与后端同源，fail-closed）：
- * - 本页面仅面向**真实责任人（USER）**；所有请求携带 x-actor-id / x-actor-kind=user。
+ * - 本页面仅面向**真实责任人（USER）**；请求头由 IdentityProvider 产出，
+ *   而 IdentityProvider 只会为通过 assertHumanIdentity 的人类主体产出头（红线⑥）。
  * - **无自动按钮**：任何确认动作必须人工点击 + 填写理由，AI 绝不代点。
- * - 本页面不持有任何治理状态，只读查询 + 提交人工确认；审批/执行/关闭均由后端编排器
- *   在强制 USER 下推进（后端再次拦截 AI 越权）。
- *
- * 说明：真实责任人身份由网关 / 鉴权层注入请求头；此处演示用责任人（human-only）。
+ * - 本页面不持有任何治理状态，也**不再持有任何身份常量**；只读查询 + 提交人工确认；
+ *   审批/执行/关闭均由后端编排器在强制 USER 下推进（后端再次拦截 AI 越权）。
+ * - 取不到合法身份时页面**不降级**：直接显示错误并禁用一切治理动作。
  */
 
 import { useCallback, useEffect, useState } from "react";
 
+import {
+  getIdentityProvider,
+  hasPermission,
+  requirePermission,
+  type GovernanceIdentity,
+} from "@/lib/identity";
+
 const API_BASE: string =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-
-// 演示用责任人（human-only，actor_kind 必须为 user）。生产由鉴权注入。
-const ACTOR_HEADERS: Record<string, string> = {
-  "x-actor-id": "governor-1",
-  "x-actor-kind": "user",
-};
 
 type GovStatus =
   | "created"
@@ -59,19 +61,28 @@ export default function GovernanceDashboardPage(): JSX.Element {
   const [busyId, setBusyId] = useState<string>("");
   const [reason, setReason] = useState<Record<string, string>>({});
   const [decision, setDecision] = useState<Record<string, Decision>>({});
+  const [identity, setIdentity] = useState<GovernanceIdentity | null>(null);
 
   const load = useCallback(async (): Promise<void> => {
     setError("");
     try {
+      // 身份来自适配层：非人类主体 / 未配置 / 已过期在此处即抛错，页面不降级。
+      const provider = getIdentityProvider();
+      const me = await provider.getIdentity();
+      requirePermission(me, "governance:workflow:read");
+      setIdentity(me);
+
+      const headers = await provider.getAuthHeaders();
       const [wfRes, revRes] = await Promise.all([
-        fetch(`${API_BASE}/governance/workflows`, { headers: ACTOR_HEADERS }),
-        fetch(`${API_BASE}/governance/reviews`, { headers: ACTOR_HEADERS }),
+        fetch(`${API_BASE}/governance/workflows`, { headers }),
+        fetch(`${API_BASE}/governance/reviews`, { headers }),
       ]);
       if (!wfRes.ok) throw new Error(`加载工作流失败（${wfRes.status}）`);
       if (!revRes.ok) throw new Error(`加载待研判失败（${revRes.status}）`);
       setWorkflows((await wfRes.json()) as WorkflowView[]);
       setPending((await revRes.json()) as WorkflowView[]);
     } catch (e) {
+      setIdentity(null);
       setError(e instanceof Error ? e.message : "加载失败");
     }
   }, []);
@@ -84,9 +95,15 @@ export default function GovernanceDashboardPage(): JSX.Element {
     setBusyId(wid);
     setError("");
     try {
+      const provider = getIdentityProvider();
+      const me = await provider.getIdentity();
+      // 写动作前二次校验权限（红线⑥：只有真人且有权者才能提交研判）。
+      requirePermission(me, "governance:review:confirm");
+      const headers = await provider.getAuthHeaders();
+
       const res = await fetch(`${API_BASE}/governance/review/confirm`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...ACTOR_HEADERS },
+        headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({
           workflow_id: wid,
           decision: decision[wid] ?? "confirmed",
@@ -105,6 +122,9 @@ export default function GovernanceDashboardPage(): JSX.Element {
     }
   };
 
+  const canConfirm =
+    identity !== null && hasPermission(identity, "governance:review:confirm");
+
   return (
     <section className="mx-auto max-w-5xl px-6 py-10">
       <p className="text-sm font-medium text-boip-primary-main">治理责任人专属</p>
@@ -112,6 +132,21 @@ export default function GovernanceDashboardPage(): JSX.Element {
       <p className="mt-2 text-sm text-slate-500">
         查看治理线索与事实摘要、研判确认、追踪执行。所有动作均须真实责任人操作，AI 不代点。
       </p>
+
+      {identity ? (
+        <p className="mt-3 text-xs text-slate-500">
+          当前责任人：
+          <span className="font-medium text-slate-700">
+            {identity.displayName ?? identity.actorId}
+          </span>
+          （{identity.actorId}）· 身份来源 {identity.scheme}
+          {identity.roles && identity.roles.length > 0
+            ? ` · 角色 ${identity.roles.join("、")}`
+            : " · 未分配角色"}
+        </p>
+      ) : (
+        <p className="mt-3 text-xs text-slate-400">未取得责任人身份，治理动作已全部禁用。</p>
+      )}
 
       {error ? (
         <p className="mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
@@ -193,7 +228,12 @@ export default function GovernanceDashboardPage(): JSX.Element {
                 />
                 <button
                   type="button"
-                  disabled={busyId === wf.workflow_id}
+                  disabled={busyId === wf.workflow_id || !canConfirm}
+                  title={
+                    canConfirm
+                      ? undefined
+                      : "当前责任人无「提交人工研判」权限（governance:review:confirm）"
+                  }
                   onClick={() => void confirm(wf.workflow_id)}
                   className="mt-2 rounded-md bg-boip-primary-main px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                 >
