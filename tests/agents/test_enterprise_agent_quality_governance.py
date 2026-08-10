@@ -383,17 +383,10 @@ def test_permission_policy_default_deny_data_for_expert() -> None:
 # 类别 7：审计（AGENT_QUALITY / AGENT_EVALUATION / AGENT_FEEDBACK，任务6）
 # ===========================================================================
 
-def test_audit_categories_present_and_count_53() -> None:
-    # 任务6（3.8.15 + 3.8.16）：累计 41 个审计类别；3.8.17 新增 AGENT_POLICY /
-    # AGENT_RUNTIME_CHECK / AGENT_TOOL_ACCESS（+3）→ 44；3.8.18 新增
-    # AGENT_SECURITY_EVENT / AGENT_RISK / AGENT_RISK_REVIEW（+3）→ 累计 47。
-    # （3.8.15 的 AGENT_QUALITY/EVALUATION/FEEDBACK + 3.8.16 的 AGENT_RESOURCE/
-    #  AGENT_COST/AGENT_COST_REPORT，共 +6；3.8.17 +3；3.8.18 +3）
-    # 3.8.19 +3（AGENT_COMPLIANCE_RULE/CHECK/RISK）→ 50；
-    # 3.8.20 +3（AGENT_GOVERNANCE_DASHBOARD/REPORT/INSIGHT）→ 累计 53；
-    # 3.8.21 +3（AGENT_GOVERNANCE_TASK/ACTION/CLOSURE）→ 累计 56；
-    # 3.8.22 +3 → 59；3.8.23 +3 → 62。
-    assert len(list(AuditActionCategory)) == 69
+def test_audit_categories_present() -> None:
+    """本层只对**自己新增的 3 类**负责；总数权威断言唯一保留在
+    ``test_enterprise_knowledge_governance_audit.py``（Phase 3.8.31 Task 9）。
+    """
     for cat in ("AGENT_QUALITY", "AGENT_EVALUATION", "AGENT_FEEDBACK"):
         assert hasattr(AuditActionCategory, cat)
         assert getattr(AuditActionCategory, cat).value in (

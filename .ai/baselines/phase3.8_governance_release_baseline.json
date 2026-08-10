@@ -1,0 +1,440 @@
+{
+  "schema_version": "1.0",
+  "manifest_name": "Phase 3.8 治理发布基线清单（Governance Release Baseline Manifest）",
+  "purpose": "冻结 Phase 3.8 系列在本次收敛点的仓库事实，作为 scripts/check_governance_repository_integrity.py 的唯一事实来源。任何后续漂移必须是显式改基线的动作。",
+  "generated_by": "Phase 3.8.31 Task 8（治理仓库完整性与发布基线收敛层）",
+  "generated_at": "2026-08-10",
+  "git": {
+    "head": "1377e8b",
+    "head_full": "1377e8b3fcbd92f6b0c9c5dd7e8a1b949f8d274a",
+    "head_phase": "3.8.29",
+    "note": "3.8.30 与 3.8.31 产物尚在工作区，未提交；本阶段不执行提交。"
+  },
+  "release_gate": {
+    "status": "BUILT_NO_GO",
+    "engineering_enabled": false,
+    "engineering_approved_emitted": false,
+    "verified_json_modified": false,
+    "authorization": "放行决策仅限主理人在人类终端执行；本基线不构成任何放行依据。"
+  },
+  "audit_category_contract": {
+    "total": 72,
+    "authority_file": "tests/agents/test_enterprise_knowledge_governance_audit.py",
+    "authority_assertion": "assert len(members) == 72",
+    "policy": "全仓仅允许权威文件断言枚举总数；其余各层一律改用存在性契约（子集断言），避免『新增一类就要连改十几处旧测试』的脆性。",
+    "history": "3.8.25 起 68 → 3.8.26 +1(VIEW) = 69 → 3.8.30 +3(TRACE/TIMELINE/REPLAY) = 72",
+    "required_families": {
+      "governance_traceability_3_8_30": [
+        "GOVERNANCE_TRACE",
+        "GOVERNANCE_TIMELINE",
+        "GOVERNANCE_REPLAY"
+      ],
+      "governance_workflow": [
+        "AGENT_GOVERNANCE_WORKFLOW_CREATE",
+        "AGENT_GOVERNANCE_WORKFLOW_REVIEW",
+        "AGENT_GOVERNANCE_WORKFLOW_EXECUTION",
+        "AGENT_GOVERNANCE_WORKFLOW_VIEW"
+      ],
+      "governance_accountability_3_8_21": [
+        "AGENT_GOVERNANCE_TASK",
+        "AGENT_GOVERNANCE_ACTION",
+        "AGENT_GOVERNANCE_CLOSURE"
+      ],
+      "governance_center_3_8_20": [
+        "AGENT_GOVERNANCE_DASHBOARD",
+        "AGENT_GOVERNANCE_REPORT",
+        "AGENT_GOVERNANCE_INSIGHT"
+      ],
+      "compliance_3_8_19": [
+        "AGENT_COMPLIANCE_RULE",
+        "AGENT_COMPLIANCE_CHECK",
+        "AGENT_COMPLIANCE_RISK"
+      ],
+      "security_risk_3_8_18": [
+        "AGENT_SECURITY_EVENT",
+        "AGENT_RISK",
+        "AGENT_RISK_REVIEW"
+      ]
+    }
+  },
+  "test_baseline": {
+    "measured_at": "2026-08-10",
+    "python": "backend/.venv/bin/python (3.11)",
+    "suites": [
+      {
+        "suite": "tests/agents",
+        "command": "backend/.venv/bin/python -m pytest tests/agents -q",
+        "passed": 2230,
+        "failed": 0,
+        "duration_s": 14.0
+      },
+      {
+        "suite": "backend/tests",
+        "command": "cd backend && .venv/bin/python -m pytest tests -q",
+        "passed": 292,
+        "failed": 0,
+        "duration_s": 21.2
+      }
+    ],
+    "total_passed": 2522,
+    "total_failed": 0,
+    "note": "3.8.29 收口时记录的 backend「291 passed / 1 failed（继承债）」已由 3.8.31 Task 9 清零；threshold 系列历史 hygiene 债亦已清理，全绿无跳过。Task 11 红线复核修正：先前记录的 2190/2482 未计入 Task 9 检查器自检 33 例，复核当日补测 40 例（33 自检 + 7 别名漏网回归守卫），实跑 2230 + 292 = 2522。"
+  },
+  "ssot": {
+    "file": ".ai/project_status.json",
+    "roadmap": ".ai/roadmap_v8.md",
+    "phase_key_overrides": {
+      "0": "phase_3_8_status"
+    },
+    "backfilled_in_3_8_31": [
+      "3.8.10",
+      "3.8.11",
+      "3.8.12",
+      "3.8.13",
+      "3.8.14",
+      "3.8.15",
+      "3.8.16",
+      "3.8.27",
+      "3.8.28",
+      "3.8.29"
+    ],
+    "backfill_rationale": "上述阶段均已产出收口报告（27/28/29 且已提交进历史），但 SSOT 此前无任何登记。按主理人裁决原编号归位，不重编号、不覆盖历史。"
+  },
+  "phase_registry": [
+    {
+      "phase": "3.8.0",
+      "name": "Enterprise Operation Layer",
+      "status": "ENTERPRISE_OPERATION_LAYER_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_status",
+      "reports": [
+        ".ai/reviews/phase3.8.0_enterprise_operation_layer_report.md"
+      ],
+      "note": "历史命名例外：状态键无编号后缀"
+    },
+    {
+      "phase": "3.8.1",
+      "name": "Enterprise Access & Permission Intelligence Layer",
+      "status": "ENTERPRISE_ACCESS_INTELLIGENCE_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_1_status",
+      "reports": [
+        ".ai/reviews/phase3.8.1_access_permission_intelligence_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.2",
+      "name": "Enterprise Collaboration Task Workflow Layer",
+      "status": "ENTERPRISE_COLLAB_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_2_status",
+      "reports": [
+        ".ai/reviews/phase3.8.2_collaboration_task_workflow_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.3",
+      "name": "Enterprise Workflow Template & Automation Layer",
+      "status": "ENTERPRISE_WORKFLOW_TEMPLATE_AUTOMATION_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_3_status",
+      "reports": [
+        ".ai/reviews/phase3.8.3_workflow_template_automation_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.4",
+      "name": "Enterprise Analytics Intelligence Layer",
+      "status": "ENTERPRISE_ANALYTICS_INTELLIGENCE_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_4_status",
+      "reports": [
+        ".ai/reviews/phase3.8.4_enterprise_analytics_intelligence_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.5",
+      "name": "Enterprise Dashboard Layer",
+      "status": "ENTERPRISE_DASHBOARD_LAYER_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_5_status",
+      "reports": [
+        ".ai/reviews/phase3.8.5_enterprise_dashboard_layer_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.6",
+      "name": "Enterprise Data Intelligence Layer",
+      "status": "ENTERPRISE_DATA_INTELLIGENCE_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_6_status",
+      "reports": [
+        ".ai/reviews/phase3.8.6_data_intelligence_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.7",
+      "name": "Enterprise Knowledge Feedback & Improvement Layer",
+      "status": "ENTERPRISE_KNOWLEDGE_FEEDBACK_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_7_status",
+      "reports": [
+        ".ai/reviews/phase3.8.7_knowledge_feedback_improvement_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.8",
+      "name": "Enterprise Knowledge Governance & Version Control Layer",
+      "status": "ENTERPRISE_KNOWLEDGE_GOVERNANCE_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_8_status",
+      "reports": [
+        ".ai/reviews/phase3.8.8_knowledge_governance_version_control_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.9",
+      "name": "Enterprise Knowledge Intelligence & Retrieval Layer",
+      "status": "ENTERPRISE_KNOWLEDGE_INTELLIGENCE_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_9_status",
+      "reports": [
+        ".ai/reviews/phase3.8.9_knowledge_intelligence_retrieval_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.10",
+      "name": "Enterprise Knowledge Agent Orchestration Layer",
+      "status": "ENTERPRISE_KNOWLEDGE_AGENT_ORCHESTRATION_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_10_status",
+      "reports": [
+        ".ai/reviews/phase3.8.10_knowledge_agent_orchestration_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.11",
+      "name": "Enterprise Knowledge Conversation & Memory Layer",
+      "status": "ENTERPRISE_KNOWLEDGE_CONVERSATION_MEMORY_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_11_status",
+      "reports": [
+        ".ai/reviews/phase3.8.11_knowledge_conversation_memory_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.12",
+      "name": "Enterprise Knowledge Task Planning & Multi-Agent Workflow Layer",
+      "status": "ENTERPRISE_KNOWLEDGE_TASK_PLANNING_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_12_status",
+      "reports": [
+        ".ai/reviews/phase3.8.12_knowledge_task_planning_multi_agent_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.13",
+      "name": "Enterprise Agent Capability Registry & Governance Layer",
+      "status": "ENTERPRISE_AGENT_GOVERNANCE_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_13_status",
+      "reports": [
+        ".ai/reviews/phase3.8.13_agent_registry_governance_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.14",
+      "name": "Enterprise Agent Observability & Performance Intelligence Layer",
+      "status": "ENTERPRISE_AGENT_OBSERVABILITY_PERFORMANCE_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_14_status",
+      "reports": [
+        ".ai/reviews/phase3.8.14_agent_observability_performance_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.15",
+      "name": "Enterprise Agent Evaluation & Quality Governance Layer",
+      "status": "ENTERPRISE_AGENT_QUALITY_GOVERNANCE_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_15_status",
+      "reports": [
+        ".ai/reviews/phase3.8.15_agent_quality_governance_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.16",
+      "name": "Enterprise Agent Cost & Resource Intelligence Layer",
+      "status": "ENTERPRISE_AGENT_COST_RESOURCE_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_16_status",
+      "reports": [
+        ".ai/reviews/phase3.8.16_agent_cost_resource_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.17",
+      "name": "Enterprise Agent Runtime Policy Governance Layer",
+      "status": "ENTERPRISE_AGENT_RUNTIME_GOVERNANCE_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_17_status",
+      "reports": [
+        ".ai/reviews/phase3.8.17_agent_runtime_policy_governance_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.18",
+      "name": "Enterprise Agent Security & Risk Governance Layer",
+      "status": "ENTERPRISE_AGENT_SECURITY_RISK_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_18_status",
+      "reports": [
+        ".ai/reviews/phase3.8.18_agent_security_risk_governance_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.19",
+      "name": "Enterprise Agent Compliance & Audit Intelligence Layer",
+      "status": "ENTERPRISE_AGENT_COMPLIANCE_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_19_status",
+      "reports": [
+        ".ai/reviews/phase3.8.19_agent_compliance_audit_report.md"
+      ],
+      "ssot_detail_key": "phase_3_8_19"
+    },
+    {
+      "phase": "3.8.20",
+      "name": "Enterprise Agent Governance Intelligence & Control Center Layer",
+      "status": "ENTERPRISE_AGENT_GOVERNANCE_CENTER_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_20_status",
+      "reports": [
+        ".ai/reviews/phase3.8.20_agent_governance_control_center_report.md"
+      ],
+      "ssot_detail_key": "phase_3_8_20"
+    },
+    {
+      "phase": "3.8.21",
+      "name": "Enterprise Agent Governance Workflow & Accountability Layer",
+      "status": "ENTERPRISE_AGENT_GOVERNANCE_WORKFLOW_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_21_status",
+      "reports": [
+        ".ai/reviews/phase3.8.21_agent_governance_workflow_accountability_report.md"
+      ],
+      "ssot_detail_key": "phase_3_8_21"
+    },
+    {
+      "phase": "3.8.22",
+      "name": "Enterprise Agent Governance Knowledge & Improvement Layer",
+      "status": "ENTERPRISE_AGENT_GOVERNANCE_KNOWLEDGE_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_22_status",
+      "reports": [
+        ".ai/reviews/phase3.8.22_agent_governance_knowledge_improvement_report.md"
+      ],
+      "ssot_detail_key": "phase_3_8_22"
+    },
+    {
+      "phase": "3.8.23",
+      "name": "Enterprise Agent Governance Knowledge Retrieval Layer",
+      "status": "ENTERPRISE_AGENT_GOVERNANCE_KNOWLEDGE_RETRIEVAL_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_23_status",
+      "reports": [
+        ".ai/reviews/phase3.8.23_agent_governance_knowledge_retrieval_report.md"
+      ],
+      "ssot_detail_key": "phase_3_8_23"
+    },
+    {
+      "phase": "3.8.24",
+      "name": "Enterprise Agent Governance Knowledge Assistant Layer",
+      "status": "ENTERPRISE_AGENT_GOVERNANCE_ASSISTANT_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_24_status",
+      "reports": [
+        ".ai/reviews/phase3.8.24_agent_governance_knowledge_assistant_report.md"
+      ],
+      "ssot_detail_key": "phase_3_8_24"
+    },
+    {
+      "phase": "3.8.25",
+      "name": "Enterprise Agent Governance Workflow Orchestration Layer",
+      "status": "ENTERPRISE_AGENT_GOVERNANCE_WORKFLOW_ORCHESTRATION_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_25_status",
+      "reports": [
+        ".ai/reviews/phase3.8.25_governance_workflow_closure_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.26",
+      "name": "Enterprise Agent Governance Persistence & Human Operation Interface Layer",
+      "status": "ENTERPRISE_AGENT_GOVERNANCE_PERSISTENCE_HUMAN_OPERATION_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_26_status",
+      "reports": [
+        ".ai/reviews/phase3.8.26_governance_dashboard_closure_report.md",
+        ".ai/reviews/phase3.8.26_persistence_human_operation_closure_report.md"
+      ]
+    },
+    {
+      "phase": "3.8.27",
+      "name": "Enterprise Governance Infrastructure Consolidation Layer",
+      "status": "ENTERPRISE_GOVERNANCE_INFRASTRUCTURE_CONSOLIDATION_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_27_status",
+      "reports": [
+        ".ai/reviews/phase3.8.27_governance_infrastructure_closure_report.md"
+      ],
+      "commit": "7384b00",
+      "ssot_detail_key": "phase_3_8_27"
+    },
+    {
+      "phase": "3.8.28",
+      "name": "Enterprise Identity & Permission Governance Implementation Layer",
+      "status": "ENTERPRISE_IDENTITY_PERMISSION_GOVERNANCE_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_28_status",
+      "reports": [
+        ".ai/reviews/phase3.8.28_enterprise_identity_closure_report.md"
+      ],
+      "commit": "f10c5dc",
+      "ssot_detail_key": "phase_3_8_28"
+    },
+    {
+      "phase": "3.8.29",
+      "name": "Enterprise Production Security & Deployment Hardening",
+      "status": "ENTERPRISE_PRODUCTION_SECURITY_HARDENING_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_29_status",
+      "reports": [
+        ".ai/reviews/phase3.8.29_production_security_closure_report.md"
+      ],
+      "commit": "1377e8b",
+      "ssot_detail_key": "phase_3_8_29"
+    },
+    {
+      "phase": "3.8.30",
+      "name": "Enterprise Agent Governance Traceability & Unified Audit Intelligence Layer",
+      "status": "ENTERPRISE_AGENT_GOVERNANCE_TRACEABILITY_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_30_status",
+      "reports": [
+        ".ai/reviews/phase3.8.30_governance_traceability_audit_report.md"
+      ],
+      "ssot_detail_key": "phase_3_8_30"
+    },
+    {
+      "phase": "3.8.31",
+      "name": "Governance Repository Integrity & Release Baseline Convergence Layer",
+      "status": "GOVERNANCE_REPOSITORY_INTEGRITY_RELEASE_BASELINE_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_8_31_status",
+      "reports": [
+        ".ai/reviews/phase3.8.31_repository_integrity_release_baseline_closure_report.md"
+      ],
+      "ssot_detail_key": "phase_3_8_31"
+    }
+  ],
+  "known_notes": [
+    {
+      "topic": "3.8.26 双报告",
+      "detail": "同一阶段的两个批次：批次 A phase3.8.26_governance_dashboard_closure_report.md（治理驾驶舱，只读 + 单一人工确认入口）；批次 B phase3.8.26_persistence_human_operation_closure_report.md（持久化 + 人工操作界面，明确引用批次 A）。非编号冲突。"
+    },
+    {
+      "topic": "3.8.27 编号双义",
+      "detail": "3.8.27 真名为『企业治理基础设施收敛层』。代码中曾有 8 处把追踪层（GOVERNANCE_TRACE/TIMELINE/REPLAY）误标为 3.8.27，已在 3.8.31 Task 13 修正为 3.8.30；governance_workflow/ 包内的 3.8.27 引用是正确的，未改。"
+    },
+    {
+      "topic": "3.8.30 编号裁决",
+      "detail": "主理人已裁决追踪层记为 3.8.30，禁止重改该裁决。"
+    },
+    "Task 11 红线复核实战发现：规则 4（审计总数断言唯一）初版仅识别裸变量 members 与 list(AuditActionCategory)，致 tests/agents/test_enterprise_governance_workflow_orchestration.py 中 `cats = {c.value for c in AuditActionCategory}` + `assert len(cats) == 72` 漏网，且该用例名 test_audit_category_count_still_68 与实际断言 72 自相矛盾。已双修：①该处改存在性契约并更名 test_workflow_audit_categories_registered；②检查器补 _enum_full_set_aliases() 识别枚举全集别名，新增 7 条双向自检（含 4 种别名变体 + 2 条误报守卫）。"
+  ],
+  "integrity_invariants": [
+    "每个有收口报告的 3.8.x 阶段，SSOT 必须有状态登记",
+    "SSOT 声明的 report 路径必须真实存在",
+    "审计枚举总数断言全仓唯一，且位于 authority_file",
+    "审计枚举实际总数必须等于本基线 audit_category_contract.total",
+    "required_families 声明的审计大类必须全部存在",
+    "agents/config.yaml 中 engineering_enabled 必须为 false",
+    "agents/ 与 backend/app/ 源码不得正向产出 engineering_approved",
+    "同一阶段编号在 SSOT 与本基线之间状态必须一致"
+  ],
+  "pending_verification": [
+    "真实生产部署与真实企业身份目录接入",
+    "verified.json 真实化（本阶段未触碰）",
+    "engineering_enabled 开启（仅人类终端可执行）",
+    "3.8.30 / 3.8.31 产物的提交边界（本阶段只规划、不提交）"
+  ]
+}

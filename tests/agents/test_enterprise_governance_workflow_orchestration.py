@@ -596,13 +596,21 @@ class TestHumanConfirmation:
 
 
 # ---------------------------------------------------------------------------
-# 任务6-⑦：审计记录（3 类 WORKFLOW_CREATE/REVIEW/EXECUTION 落库、计数 68）
+# 任务6-⑦：审计记录（3 类 WORKFLOW_CREATE/REVIEW/EXECUTION 落库）
 # ---------------------------------------------------------------------------
 
 class TestAuditRecords:
-    def test_audit_category_count_still_68(self) -> None:
+    def test_workflow_audit_categories_registered(self) -> None:
+        """本层只断言三类工作流审计大类在册（存在性契约）。
+
+        Phase 3.8.31 Task 9：此处原有 ``assert len(cats) == 69`` 的总数硬断言，
+        且函数名写死 ``still_68``——每新增一类审计大类都要回来改一次，名字还会与
+        实际数字脱节（本次复核时名为 68、断言已是 72，名字在撒谎）。总数权威已
+        统一收敛到 ``tests/agents/test_enterprise_knowledge_governance_audit.py``
+        （``EXPECTED_CATEGORIES`` + ``assert len(members) == 72``），此处只断言
+        本层真正依赖的三类是否存在，断言强度不减、脆性归零。
+        """
         cats = {c.value for c in AuditActionCategory}
-        assert len(cats) == 69
         for v in (
             "agent_governance_workflow_create",
             "agent_governance_workflow_review",

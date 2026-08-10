@@ -23,6 +23,7 @@ engineering_approved。全部保持 pending_verification。
 from __future__ import annotations
 
 import json
+import tempfile
 from pathlib import Path
 
 from agents.config_loader import load_engineering_enabled
@@ -76,11 +77,21 @@ def _request(tid: str, *, source_ref: dict[str, str] | None = None) -> IntakeReq
     )
 
 
+# Phase 3.8.31 T7（threshold hygiene 技术债根因修复）：
+# 历史实现把录入临时件写在 `tests/` 源码目录（`tests/_tmp_intake_*.json`、
+# `tests/intake_snapshots/` 等），既污染仓库工作树，又会在清理阶段对 `tests/`
+# 批量 unlink 时触发执行环境的批量删除护栏而中断。此处做根因隔离：临时件全部
+# 迁出仓库到进程级系统临时根目录。`ThresholdIntakeWorkflow` 默认 snapshot_dir
+# 取 `verified_path.parent / "intake_snapshots"`，故快照目录自动跟随迁出。
+# 不使用 skip/xfail，不改动被测业务逻辑，断言强度保持不变。
+_TMP_ROOT = Path(tempfile.mkdtemp(prefix="boip_threshold_intake_"))
+
+
 def _new_workflow() -> tuple[ThresholdIntakeWorkflow, Path, Path]:
     """返回工作流实例 + 临时 verified 路径 + 临时 review_log 路径。"""
 
-    verified = Path(f"tests/_tmp_intake_{_uniq()}.json")
-    review = Path(f"tests/_tmp_intake_log_{_uniq()}.jsonl")
+    verified = _TMP_ROOT / f"_tmp_intake_{_uniq()}.json"
+    review = _TMP_ROOT / f"_tmp_intake_log_{_uniq()}.jsonl"
     return (
         ThresholdIntakeWorkflow(
             verified_path=verified,
@@ -102,7 +113,7 @@ def _cleanup(*paths: Path) -> None:
     for p in paths:
         if p.is_file():
             p.unlink()
-    snap = Path("tests/intake_snapshots")
+    snap = _TMP_ROOT / "intake_snapshots"
     if snap.is_dir():
         for f in snap.iterdir():
             f.unlink()
@@ -326,8 +337,8 @@ def test_intake_output_v2_and_migration_noop() -> None:
         assert loaded["E-TH-03"]["verified"] is True
 
         # 喂入迁移工具 → 已 v2 → noop（结构升级能力兼容）。
-        out_tmp = Path(f"tests/_tmp_intake_mig_{_uniq()}.json")
-        snap_dir = Path(f"tests/_tmp_intake_snap_{_uniq()}")
+        out_tmp = _TMP_ROOT / f"_tmp_intake_mig_{_uniq()}.json"
+        snap_dir = _TMP_ROOT / f"_tmp_intake_snap_{_uniq()}"
         try:
             report = migrate_thresholds(verified, out_tmp, snapshot_dir=snap_dir)
             assert report.status == MIGRATION_STATUS_NOOP

@@ -436,13 +436,10 @@ def test_permission_policy_default_deny_cost_data_for_expert() -> None:
 # 类别 7：审计（AGENT_RESOURCE / AGENT_COST / AGENT_COST_REPORT，任务6）
 # ===========================================================================
 
-def test_audit_categories_present_and_count_53() -> None:
-    # 任务6（3.8.16 → 41；3.8.17 +3 → 44；3.8.18 +3 → 47；
-    # 3.8.19 +3（agent_compliance_rule/check/risk）→ 50；
-    # 3.8.20 +3（agent_governance_dashboard/report/insight）→ 53；
-    # 3.8.21 +3（agent_governance_task/action/closure）→ 累计 56；
-    # 3.8.22 +3 → 59；3.8.23 +3 → 62。
-    assert len(list(AuditActionCategory)) == 69
+def test_audit_categories_present() -> None:
+    """本层只对**自己新增的 3 类**负责；总数权威断言唯一保留在
+    ``test_enterprise_knowledge_governance_audit.py``（Phase 3.8.31 Task 9）。
+    """
     for cat in ("AGENT_RESOURCE", "AGENT_COST", "AGENT_COST_REPORT"):
         assert hasattr(AuditActionCategory, cat)
         assert getattr(AuditActionCategory, cat).value in (

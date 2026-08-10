@@ -3077,6 +3077,13 @@
   "phase_3_8_7_status": "ENTERPRISE_KNOWLEDGE_FEEDBACK_BUILT_NO_GO",
   "phase_3_8_8_status": "ENTERPRISE_KNOWLEDGE_GOVERNANCE_BUILT_NO_GO",
   "phase_3_8_9_status": "ENTERPRISE_KNOWLEDGE_INTELLIGENCE_BUILT_NO_GO",
+  "phase_3_8_10_status": "ENTERPRISE_KNOWLEDGE_AGENT_ORCHESTRATION_BUILT_NO_GO",
+  "phase_3_8_11_status": "ENTERPRISE_KNOWLEDGE_CONVERSATION_MEMORY_BUILT_NO_GO",
+  "phase_3_8_12_status": "ENTERPRISE_KNOWLEDGE_TASK_PLANNING_BUILT_NO_GO",
+  "phase_3_8_13_status": "ENTERPRISE_AGENT_GOVERNANCE_BUILT_NO_GO",
+  "phase_3_8_14_status": "ENTERPRISE_AGENT_OBSERVABILITY_PERFORMANCE_BUILT_NO_GO",
+  "phase_3_8_15_status": "ENTERPRISE_AGENT_QUALITY_GOVERNANCE_BUILT_NO_GO",
+  "phase_3_8_16_status": "ENTERPRISE_AGENT_COST_RESOURCE_BUILT_NO_GO",
   "phase_3_8_17_status": "ENTERPRISE_AGENT_RUNTIME_GOVERNANCE_BUILT_NO_GO",
   "phase_3_8_18_status": "ENTERPRISE_AGENT_SECURITY_RISK_BUILT_NO_GO",
   "phase_3_8_19_status": "ENTERPRISE_AGENT_COMPLIANCE_BUILT_NO_GO",
@@ -3087,6 +3094,11 @@
   "phase_3_8_24_status": "ENTERPRISE_AGENT_GOVERNANCE_ASSISTANT_BUILT_NO_GO",
   "phase_3_8_25_status": "ENTERPRISE_AGENT_GOVERNANCE_WORKFLOW_ORCHESTRATION_BUILT_NO_GO",
   "phase_3_8_26_status": "ENTERPRISE_AGENT_GOVERNANCE_PERSISTENCE_HUMAN_OPERATION_BUILT_NO_GO",
+  "phase_3_8_27_status": "ENTERPRISE_GOVERNANCE_INFRASTRUCTURE_CONSOLIDATION_BUILT_NO_GO",
+  "phase_3_8_28_status": "ENTERPRISE_IDENTITY_PERMISSION_GOVERNANCE_BUILT_NO_GO",
+  "phase_3_8_29_status": "ENTERPRISE_PRODUCTION_SECURITY_HARDENING_BUILT_NO_GO",
+  "phase_3_8_30_status": "ENTERPRISE_AGENT_GOVERNANCE_TRACEABILITY_BUILT_NO_GO",
+  "phase_3_8_31_status": "GOVERNANCE_REPOSITORY_INTEGRITY_RELEASE_BASELINE_BUILT_NO_GO",
   "phase_3_8_19": {
     "phase": "3.8.19",
     "name": "Enterprise Agent Compliance & Audit Intelligence Layer（企业智能体合规与审计智能层）",
@@ -3109,7 +3121,11 @@
       "AGENT_COMPLIANCE_RISK"
     ],
     "forbidden_names_count": 80,
-    "compliance_check_result_values": ["pass", "attention", "not_applicable"],
+    "compliance_check_result_values": [
+      "pass",
+      "attention",
+      "not_applicable"
+    ],
     "no_verdict_semantics": true,
     "human_only_nodes": [
       "confirm_rule_active",
@@ -3391,6 +3407,408 @@
       "verified.json 真实化",
       "engineering_enabled 开启",
       "真实工程参数 / 报价 / 自动审批"
+    ]
+  },
+  "phase_3_8_25": {
+    "phase": "3.8.25",
+    "name": "Enterprise Agent Governance Workflow Orchestration Layer（企业智能体治理工作流编排层）",
+    "status": "ENTERPRISE_AGENT_GOVERNANCE_WORKFLOW_ORCHESTRATION_BUILT_NO_GO",
+    "identity": "BOIP AI Chief Architect",
+    "branch": "feat/phase3.8.25-governance-workflow",
+    "objective": "把治理链路「问题发现 → 事实辅助分析 → 人工研判 → 治理任务创建 → 执行跟踪 → 结果归档 → 审计闭环」串成可追踪、可审计、AI 不可越权的工作流流水线",
+    "core_module": "agents/enterprise/governance_workflow/orchestrator.py",
+    "core_module_scale_at_closure": "570 行 / 18 方法（注：Phase 3.8.27 T1 统一双实现后扩展为 1394 行）",
+    "state_machine": "六态机（仅前进，无回退）：CREATED → UNDER_REVIEW → HUMAN_CONFIRMED → IN_PROGRESS → WAITING_RESULT → COMPLETED（归档 archived=true）；无 AUTO_APPROVED/AUTO_EXECUTED/AUTO_CLOSED 态；非法/回退迁移直接拒绝；终态不可再转",
+    "audit_categories_delta": "65 → 68（+agent_governance_workflow_create/review/execution）；10 个既有测试断言同步",
+    "test_result": "新增 20 用例全绿；全 agents 套件零回归",
+    "red_lines": {
+      "engineering_enabled": "恒 false（autouse fixture 锁 load_engineering_enabled→False，构造经 safety_invariants_ok()）",
+      "engineering_approved": "未输出",
+      "no_ai_auto_governance": "human_confirm/start_execution/submit_execution_result 强制 require_human_actor(USER)；reviewer_kind 非 USER 抛 EnterpriseRedLineViolationError",
+      "no_auto_state": "禁名含 auto_approve/auto_execute/auto_close_workflow/generate_policy/decide_workflow"
+    },
+    "report": ".ai/reviews/phase3.8.25_governance_workflow_closure_report.md",
+    "roadmap_ref": ".ai/roadmap_v8.md §28",
+    "verified_json_modified": false,
+    "engineering_enabled_modified": false,
+    "stop": "已 STOP，不进入 Phase 3.8.26，等待主理人审核授权",
+    "ssot_backfilled_by": "Phase 3.8.31 Task 11（本阶段状态串此前已登记，但缺少阶段档案 dict；档案 dict 自 3.8.19 起为登记约定，此处据 roadmap §28 与收口报告实证补齐，不新增任何未经证实的事实）",
+    "pending_verification": [
+      "真实治理工作流与人工研判证据",
+      "verified.json 真实化",
+      "engineering_enabled 开启"
+    ]
+  },
+  "phase_3_8_26": {
+    "phase": "3.8.26",
+    "name": "Enterprise Agent Governance Persistence & Human Operation Interface Layer（企业智能体治理持久化与人工操作界面层）",
+    "status": "ENTERPRISE_AGENT_GOVERNANCE_PERSISTENCE_HUMAN_OPERATION_BUILT_NO_GO",
+    "identity": "BOIP AI Chief Architect",
+    "batch_structure": "本阶段分两批次交付，各出一份收口报告；批次 B 明确引用批次 A，二者为同一阶段的先后批次，非编号冲突",
+    "batch_a": {
+      "name": "治理驾驶舱与人工操作界面层（只读 + 单确认入口）",
+      "branch": "feat/phase3.8.26-governance-dashboard",
+      "core_module": "agents/enterprise/governance_dashboard/service.py（GovernanceDashboardService，377 行，只读查询 + confirm_review 单写入口）",
+      "forbidden_count": "176 项（= 3.8.25 编排层 166 ∪ 本层 17 增量）",
+      "api": "backend/app/api/governance_dashboard.py（/governance/*：GET 5 + POST 1，强制 x-actor-kind:user 否则 403）",
+      "ui": "frontend/src/app/governance-dashboard/page.tsx（待研判卡片 + 人工确认表单，无自动按钮）",
+      "test_result": "tests/agents/test_enterprise_governance_dashboard.py 19 用例 + backend/tests/test_governance_dashboard.py 6 用例",
+      "report": ".ai/reviews/phase3.8.26_governance_dashboard_closure_report.md"
+    },
+    "batch_b": {
+      "name": "治理持久化与人工操作界面层（落库 + 人工操作 API + 人工 UI + 审计增强）",
+      "branch": "feat/phase3.8.26-governance-persistence",
+      "orm": "backend/app/db/models/governance_workflow.py（WorkflowORM/ExecutionRecordORM/ReviewORM/AssignmentORM/ClosureReportORM）",
+      "db_check_constraints": "三道 CHECK：status 六态白名单 / requires_human_confirmation IN (1,true) 恒真 / actor_kind='user' 恒真",
+      "migration": "backend/alembic/versions/3826a1b2c3d4_phase3_8_26_governance_persistence.py",
+      "repository": "backend/app/db/repositories/governance_workflow_repository.py（Repository 为系统记录源；require_human_actor + OrgScopeError 组织隔离）",
+      "api": "backend/app/api/governance_operations.py（require_user，非 user→403；无 auto_* 写入口）",
+      "ui": "backend/app/static/governance_human_ui.html（human-only，无自动提交）",
+      "audit_categories_delta": "68 → 69（+agent_governance_workflow_view）+ 4 个 record 方法",
+      "report": ".ai/reviews/phase3.8.26_persistence_human_operation_closure_report.md"
+    },
+    "defense_in_depth": "三层：API 层 require_user→403；Repository 层 require_human_actor(USER)+OrgScopeError；DB 层三道 CHECK 结构级兜底",
+    "test_result": "全 agents 套件 2069 passed / 0 failed（清洁运行，先删 _tmp_drill_* 历史阈值债文件，零回归）；T8 八类 fail-closed 10/10 通过",
+    "red_lines": {
+      "engineering_enabled": "false（agents/config.yaml:102 未变）",
+      "engineering_approved": "未输出（仅负向声明）",
+      "no_auto_write_entry": "无 auto_confirm/auto_execute/auto_close/auto_assign 等 auto_* 入口（grep 0 命中）"
+    },
+    "roadmap_ref": ".ai/roadmap_v8.md §29",
+    "verified_json_modified": false,
+    "engineering_enabled_modified": false,
+    "stop": "已 STOP，不进入 Phase 3.8.27，等待主理人审核授权",
+    "ssot_backfilled_by": "Phase 3.8.31 Task 11（本阶段状态串此前已登记，但缺少阶段档案 dict；据 roadmap §29 与两份收口报告实证补齐，并在此正式消歧双报告为批次 A/B，非编号冲突）",
+    "pending_verification": [
+      "真实治理证据（责任人 USER 身份、组织归属）",
+      "verified.json 真实化",
+      "engineering_enabled 开启"
+    ]
+  },
+  "phase_3_8_27": {
+    "phase": "3.8.27",
+    "name": "Enterprise Governance Infrastructure Consolidation Layer（企业治理基础设施收敛层）",
+    "status": "ENTERPRISE_GOVERNANCE_INFRASTRUCTURE_CONSOLIDATION_BUILT_NO_GO",
+    "closed_at": "2026-08-09",
+    "identity": "BOIP AI Chief Architect",
+    "branch": "feat/phase3.8.27-governance-infrastructure",
+    "implementation_commits": "9 个（1275a1b → 572eecc）",
+    "report_commit": "7384b00",
+    "commits_verified_ancestor_of_head": true,
+    "change_scale": "491 files changed, 108552 insertions(+), 333 deletions(-)",
+    "tasks_total": 5,
+    "tasks_completed": 5,
+    "tasks": [
+      "T1 统一 GovernanceWorkflow 实现（消除 orchestrator.py / service.py 双实现，5 条导入路径收敛到唯一类对象）",
+      "T2 工作流持久化（内存 dict → 可替换持久化端口 + 2 适配器 + 历史留痕）",
+      "T3 企业身份认证接入准备（消除前端硬编码责任人，抽出 Identity Provider 适配层，本阶段仅接口抽象）",
+      "T4 Git 仓库治理（修复 agents//tests//.ai/ 大面积未追踪；建立追踪策略、CODEOWNERS、治理规范）",
+      "T5 测试增强（唯一实现 / Repository / 权限 / 审计 / 迁移兼容五维度）"
+    ],
+    "core_module": "agents/enterprise/governance_workflow/",
+    "core_module_breakdown": {
+      "orchestrator.py": 1394,
+      "repository.py": 1067,
+      "models.py": 624,
+      "forbidden.py": 145,
+      "__init__.py": 84,
+      "service.py": 39
+    },
+    "secondary_module": "frontend/src/lib/identity/",
+    "secondary_module_breakdown": {
+      "types.ts": 175,
+      "guards.ts": 192,
+      "registry.ts": 128,
+      "errors.ts": 80,
+      "index.ts": 60
+    },
+    "test_result": "69 用例全绿",
+    "boundary_declaration": "本阶段是「搬存储、抽接口、补追踪、加测试」，不改变任何 AI 治理边界；所有 Human-in-the-loop 守卫的位置与强度与 3.8.26 完全一致，无一处放宽",
+    "red_lines": {
+      "engineering_enabled": "false（agents/config.yaml:102，本阶段未触碰）",
+      "engineering_approved": "未输出",
+      "governance_boundary_unchanged": "AI 治理边界零变更，守卫强度与 3.8.26 一致"
+    },
+    "report": ".ai/reviews/phase3.8.27_governance_infrastructure_closure_report.md",
+    "roadmap_ref": ".ai/roadmap_v8.md §30",
+    "verified_json_modified": false,
+    "engineering_enabled_modified": false,
+    "ssot_backfilled_by": "Phase 3.8.31 Task 13（本阶段已提交但此前完全缺失于 SSOT，属治理缺口，现按主理人裁决原编号归位，不重编号）",
+    "pending_verification": [
+      "真实持久化后端（当前为可替换适配器，未接生产库）",
+      "verified.json 真实化",
+      "engineering_enabled 开启"
+    ]
+  },
+  "phase_3_8_28": {
+    "phase": "3.8.28",
+    "name": "Enterprise Identity & Permission Governance Implementation Layer（企业身份认证与权限治理实装层）",
+    "status": "ENTERPRISE_IDENTITY_PERMISSION_GOVERNANCE_BUILT_NO_GO",
+    "closed_at": "2026-08-09",
+    "identity": "BOIP AI Chief Architect",
+    "branch": "feat/phase3.8.28-enterprise-identity",
+    "commit": "f10c5dc",
+    "commit_time": "2026-08-09 22:51:28 +0800",
+    "commits_verified_ancestor_of_head": true,
+    "change_scale": "21 files changed（1779 insertions / 261 deletions）+ 9 个新增文件；后端身份包约 1870 行",
+    "tasks_total": 6,
+    "tasks_completed": 6,
+    "tasks": [
+      "T1 身份验证适配层（verifier：凭据 → 经密码学校验的声明；HS256 实装，OIDC/SSO 仅留骨架）",
+      "T2 权限目录（permissions：唯一治理权限词表 9 项 + 4 治理角色 + 禁语扫描）",
+      "T3 身份链路打通（后端 principal/resolver/dependencies/service + 前端 BackendSessionIdentityProvider/token-store/登录页）",
+      "T4 责任闭环（accountability：责任五元组，问责记录不可被自动审批动作写入）",
+      "T5 安全测试（6 类 fail-closed + 头伪造回归 + 前后端词表对齐）",
+      "T6 CI 与仓库规则（CODEOWNERS 守护身份模块 + 专项 CI 工作流 + 静态扫描禁语头回归）"
+    ],
+    "core_module": "backend/app/identity/",
+    "core_module_lines": 1870,
+    "core_module_layers": [
+      "permissions",
+      "verifier",
+      "resolver",
+      "principal",
+      "service",
+      "dependencies",
+      "accountability",
+      "seed",
+      "errors"
+    ],
+    "governance_permissions_count": 9,
+    "governance_roles_count": 4,
+    "test_result": "后端身份安全套件 58 例全绿；前端身份链路 81 例全绿；治理相关套件合计 144 例零回归",
+    "key_design": "治理身份不再由请求头声称，而由后端从 Authorization: Bearer <token> 派生，并经权威数据源（数据库）二次裁定；遗留 x-actor-* 身份头一律 400",
+    "boundary_declaration": "本阶段不改变任何 AI 治理边界；守卫位置与强度与 3.8.27 完全一致，无一处放宽",
+    "red_lines": {
+      "engineering_enabled": "false（agents/config.yaml:102，本阶段未触碰）",
+      "engineering_approved": "未输出",
+      "actor_kind_forced_user": "GovernancePrincipal.actor_kind 恒为 USER，禁语即拒",
+      "default_deny": "require_governance_permission 默认拒绝（403）；跨组织 require_same_org 拒绝（403）",
+      "no_ai_as_accountability_owner": "问责记录不可被自动审批动作写入"
+    },
+    "report": ".ai/reviews/phase3.8.28_enterprise_identity_closure_report.md",
+    "roadmap_ref": ".ai/roadmap_v8.md §31",
+    "verified_json_modified": false,
+    "engineering_enabled_modified": false,
+    "ssot_backfilled_by": "Phase 3.8.31 Task 13（本阶段已提交但此前完全缺失于 SSOT，属治理缺口，现按主理人裁决原编号归位，不重编号）",
+    "known_residual_risk_at_closure": "凭据存放于 sessionStorage —— 存在 XSS 即可窃取治理凭据（已于 Phase 3.8.29 T1 兑现修复为 HttpOnly Cookie）",
+    "pending_verification": [
+      "OIDC/SSO 真实 IdP 接入（本阶段仅骨架）",
+      "真实企业用户目录与真实治理角色授予",
+      "verified.json 真实化",
+      "engineering_enabled 开启"
+    ]
+  },
+  "phase_3_8_29": {
+    "phase": "3.8.29",
+    "name": "Enterprise Production Security & Deployment Hardening（企业生产安全与部署强化层）",
+    "status": "ENTERPRISE_PRODUCTION_SECURITY_HARDENING_BUILT_NO_GO",
+    "closed_at": "2026-08-10",
+    "report_dated": "2026-08-09",
+    "identity": "BOIP AI Chief Architect",
+    "branch": "feat/phase3.8.29-production-security（自 Phase 3.8.28 f10c5dc 切出）",
+    "commit": "1377e8b",
+    "commit_time": "2026-08-10 17:03:28 +0800",
+    "commits_verified_ancestor_of_head": true,
+    "is_current_head_at_phase_3_8_31_start": true,
+    "tasks_total": 7,
+    "tasks_completed": 7,
+    "tasks": [
+      "T1 Token 安全强化（sessionStorage → HttpOnly Cookie；Cookie 策略 / CSRF 双提交 / SameSite / 刷新）",
+      "T2 OIDC/SSO 生产接口（IdP 适配器标准化，缺配置 fail-closed，禁自动 fallback 开发身份）",
+      "T3 环境隔离（dev / testing / production 三态，生产禁 static-dev、禁测试密钥）",
+      "T4 安全审计增强（append-only Audit Trail：login/logout/refresh/denied/failure）",
+      "T5 CI/CD 生产门禁（身份安全 / 权限 / 红线扫描 / 依赖扫描，失败禁合并）",
+      "T6 部署文档 docs/PRODUCTION_DEPLOYMENT_GUIDE.md",
+      "T7 production-security 测试，全部 fail-closed"
+    ],
+    "three_enforcement_layers": {
+      "startup": "Settings.assert_production_safe()（backend/app/main.py:34，is_production 时调用）→ 进程拒绝启动",
+      "assembly": "build_identity_service()（backend/app/identity/dependencies.py:83）→ IdentityConfigError，请求一律 401",
+      "ci": "scripts/lint/check_production_security.py（7 条红线）→ CI 失败，禁止合并"
+    },
+    "credential_priority_rule": "Authorization 头存在则显式独占（非法也不回落 Cookie）；完全没给头才读 HttpOnly Cookie 兜底。优先级不可反转（防责任人张冠李戴）",
+    "test_result": "backend/tests/test_production_security.py 49 passed（35 安全 + 14 扫描器自检）；backend/tests 全量 291 passed / 1 failed（继承债）；frontend identity jest 88 passed；tsc --noEmit 0 error；check_production_security.py exit 0（7/7）",
+    "inherited_debt_at_closure": {
+      "description": "工作树中存在未提交的 governance_traceability 产物，使 len(AuditActionCategory) 由 69 变为 72，导致 backend/tests/test_governance_persistence_workflow.py::test_audit_workflow_categories_reuse（断言 == 69）失败",
+      "judgment": "与 3.8.29 无因果关系（本阶段改动零涉及 agents/）",
+      "resolved_by": "Phase 3.8.31 Task 9 —— 已改为「四类治理工作流审计存在性契约」，总数权威唯一保留在 tests/agents/test_enterprise_knowledge_governance_audit.py；复验 14 passed",
+      "resolved": true
+    },
+    "docs": [
+      "docs/PRODUCTION_DEPLOYMENT_GUIDE.md"
+    ],
+    "red_lines": {
+      "engineering_enabled": "false（agents/config.yaml:102，未改）",
+      "engineering_approved": "未输出",
+      "no_auto_fallback_dev_identity": "缺 IdP 配置 fail-closed，禁自动 fallback 开发身份",
+      "production_forbids_test_secrets": "生产禁 static-dev provider、禁测试密钥，启动期即拒"
+    },
+    "report": ".ai/reviews/phase3.8.29_production_security_closure_report.md",
+    "roadmap_ref": ".ai/roadmap_v8.md §32",
+    "verified_json_modified": false,
+    "engineering_enabled_modified": false,
+    "ssot_backfilled_by": "Phase 3.8.31 Task 13（本阶段已提交但此前完全缺失于 SSOT，属治理缺口，现按主理人裁决原编号归位，不重编号）",
+    "pending_verification": [
+      "真实生产环境部署与拓扑决策（同源/跨子域/跨站）",
+      "sso-gateway 网络隔离绕过验证",
+      "审计表 PITR 恢复演练",
+      "verified.json 真实化",
+      "engineering_enabled 开启（仅人类终端可执行）"
+    ]
+  },
+  "phase_3_8_30": {
+    "phase": "3.8.30",
+    "name": "Enterprise Agent Governance Traceability & Unified Audit Intelligence Layer（企业智能体治理全链路追踪与统一审计智能层）",
+    "status": "ENTERPRISE_AGENT_GOVERNANCE_TRACEABILITY_BUILT_NO_GO",
+    "closed_at": "2026-08-10",
+    "identity": "BOIP AI Chief Architect",
+    "tasks_total": 11,
+    "tasks_completed": 11,
+    "core_module": "agents/enterprise/governance_traceability/",
+    "core_module_lines": 1610,
+    "core_module_breakdown": {
+      "__init__.py": 71,
+      "forbidden.py": 115,
+      "models.py": 659,
+      "service.py": 765
+    },
+    "test_file": "tests/agents/test_enterprise_governance_traceability.py",
+    "test_file_lines": 538,
+    "new_test_cases": 36,
+    "test_categories": 8,
+    "full_suite_result": "本层 36 passed；关联审计 test_enterprise_knowledge_governance_audit.py 17 passed（已修 EXPECTED_CATEGORIES +3）；全量 16 例 test_threshold_* 失败为历史 hygiene 债（_tmp_drill_* + SAFE_DELETE_BULK_CONFIRM_REQUIRED 护栏），与本层无关、零回归",
+    "audit_categories": 72,
+    "audit_categories_added": [
+      "GOVERNANCE_TRACE",
+      "GOVERNANCE_TIMELINE",
+      "GOVERNANCE_REPLAY"
+    ],
+    "forbidden_names_count": 243,
+    "read_only_layers": [
+      "audit",
+      "orchestrator",
+      "knowledge"
+    ],
+    "three_gates": [
+      "_gate",
+      "_require_user(USER + require_human_actor)",
+      "_ensure_org_scope",
+      "_ensure_access(AgentPermissionPolicy 默认拒绝 + IdentityService.check(VIEW_AUDIT))"
+    ],
+    "red_lines": {
+      "engineering_enabled": "false（agents/config.yaml:102，未变更）",
+      "engineering_approved": "未输出；hasattr(GovernanceTraceabilityService,'engineering_approved')==False；列入 _TRACEABILITY_FORBIDDEN 243 项负向声明",
+      "no_ai_auto_modify_governance_record": "本层对 audit/orchestrator/knowledge 纯只读，不回写、不修改、不关事件、不代责",
+      "no_ai_auto_generate_governance_conclusion": "GovernanceTraceReport.conclusion_included=False 强校验；SourceTrace 只汇编事实、不生成结论",
+      "no_ai_auto_close_event": "GovernanceReplayView.re_executed=False 强校验；禁止重放执行",
+      "no_ai_as_audit_owner": "审计禁 record_human_approval（仅负向引用）；三道闸门强制 USER + require_human_actor + VIEW_AUDIT"
+    },
+    "report": ".ai/reviews/phase3.8.30_governance_traceability_audit_report.md",
+    "roadmap_ref": ".ai/roadmap_v8.md §33",
+    "verified_json_modified": false,
+    "engineering_enabled_modified": false,
+    "stop": "已 STOP，不进入 Phase 3.8.31，等待主理人审核授权",
+    "pending_verification": [
+      "真实治理事实全链路追踪与来源链",
+      "真实审计时间线与事实重放验证",
+      "verified.json 真实化",
+      "engineering_enabled 开启",
+      "真实工程参数 / 自动审批"
+    ]
+  },
+  "phase_3_8_31": {
+    "phase": "3.8.31",
+    "name": "Governance Repository Integrity & Release Baseline Convergence Layer（治理仓库完整性与发布基线收敛层）",
+    "status": "GOVERNANCE_REPOSITORY_INTEGRITY_RELEASE_BASELINE_BUILT_NO_GO",
+    "closed_at": "2026-08-10",
+    "identity": "BOIP AI Chief Architect + Repository Governance Auditor + Release Baseline Custodian",
+    "phase_nature": "仓库治理 / SSOT 对齐 / Git 完整性 / 测试基线收敛，非新业务功能开发",
+    "tasks_total": 18,
+    "tasks_completed": 18,
+    "core_deliverables": {
+      "release_baseline_manifest": ".ai/baselines/phase3.8_governance_release_baseline.json",
+      "integrity_checker": "scripts/check_governance_repository_integrity.py",
+      "integrity_checker_lines": 565,
+      "integrity_checker_rules": 9,
+      "checker_self_tests": "tests/agents/test_governance_repository_integrity_checker.py",
+      "checker_self_tests_lines": 434,
+      "checker_self_test_cases": 40,
+      "ci_integration": "scripts/ci/local_ci.sh 步骤 11（共 11 步，只读静态门禁）"
+    },
+    "integrity_rules": [
+      "基线清单可解析",
+      "阶段登记完整（报告 ⇒ SSOT）",
+      "SSOT 报告路径真实存在",
+      "审计总数断言全仓唯一",
+      "审计总数与基线一致",
+      "必需审计族齐备",
+      "红线①engineering_enabled=false",
+      "红线②不产出 engineering_approved",
+      "阶段编号唯一无冲突"
+    ],
+    "checker_result": "9/9 全绿；自检 40/40 全过",
+    "audit_categories": 72,
+    "audit_total_authority_file": "tests/agents/test_enterprise_knowledge_governance_audit.py",
+    "audit_contract_policy": "全仓仅权威文件断言枚举总数；其余各层改用存在性契约（子集断言），消除『加一类改十几处』的脆性",
+    "full_suite_result": "tests/agents 2230 passed / 0 failed（14.0s）；backend/tests 292 passed / 0 failed（21.2s）；合计 2522 passed / 0 failed，零跳过零 xfail",
+    "debts_cleared": [
+      "3.8.29 遗留 backend 1 failed 继承债 → 清零（292 全绿）",
+      "threshold 系列 _tmp_drill_* 临时文件历史 hygiene 债 → 清理，残留 0",
+      "14 条 `== 69` 脆性总数断言 → 收敛为存在性契约"
+    ],
+    "defects_found_and_fixed": [
+      {
+        "defect": "检查器规则 4 枚举全集别名漏网（门禁失效）",
+        "detail": "规则 4 仅识别裸变量白名单，致 test_enterprise_governance_workflow_orchestration.py 中 `cats = {c.value for c in AuditActionCategory}` + `assert len(cats) == 72` 漏检；该用例名 test_audit_category_count_still_68 与实际断言 72 自相矛盾",
+        "fix": "①被测方改存在性契约并更名 test_workflow_audit_categories_registered；②检查器补 _enum_full_set_aliases() 识别枚举全集别名；③新增 7 条双向自检（4 种别名变体 + 2 条误报守卫），自检 33→40"
+      },
+      {
+        "defect": "基线测试数字失真（统计口径缺口，非伪造）",
+        "detail": "基线记 tests/agents=2190，实跑 2230，差 40 = 33（T9 自检）+ 7（本次新增回归守卫）；2190 系 T9 自检建立前所测未同步",
+        "fix": "据实更新基线为 2230 / 292 / 合计 2522，note 写明差额来源保留可追溯性"
+      }
+    ],
+    "ssot_backfilled_phases": [
+      "3.8.10",
+      "3.8.11",
+      "3.8.12",
+      "3.8.13",
+      "3.8.14",
+      "3.8.15",
+      "3.8.16",
+      "3.8.25",
+      "3.8.26",
+      "3.8.27",
+      "3.8.28",
+      "3.8.29"
+    ],
+    "numbering_adjudication": "3.8.27 = 企业治理基础设施收敛层（7384b00）；追踪层按主理人裁决记为 3.8.30，禁止重改；governance_workflow/ 包内 3.8.27 引用正确未改",
+    "red_lines": {
+      "engineering_enabled": "false（agents/config.yaml:102，未变更）；检查器规则 7 常态化守卫",
+      "engineering_approved": "未输出；全仓仅否定式声明与 fail-closed 闸门，无正向产出路径；检查器规则 8 常态化守卫",
+      "no_history_overwrite": "HEAD 恒 1377e8b，未 rebase/amend/force；reflog 无相关记录；本阶段零提交",
+      "no_phase_renumber": "7384b00/f10c5dc/1377e8b 三 commit 经 merge-base --is-ancestor 实证在册；编号未挪用；检查器规则 9 守卫",
+      "no_test_deletion_or_skip": "17 测试文件改动，函数级 19 删 = 19 增（全为重命名/签名变更），零测试丢失；无新增 skip/xfail；脆性断言为语义收敛非删除",
+      "no_fabrication": "commit 经 merge-base 实证；测试数字当日实跑；verified.json 未触碰；release 状态维持 BUILT_NO_GO"
+    },
+    "commit_boundary_plan": {
+      "executed": false,
+      "note": "本阶段只规划不提交，30 项改动全留工作区；差异 24 已跟踪文件 +918/-131",
+      "commit_a": "Phase 3.8.30 追踪层产物（governance_traceability/ + 追踪层测试 + 3.8.30 报告 + audit/service/__init__ 接入）",
+      "commit_b": "Phase 3.8.31 仓库完整性与基线收敛（baselines/ + 检查器 + 自检 + SSOT/roadmap/gitignore/local_ci + 17 测试文件）",
+      "authorization": "提交动作待主理人授权后执行，AI 不自行提交，避免污染 3.8.30 与 3.8.31 边界语义"
+    },
+    "report": ".ai/reviews/phase3.8.31_repository_integrity_release_baseline_closure_report.md",
+    "roadmap_ref": ".ai/roadmap_v8.md §34",
+    "verified_json_modified": false,
+    "engineering_enabled_modified": false,
+    "stop": "已 STOP，不进入 Phase 3.8.32，等待主理人审核授权",
+    "pending_verification": [
+      "真实生产部署与真实企业身份目录接入",
+      "verified.json 真实化（本阶段未触碰）",
+      "engineering_enabled 开启（仅人类终端可执行）",
+      "3.8.30 / 3.8.31 产物的提交边界（已规划、未执行）"
     ]
   }
 }

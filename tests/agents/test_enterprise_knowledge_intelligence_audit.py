@@ -31,21 +31,21 @@ def test_three_new_categories_exist() -> None:
     assert AuditActionCategory.KNOWLEDGE_QUERY.value == "knowledge_query"
 
 
-def test_total_audit_categories_44() -> None:
-    # 3.8.8 收口 16 个 + 3.8.9 新增 3 个 + 3.8.10 新增 4 个 + 3.8.11 新增 3 个
-    # + 3.8.12 新增 3 个 + 3.8.13 新增 3 个（agent_register/agent_execution/
-    # agent_version）+ 3.8.14 新增 3 个（agent_metric/agent_trace/
-    # agent_health）+ 3.8.15 新增 3 个（agent_quality/agent_evaluation/
-    # agent_feedback）+ 3.8.16 新增 3 个（agent_resource/agent_cost/
-    # agent_cost_report）+ 3.8.17 新增 3 个（agent_policy/agent_runtime_check/
-    # agent_tool_access）+ 3.8.18 新增 3 个（agent_security_event/agent_risk/
-    # agent_risk_review）+ 3.8.19 新增 3 个（agent_compliance_rule/
-    # agent_compliance_check/agent_compliance_risk）+ 3.8.20 新增 3 个
-    # （agent_governance_dashboard/agent_governance_report/
-    #  agent_governance_insight）= 53；3.8.21 新增 3 个
-    # （agent_governance_task/agent_governance_action/
-    #  agent_governance_closure）= 56
-    assert len(list(AuditActionCategory)) == 69
+def test_knowledge_intelligence_categories_registered() -> None:
+    """本层只对**自己新增的 3 类**已在全局枚举注册负责。
+
+    Phase 3.8.31 Task 9：原函数名停留在 ``_44``、注释推导链停留在 56，而实际
+    断言值已被历次阶段改到 72 —— 名称、注释、断言三者互相脱节，是典型的脆性
+    契约。审计大类**总数**的唯一权威断言保留在
+    ``tests/agents/test_enterprise_knowledge_governance_audit.py``
+    （``EXPECTED_CATEGORIES`` 全量成员名集合 + 总数）。
+    """
+    names = set(AuditActionCategory.__members__)
+    assert {
+        "KNOWLEDGE_SEARCH",
+        "KNOWLEDGE_RETRIEVAL",
+        "KNOWLEDGE_QUERY",
+    } <= names
 
 
 def test_record_knowledge_search_action() -> None:

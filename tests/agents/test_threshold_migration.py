@@ -96,7 +96,7 @@ def _base_v1_entry(tid: str) -> dict[str, Any]:
 # 1. v1 读取
 # ---------------------------------------------------------------------------
 
-def test_v1_read_detects_version() -> None:
+def test_v1_read_detects_version(tmp_path: Path) -> None:
     """场景1：v1 条目（自由文本 source_ref、无治理字段）→ entry_schema_version=v1。"""
 
     v1_entry = _base_v1_entry("E-TH-01")
@@ -109,7 +109,7 @@ def test_v1_read_detects_version() -> None:
     assert sr.is_complete() is False
 
     # 通过真实文件加载路径验证 v1 解析（写入临时 v1 文件）。
-    tmp = Path("tests/_tmp_v1_in.json")
+    tmp = tmp_path / "_tmp_v1_in.json"
     try:
         _write_tmp(tmp, _v1_document({"E-TH-01": _base_v1_entry("E-TH-01")}))
         loaded = load_verified_thresholds(tmp)
@@ -164,7 +164,7 @@ def test_v2_read_detects_version() -> None:
 # 3. migration 成功
 # ---------------------------------------------------------------------------
 
-def test_migration_success_keeps_original_and_adds_fields() -> None:
+def test_migration_success_keeps_original_and_adds_fields(tmp_path: Path) -> None:
     """场景3：v1 → v2 迁移成功；生成快照、原文件不变、D-TH 决策 A 补专家签位 null。"""
 
     # 构造混合 v1 输入：一条"类 E-TH"（已带 expert 字段位）、一条"类 D-TH"（缺 expert 字段）。
@@ -173,9 +173,9 @@ def test_migration_success_keeps_original_and_adds_fields() -> None:
     eth_like["expert_verified_by"] = None
     eth_like["expert_verified_at"] = None
 
-    in_tmp = Path("tests/_tmp_mig_in.json")
-    out_tmp = Path("tests/_tmp_mig_out.json")
-    snap_dir = Path("tests/_tmp_snapshots")
+    in_tmp = tmp_path / "_tmp_mig_in.json"
+    out_tmp = tmp_path / "_tmp_mig_out.json"
+    snap_dir = tmp_path / "_tmp_snapshots"
     try:
         _write_tmp(in_tmp, _v1_document({"E-TH-01": eth_like, "D-TH-01": dth_like}))
         original_hash = _sha256_of(in_tmp)
@@ -231,12 +231,12 @@ def test_migration_success_keeps_original_and_adds_fields() -> None:
 # 4. migration 失败 rollback
 # ---------------------------------------------------------------------------
 
-def test_migration_failure_rolls_back() -> None:
+def test_migration_failure_rolls_back(tmp_path: Path) -> None:
     """场景4：输入损坏（非法 JSON）→ 自动回滚：输出不生成、快照保留、status=rolled_back。"""
 
-    in_tmp = Path("tests/_tmp_mig_bad_in.json")
-    out_tmp = Path("tests/_tmp_mig_bad_out.json")
-    snap_dir = Path("tests/_tmp_snapshots_bad")
+    in_tmp = tmp_path / "_tmp_mig_bad_in.json"
+    out_tmp = tmp_path / "_tmp_mig_bad_out.json"
+    snap_dir = tmp_path / "_tmp_snapshots_bad"
     try:
         # 写入非法 JSON（损坏输入）。
         in_tmp.write_text("{ this is not valid json", encoding="utf-8")
@@ -330,7 +330,7 @@ def test_source_ref_hash_failures() -> None:
 # 7. D-TH 双签字段兼容
 # ---------------------------------------------------------------------------
 
-def test_d_th_double_sign_field_compatible() -> None:
+def test_d_th_double_sign_field_compatible(tmp_path: Path) -> None:
     """场景7：真实 D-TH（设计侧）缺专家签位 → schema 解析为 None + ensure 补齐 null。"""
 
     design_thresholds = load_verified_thresholds(_D_PATH)
@@ -350,9 +350,9 @@ def test_d_th_double_sign_field_compatible() -> None:
     assert "expert_verified_by" in padded
 
     # 经由迁移（决策 A）后，D-TH 输出条目仍带 null 专家签位，且治理态为 DRAFT。
-    in_tmp = Path("tests/_tmp_dth_in.json")
-    out_tmp = Path("tests/_tmp_dth_out.json")
-    snap_dir = Path("tests/_tmp_snapshots_dth")
+    in_tmp = tmp_path / "_tmp_dth_in.json"
+    out_tmp = tmp_path / "_tmp_dth_out.json"
+    snap_dir = tmp_path / "_tmp_snapshots_dth"
     try:
         _write_tmp(in_tmp, _v1_document({"D-TH-01": d01}))
         report = migrate_thresholds(in_tmp, out_tmp, snapshot_dir=snap_dir, dth_decision=DTH_DECISION_A)
@@ -378,7 +378,7 @@ def test_d_th_double_sign_field_compatible() -> None:
 # 8. engineering_enabled=false 保护（迁移后）
 # ---------------------------------------------------------------------------
 
-def test_engineering_enabled_false_after_migration() -> None:
+def test_engineering_enabled_false_after_migration(tmp_path: Path) -> None:
     """场景8：迁移真实 E-TH（v1→v2，全 draft/value=null）后，门禁与校验恒 pending。
 
     通过 can_enable_engineering 默认拒绝 + ExpertBackedEngineeringValidation
@@ -387,9 +387,9 @@ def test_engineering_enabled_false_after_migration() -> None:
 
     from agents.engineering.validation import ExpertBackedEngineeringValidation
 
-    in_tmp = Path("tests/_tmp_real_mig_in.json")
-    out_tmp = Path("tests/_tmp_real_mig_out.json")
-    snap_dir = Path("tests/_tmp_snapshots_real")
+    in_tmp = tmp_path / "_tmp_real_mig_in.json"
+    out_tmp = tmp_path / "_tmp_real_mig_out.json"
+    snap_dir = tmp_path / "_tmp_snapshots_real"
     try:
         # 复制真实工程侧 v1 库为临时输入（不触碰仓库真实文件）。
         in_tmp.write_text(_E_PATH.read_text(encoding="utf-8"), encoding="utf-8")
@@ -443,7 +443,7 @@ def test_engineering_enabled_false_after_migration() -> None:
 # 附加：noop（输入已是 v2）/ source_ref dict 分支 / 非 Mapping 条目 / 决策 B
 # ---------------------------------------------------------------------------
 
-def test_migration_noop_when_already_v2() -> None:
+def test_migration_noop_when_already_v2(tmp_path: Path) -> None:
     """已为 v2 的输入 → status=noop，不写输出、保留快照。"""
 
     # 构造一个最小 v2 文档（schema_version=2，已含治理字段）。
@@ -468,9 +468,9 @@ def test_migration_noop_when_already_v2() -> None:
             }
         },
     }
-    in_tmp = Path("tests/_tmp_noop_in.json")
-    out_tmp = Path("tests/_tmp_noop_out.json")
-    snap_dir = Path("tests/_tmp_snapshots_noop")
+    in_tmp = tmp_path / "_tmp_noop_in.json"
+    out_tmp = tmp_path / "_tmp_noop_out.json"
+    snap_dir = tmp_path / "_tmp_snapshots_noop"
     try:
         _write_tmp(in_tmp, v2_doc)
         report = migrate_thresholds(in_tmp, out_tmp, snapshot_dir=snap_dir)
@@ -494,14 +494,14 @@ def test_migration_noop_when_already_v2() -> None:
             snap_dir.rmdir()
 
 
-def test_migration_source_ref_dict_branch() -> None:
+def test_migration_source_ref_dict_branch(tmp_path: Path) -> None:
     """v1 条目若 source_ref 已是字典（但缺 hash）→ 走 Mapping 分支补齐 hash。"""
 
     eth = _base_v1_entry("E-TH-02")
     eth["source_ref"] = {"standard": "GB 50009", "clause": "8.1.1"}  # 字典、缺 hash
-    in_tmp = Path("tests/_tmp_sr_in.json")
-    out_tmp = Path("tests/_tmp_sr_out.json")
-    snap_dir = Path("tests/_tmp_snapshots_sr")
+    in_tmp = tmp_path / "_tmp_sr_in.json"
+    out_tmp = tmp_path / "_tmp_sr_out.json"
+    snap_dir = tmp_path / "_tmp_snapshots_sr"
     try:
         _write_tmp(in_tmp, _v1_document({"E-TH-02": eth}))
         report = migrate_thresholds(in_tmp, out_tmp, snapshot_dir=snap_dir)
@@ -522,7 +522,7 @@ def test_migration_source_ref_dict_branch() -> None:
             snap_dir.rmdir()
 
 
-def test_migration_skips_non_mapping_entry() -> None:
+def test_migration_skips_non_mapping_entry(tmp_path: Path) -> None:
     """thresholds 中混入非 Mapping 条目 → 跳过（continue），不计入迁移。"""
 
     doc = _v1_document(
@@ -531,9 +531,9 @@ def test_migration_skips_non_mapping_entry() -> None:
             "BAD-ENTRY": ["not", "a", "dict"],  # 非 Mapping，应被跳过
         }
     )
-    in_tmp = Path("tests/_tmp_badentry_in.json")
-    out_tmp = Path("tests/_tmp_badentry_out.json")
-    snap_dir = Path("tests/_tmp_snapshots_badentry")
+    in_tmp = tmp_path / "_tmp_badentry_in.json"
+    out_tmp = tmp_path / "_tmp_badentry_out.json"
+    snap_dir = tmp_path / "_tmp_snapshots_badentry"
     try:
         _write_tmp(in_tmp, doc)
         report = migrate_thresholds(in_tmp, out_tmp, snapshot_dir=snap_dir)
@@ -553,13 +553,13 @@ def test_migration_skips_non_mapping_entry() -> None:
             snap_dir.rmdir()
 
 
-def test_migration_dth_decision_b_keeps_structure() -> None:
+def test_migration_dth_decision_b_keeps_structure(tmp_path: Path) -> None:
     """决策 B（保持单签）→ 不补 expert_verified_* 字段，D-TH 结构不动。"""
 
     dth_like = _base_v1_entry("D-TH-01")  # 缺 expert 字段
-    in_tmp = Path("tests/_tmp_dthb_in.json")
-    out_tmp = Path("tests/_tmp_dthb_out.json")
-    snap_dir = Path("tests/_tmp_snapshots_dthb")
+    in_tmp = tmp_path / "_tmp_dthb_in.json"
+    out_tmp = tmp_path / "_tmp_dthb_out.json"
+    snap_dir = tmp_path / "_tmp_snapshots_dthb"
     try:
         from agents.engineering.threshold_migration import DTH_DECISION_B
 
@@ -586,11 +586,11 @@ def test_migration_dth_decision_b_keeps_structure() -> None:
             snap_dir.rmdir()
 
 
-def test_migration_rollback_with_default_snapshot_dir() -> None:
+def test_migration_rollback_with_default_snapshot_dir(tmp_path: Path) -> None:
     """snapshot_dir=None（取输出同级）→ 损坏输入触发回滚，覆盖默认目录分支。"""
 
-    in_tmp = Path("tests/_tmp_def_in.json")
-    out_tmp = Path("tests/_tmp_def_out.json")  # 同级目录即快照目录
+    in_tmp = tmp_path / "_tmp_def_in.json"
+    out_tmp = tmp_path / "_tmp_def_out.json"  # 同级目录即快照目录
     try:
         in_tmp.write_text("{ broken json", encoding="utf-8")
         report = migrate_thresholds(in_tmp, out_tmp)  # snapshot_dir=None
@@ -603,6 +603,9 @@ def test_migration_rollback_with_default_snapshot_dir() -> None:
             in_tmp.unlink()
         if out_tmp.is_file():
             out_tmp.unlink()
-        # 同级快照目录里的 verified.*.v1.json
-        for f in Path("tests").glob("verified.*.v1.json"):
+        # 同级快照目录里的 verified.*.v1.json。
+        # Phase 3.8.31 T7：历史实现在此硬编码扫描 `Path("tests")`，即便本用例的
+        # 输入/输出已迁出仓库，该清理块仍会连带删除 `tests/` 下同名快照残留。
+        # 现随 out_tmp 定位到真实快照目录（tmp_path），确保清理范围与产出范围一致。
+        for f in out_tmp.parent.glob("verified.*.v1.json"):
             f.unlink()

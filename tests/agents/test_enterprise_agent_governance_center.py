@@ -740,14 +740,16 @@ def test_layer_wires_governance_center_with_shared_deps() -> None:
 # 类别 7：audit（+3 类别，actor 真实）
 # ===========================================================================
 
-def test_audit_has_three_new_categories_total_53() -> None:
+def test_audit_has_three_new_categories() -> None:
+    """本层只对**自己新增的 3 类**负责；总数权威断言唯一保留在
+    ``test_enterprise_knowledge_governance_audit.py``（Phase 3.8.31 Task 9）。
+    """
     names = set(AuditActionCategory.__members__)
     assert {
         "AGENT_GOVERNANCE_DASHBOARD",
         "AGENT_GOVERNANCE_REPORT",
         "AGENT_GOVERNANCE_INSIGHT",
     } <= names
-    assert len(list(AuditActionCategory)) == 69
 
 
 def test_audit_category_values() -> None:

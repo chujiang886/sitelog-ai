@@ -319,9 +319,20 @@ def test_audit_forbids_record_human_approval():
 
 
 def test_audit_workflow_categories_reuse():
-    # ① VIEW 已新增，审计动作大类总数 68 → 69
-    assert hasattr(AuditActionCategory, "AGENT_GOVERNANCE_WORKFLOW_VIEW")
-    assert len(list(AuditActionCategory)) == 69
+    # ① VIEW 已新增（本层真正关心的契约：治理工作流四类审计语义齐备）。
+    #
+    # Phase 3.8.31 Task 9：此处原为 ``len(list(AuditActionCategory)) == 69``。
+    # Phase 3.8.30 新增 GOVERNANCE_TRACE / TIMELINE / REPLAY（69 → 72）后，本
+    # 断言未同步而**长期为红**——这正是「每新增一类就要连改十几处旧测试」的
+    # 脆性契约代价。改为存在性断言；审计大类**总数**的唯一权威断言保留在
+    # ``tests/agents/test_enterprise_knowledge_governance_audit.py``
+    # （``EXPECTED_CATEGORIES``，每一成员均登记了其 Phase 出处）。
+    assert {
+        "AGENT_GOVERNANCE_WORKFLOW_CREATE",
+        "AGENT_GOVERNANCE_WORKFLOW_REVIEW",
+        "AGENT_GOVERNANCE_WORKFLOW_EXECUTION",
+        "AGENT_GOVERNANCE_WORKFLOW_VIEW",
+    } <= set(AuditActionCategory.__members__)
     svc = AuditService(org_id="o-aud")
     # ② 复用 REVIEW / EXECUTION / CREATE（三个已有大类）写入正确分类、actor=user
     r_rev = svc.record_agent_governance_workflow_review(record_id="r1", actor_id="u1")

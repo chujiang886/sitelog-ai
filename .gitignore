@@ -44,8 +44,15 @@ backend/storage/
 # ─────────────────────────────────────────────────────────────────────────────
 
 # 测试临时产物（历史债：曾堆积数百个 _tmp_* 文件导致 threshold 系列测试雪崩式失败）
+# Phase 3.8.31 T7 已做根因修复：threshold 系列测试的临时件全部迁出仓库（pytest
+# tmp_path / 系统临时目录），正常路径下不再向 tests/ 落盘。以下规则保留为防御层，
+# 覆盖历史残留与个别用例回退时的产物泄漏。
 tests/_tmp_*
 tests/intake_snapshots/
+# 迁移快照产物：`migrate_thresholds` 以 `verified.<sha256[:16]>.v1.json` 确定性命名，
+# 由内容哈希生成、可重跑复现，不含唯一人工输入。注意与阈值 SSOT `verified.json`
+# 区分——后者必须追踪，不受此规则影响。
+tests/verified.*.v1.json
 
 # 构建缓存（tsbuildinfo 每次 tsc 都变更，入库只会制造无意义 diff）
 *.tsbuildinfo

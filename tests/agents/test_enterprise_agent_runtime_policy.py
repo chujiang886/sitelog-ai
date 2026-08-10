@@ -367,13 +367,10 @@ def test_list_runtime_policies_requires_access() -> None:
 # 类别 6：审计（AGENT_POLICY / AGENT_RUNTIME_CHECK / AGENT_TOOL_ACCESS，任务5）
 # ===========================================================================
 
-def test_audit_categories_count_53_with_3_8_20() -> None:
-    # 3.8.17 新增 3 个类别 → 44；3.8.18 再新增 3 个（agent_security_event /
-    # agent_risk / agent_risk_review）→ 47；3.8.19 再 +3 → 50；
-    # 3.8.20 再 +3（agent_governance_dashboard/report/insight）→ 累计 53；
-    # 3.8.21 再 +3（agent_governance_task/action/closure）→ 累计 56；
-    # 3.8.22 +3 → 59；3.8.23 +3 → 62。
-    assert len(list(AuditActionCategory)) == 69
+def test_audit_categories_present() -> None:
+    """本层只对**自己新增的 3 类**负责；总数权威断言唯一保留在
+    ``test_enterprise_knowledge_governance_audit.py``（Phase 3.8.31 Task 9）。
+    """
     for cat, val in (
         ("AGENT_POLICY", "agent_policy"),
         ("AGENT_RUNTIME_CHECK", "agent_runtime_check"),

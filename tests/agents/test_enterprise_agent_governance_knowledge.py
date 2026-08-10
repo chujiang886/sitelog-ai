@@ -903,13 +903,19 @@ def test_knowledge_service_is_read_only_on_policy_and_agent() -> None:
 # ---------------------------------------------------------------------------
 
 def test_audit_has_three_new_knowledge_categories() -> None:
-    """审计枚举新增 case / knowledge / improvement 三类，总数 59；3.8.23 再 +3 → 62。"""
-    members = list(AuditActionCategory.__members__.values())
-    values = {m.value for m in members}
+    """审计枚举含 case / knowledge / improvement 三类（本层关心的语义契约）。
+
+    Phase 3.8.31 Task 9：此处原有 ``assert len(members) == 72`` 的总数断言。
+    枚举总数是**全局事实**，不是本层的契约——每新增一个治理大类，就要回头改
+    十几个层的测试，这种脆性正是 3.8.29 遗留 ``== 69`` 红灯的成因。
+    总数权威唯一保留在 ``tests/agents/test_enterprise_knowledge_governance_audit.py``
+    （``EXPECTED_CATEGORIES`` + ``assert len(members) == 72``），此处只断言
+    本层真正依赖的三类存在。
+    """
+    values = {m.value for m in AuditActionCategory.__members__.values()}
     assert "agent_governance_case" in values
     assert "agent_governance_knowledge" in values
     assert "agent_governance_improvement" in values
-    assert len(members) == 69
 
 
 def test_audit_records_case_and_knowledge_and_improvement() -> None:

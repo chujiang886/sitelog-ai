@@ -1015,13 +1015,28 @@ class TestMigrationCompatibility:
         # 原始事实完好，未被后来者改写。
         assert orch.get_workflow("wf-dup").source_id == "gt-1"
 
-    def test_audit_category_total_is_stable(self) -> None:
-        """迁移兼容：本阶段是基础设施收敛，**不新增审计类别**。
+    def test_audit_category_contract_intact(self) -> None:
+        """基础设施收敛不得**丢失**任何既有治理审计语义。
 
-        69 是 Phase 3.8.26 的既有总数；3.8.27 未动审计枚举，若此断言变红，
-        说明有人在基础设施阶段偷偷扩了治理语义。
+        Phase 3.8.31 Task 9：原断言硬编码总数（69 → 72 时被迫连带修改十余处
+        历史测试），属结构性脆性；改为「治理审计族存在性契约」——它才是本层
+        真正要守的东西（收敛不许丢语义）。审计大类**总数**的唯一权威断言保留
+        在 ``tests/agents/test_enterprise_knowledge_governance_audit.py``
+        （``EXPECTED_CATEGORIES`` 全量成员名集合 + 总数）。
         """
-        assert len(AuditActionCategory) == 69
+        names = set(AuditActionCategory.__members__)
+        assert {
+            # Phase 3.8.21 治理任务 / 行动 / 收口
+            "AGENT_GOVERNANCE_TASK",
+            "AGENT_GOVERNANCE_ACTION",
+            "AGENT_GOVERNANCE_CLOSURE",
+            # Phase 3.8.26 治理工作流查看（只读事实）
+            "AGENT_GOVERNANCE_WORKFLOW_VIEW",
+            # Phase 3.8.30 治理全链路追踪 / 时间线 / 重放（只读事实）
+            "GOVERNANCE_TRACE",
+            "GOVERNANCE_TIMELINE",
+            "GOVERNANCE_REPLAY",
+        } <= names
 
     def test_governance_workflow_audit_categories_intact(self) -> None:
         for name in (

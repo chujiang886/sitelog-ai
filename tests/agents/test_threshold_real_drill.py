@@ -20,6 +20,7 @@ engineering_approved。全部保持 pending_verification。
 from __future__ import annotations
 
 import json
+import tempfile
 from pathlib import Path
 
 from agents.config_loader import load_engineering_enabled
@@ -72,10 +73,21 @@ def _uniq() -> str:
     return uuid.uuid4().hex[:8]
 
 
+# Phase 3.8.31 T7（threshold hygiene 技术债根因修复）：
+# 历史实现把演练临时件写在 `tests/` 源码目录（`tests/_tmp_drill_*.json` 等），
+# 造成两个后果：(1) 仓库工作树被测试产物污染、残留文件跨轮次堆积；
+# (2) 清理阶段对 `tests/` 目录批量 unlink 会触发执行环境的批量删除护栏而中断。
+# 修复方式为根因隔离——所有临时件迁出仓库，落到进程级系统临时根目录。
+# `ThresholdIntakeWorkflow` 的默认 snapshot_dir 取 `verified_path.parent /
+# "intake_snapshots"`，因此 verified/review 路径迁移后，快照目录自动跟随迁出。
+# 不使用 skip/xfail，不改动被测业务逻辑，断言强度保持不变。
+_TMP_ROOT = Path(tempfile.mkdtemp(prefix="boip_threshold_drill_"))
+
+
 def _paths() -> tuple[Path, Path]:
     return (
-        Path(f"tests/_tmp_drill_{_uniq()}.json"),
-        Path(f"tests/_tmp_drill_log_{_uniq()}.jsonl"),
+        _TMP_ROOT / f"_tmp_drill_{_uniq()}.json",
+        _TMP_ROOT / f"_tmp_drill_log_{_uniq()}.jsonl",
     )
 
 
@@ -83,7 +95,7 @@ def _cleanup(*paths: Path) -> None:
     for p in paths:
         if p.is_file():
             p.unlink()
-    snap = Path("tests/intake_snapshots")
+    snap = _TMP_ROOT / "intake_snapshots"
     if snap.is_dir():
         for f in snap.iterdir():
             f.unlink()

@@ -1630,3 +1630,270 @@ GovernanceWorkflowRepository (require_human_actor + OrgScopeError)  ──snapsh
 - **状态：🟢 BUILT_NO_GO（已收口）**：Phase 3.8.26 批次 A（治理驾驶舱，只读 + 单确认入口）与批次 B（持久化 Repository + 人工操作 API + 人工 UI + 审计增强 69 类别）均交付；六道 fail-closed 红线三层防御纵深逐项验证；全 agents 套件 2069 passed 零回归；`engineering_enabled=false`，不输出 `engineering_approved`，不 AI 自动确认/执行/关闭/改状态/改权限/代替人工责任。
 - **STOP：不进入 Phase 3.8.27**，不自动开启 `engineering_enabled`，不输出 `engineering_approved`，不自动评级/确认/禁用/报价 Agent，不代替人工责任。等待主理人审核授权。
 
+## 30. Phase 3.8.27 — Enterprise Governance Infrastructure Consolidation Layer（企业治理基础设施收敛层）
+
+> **文档对账补写说明**：本章由 **Phase 3.8.31 Task 11** 补写。本阶段代码与收口报告早已提交入库（实现 9 个 commit `1275a1b → 572eecc`，报告 commit `7384b00`，均已验证为当前 HEAD 的祖先），但此前 **既未登记于 `.ai/project_status.json`，也未写入本 roadmap**，属治理缺口。现按主理人裁决 **原编号归位，不重编号、不覆盖历史**。
+
+### 30.1 阶段目标
+
+在 3.8.26（持久化 + 人工操作界面）之上做一次**基础设施收敛**，解决「双实现 / 内存态 / 硬编码责任人 / 仓库大面积未追踪」四类结构性欠账。本阶段是「搬存储、抽接口、补追踪、加测试」，**不改变任何 AI 治理边界**。
+
+### 30.2 任务链（T1–T5，全部完成）
+
+| # | 任务 | 结果 |
+|---|---|---|
+| T1 | 统一 `GovernanceWorkflow` 实现 | 消除 `orchestrator.py` / `service.py` 双实现，5 条导入路径收敛到唯一类对象 |
+| T2 | 工作流持久化 | 内存 dict → 可替换持久化端口 + 2 适配器 + 历史留痕 |
+| T3 | 企业身份认证接入准备 | 消除前端硬编码责任人，抽出 Identity Provider 适配层（**本阶段仅接口抽象**，实装在 3.8.28） |
+| T4 | Git 仓库治理 | 修复 `agents/` `tests/` `.ai/` 大面积未追踪；建立追踪策略、CODEOWNERS、治理规范 |
+| T5 | 测试增强 | 唯一实现 / Repository / 权限 / 审计 / 迁移兼容五维度 |
+
+### 30.3 交付物
+
+| 类别 | 路径 | 规模 |
+|---|---|---|
+| 核心包 | `agents/enterprise/governance_workflow/` | `orchestrator.py` 1394 / `repository.py` 1067 / `models.py` 624 / `forbidden.py` 145 / `__init__.py` 84 / `service.py` 39 |
+| 前端身份适配层 | `frontend/src/lib/identity/` | `types.ts` 175 / `guards.ts` 192 / `registry.ts` 128 / `errors.ts` 80 / `index.ts` 60 |
+| 收口报告 | `.ai/reviews/phase3.8.27_governance_infrastructure_closure_report.md` | — |
+
+变更规模：**491 files changed, 108552 insertions(+), 333 deletions(-)**（其中绝大部分为 T4 把历史未追踪文件正式纳入版本控制）。
+
+### 30.4 红线守约
+
+- ① `engineering_enabled=false`（`agents/config.yaml:102`，本阶段未触碰）；② 不输出 `engineering_approved`。
+- **边界声明**：所有 Human-in-the-loop 守卫的位置与强度与 3.8.26 **完全一致，无一处放宽**。
+
+### 30.5 测试与状态
+
+- **69 用例全绿**。
+- **状态：🟢 BUILT_NO_GO（已收口）**。未决：真实持久化后端（当前为可替换适配器，未接生产库）、`verified.json` 真实化、`engineering_enabled` 开启。
+
+> ⚠️ **编号双义提醒**：`governance_workflow/` 包内出现的 "3.8.27" 引用指向**本层（治理基础设施收敛层）**，是**正确的，不可改**。另有一批被误标为 3.8.27 的追踪层内容，主理人已裁决记为 **3.8.30**（见 §33）。
+
+---
+
+## 31. Phase 3.8.28 — Enterprise Identity & Permission Governance Implementation Layer（企业身份认证与权限治理实装层）
+
+> **文档对账补写说明**：本章由 **Phase 3.8.31 Task 11** 补写。本阶段已提交（commit `f10c5dc`，2026-08-09 22:51:28 +0800，已验证为当前 HEAD 祖先），此前缺失于 SSOT 与 roadmap，现原编号归位。
+
+### 31.1 阶段目标
+
+把 3.8.27 抽象出的身份接口**真正实装**：治理身份不再由请求头「声称」，而由后端从 `Authorization: Bearer <token>` **派生**，并经权威数据源（数据库）**二次裁定**；遗留 `x-actor-*` 身份头一律 **400**。
+
+### 31.2 任务链（T1–T6，全部完成）
+
+| # | 任务 | 要点 |
+|---|---|---|
+| T1 | 身份验证适配层 | `verifier`：凭据 → 经密码学校验的声明；HS256 实装，OIDC/SSO 仅留骨架 |
+| T2 | 权限目录 | `permissions`：唯一治理权限词表 **9 项** + **4** 治理角色 + 禁语扫描 |
+| T3 | 身份链路打通 | 后端 `principal`/`resolver`/`dependencies`/`service` + 前端 `BackendSessionIdentityProvider`/`token-store`/登录页 |
+| T4 | 责任闭环 | `accountability`：责任五元组，问责记录不可被自动审批动作写入 |
+| T5 | 安全测试 | 6 类 fail-closed + 头伪造回归 + 前后端词表对齐 |
+| T6 | CI 与仓库规则 | CODEOWNERS 守护身份模块 + 专项 CI 工作流 + 静态扫描禁语头回归 |
+
+### 31.3 交付物
+
+- 核心包 `backend/app/identity/`（约 **1870 行**，9 层）：`permissions` / `verifier` / `resolver` / `principal` / `service` / `dependencies` / `accountability` / `seed` / `errors`。
+- 变更规模：21 files changed（1779 insertions / 261 deletions）+ 9 个新增文件。
+- 收口报告：`.ai/reviews/phase3.8.28_enterprise_identity_closure_report.md`。
+
+### 31.4 红线守约
+
+| 红线 | 守约证据 |
+|---|---|
+| ① `engineering_enabled` | `false`（`agents/config.yaml:102`，本阶段未触碰） |
+| ② `engineering_approved` | 未输出 |
+| actor_kind 强制 | `GovernancePrincipal.actor_kind` 恒为 `USER`，禁语即拒 |
+| 默认拒绝 | `require_governance_permission` 默认拒绝（403）；跨组织 `require_same_org` 拒绝（403） |
+| 不代责 | 问责记录不可被自动审批动作写入 |
+
+**边界声明**：本阶段不改变任何 AI 治理边界；守卫位置与强度与 3.8.27 完全一致，无一处放宽。
+
+### 31.5 测试与状态
+
+- 后端身份安全套件 **58 例全绿**；前端身份链路 **81 例全绿**；治理相关套件合计 **144 例零回归**。
+- **状态：🟢 BUILT_NO_GO（已收口）**。
+- **收口时已知残余风险**：凭据存放于 `sessionStorage` —— 存在 XSS 即可窃取治理凭据。**该债已于 Phase 3.8.29 T1 兑现修复为 HttpOnly Cookie**（见 §32）。
+- 未决：OIDC/SSO 真实 IdP 接入（本阶段仅骨架）、真实企业用户目录与真实治理角色授予、`verified.json` 真实化、`engineering_enabled` 开启。
+
+---
+
+## 32. Phase 3.8.29 — Enterprise Production Security & Deployment Hardening（企业生产安全与部署强化层）
+
+> **文档对账补写说明**：本章由 **Phase 3.8.31 Task 11** 补写。本阶段已提交（commit `1377e8b`，2026-08-10 17:03:28 +0800），**即 Phase 3.8.31 开工时的当前 HEAD**。此前缺失于 SSOT 与 roadmap，现原编号归位。
+
+### 32.1 阶段目标
+
+把 3.8.28 的身份链路**推到可生产**：关闭 XSS 窃取凭据通道、标准化 IdP 接入、隔离运行环境、审计可追溯、CI 生产门禁化。分支自 3.8.28 `f10c5dc` 切出。
+
+### 32.2 任务链（T1–T7，全部完成）
+
+| # | 任务 |
+|---|---|
+| T1 | Token 安全强化（`sessionStorage` → **HttpOnly Cookie**；Cookie 策略 / CSRF 双提交 / SameSite / 刷新） |
+| T2 | OIDC/SSO 生产接口（IdP 适配器标准化，缺配置 **fail-closed**，禁自动 fallback 开发身份） |
+| T3 | 环境隔离（dev / testing / production 三态，生产禁 static-dev、禁测试密钥） |
+| T4 | 安全审计增强（**append-only** Audit Trail：login/logout/refresh/denied/failure） |
+| T5 | CI/CD 生产门禁（身份安全 / 权限 / 红线扫描 / 依赖扫描，失败禁合并） |
+| T6 | 部署文档 `docs/PRODUCTION_DEPLOYMENT_GUIDE.md` |
+| T7 | production-security 测试，全部 fail-closed |
+
+### 32.3 三层强制点（纵深防御）
+
+| 层 | 位置 | 失败行为 |
+|---|---|---|
+| 启动期 | `Settings.assert_production_safe()`（`backend/app/main.py:34`，`is_production` 时调用） | **进程拒绝启动** |
+| 装配期 | `build_identity_service()`（`backend/app/identity/dependencies.py:83`） | `IdentityConfigError`，请求一律 **401** |
+| CI | `scripts/lint/check_production_security.py`（7 条红线） | **CI 失败，禁止合并** |
+
+### 32.4 关键规则：凭据优先级不可反转
+
+**`Authorization` 头存在则显式独占（非法也不回落 Cookie）；完全没给头才读 HttpOnly Cookie 兜底。** 该优先级不可反转 —— 反转会导致「责任人张冠李戴」。
+
+### 32.5 测试与状态
+
+- `backend/tests/test_production_security.py` **49 passed**（35 安全 + 14 扫描器自检）；`backend/tests` 全量 **291 passed / 1 failed**（继承债，见下）；frontend identity jest **88 passed**；`tsc --noEmit` **0 error**；`check_production_security.py` exit 0（**7/7**）。
+- **收口时继承债**：工作树中存在未提交的 `governance_traceability` 产物，使 `len(AuditActionCategory)` 由 69 变为 72，导致 `backend/tests/test_governance_persistence_workflow.py::test_audit_workflow_categories_reuse`（断言 `== 69`）失败。判定：**与 3.8.29 无因果关系**（本阶段改动零涉及 `agents/`）。
+  → **已由 Phase 3.8.31 Task 9 兑现清偿**：改为「四类治理工作流审计存在性契约」，总数权威唯一保留在 `tests/agents/test_enterprise_knowledge_governance_audit.py`；复验通过，`backend/tests` 现为 **292 passed / 0 failed**。
+- **状态：🟢 BUILT_NO_GO（已收口）**。未决：真实生产环境部署与拓扑决策（同源/跨子域/跨站）、sso-gateway 网络隔离绕过验证、审计表 PITR 恢复演练、`verified.json` 真实化、`engineering_enabled` 开启（**仅人类终端可执行**）。
+
+---
+
+## 33. Phase 3.8.30 — Enterprise Agent Governance Traceability & Unified Audit Intelligence Layer（企业智能体治理全链路追踪与统一审计智能层）
+
+> **阶段编号说明**：本层原按 spec 标为 3.8.27，但经核对仓库真实状态，`3.8.27`/`3.8.28`/`3.8.29` 已被占用（治理基础设施收敛层 / 企业身份认证与权限治理实装层 / 生产安全层）。主理人裁决本追踪层顺延记为 **3.8.30**，独立分支单独提交，不污染已占用编号。详见收口报告 §7。
+
+### 33.1 阶段目标
+
+在已收敛的权威治理层（3.8.13 能力注册 → 3.8.26 持久化/人工操作）之上新建「全链路追踪与统一审计智能层」：
+1. 治理事实的**全链路唯一追踪**（Trace + Link），把 workflow / task / audit / knowledge / event 串成可溯源网络；
+2. **统一审计时间线**（只读聚合）与**事实重放视图**（禁止重新执行动作）；
+3. **完整来源链报告**（SourceTrace），只汇编事实、不生成结论；
+4. 对既有 audit / orchestrator / knowledge 层**纯只读**，不回写、不修改、不关闭事件、不代责。
+
+### 33.2 架构与代码清单（T1–T7）
+
+新增包 `agents/enterprise/governance_traceability/`（4 文件，全部 untracked，1610 行）：
+
+| 文件 | 行数 | 职责 |
+|---|---|---|
+| `__init__.py` | 71 | 导出 14 个公共符号 + 语义标记常量 |
+| `forbidden.py` | 115 | `_TRACEABILITY_EXTRA_FORBIDDEN`(~145) → `_TRACEABILITY_FORBIDDEN`(**243** 项) |
+| `models.py` | 659 | `AuditViewer`/`GovernanceTraceSourceType`(10)/`GovernanceTrace`/`GovernanceTraceLink`/`GovernanceAuditTimeline(Entry)`/`GovernanceReplayView(Step)`/`SourceTrace`/`GovernanceTraceReport` |
+| `service.py` | 765 | `GovernanceTraceabilityService(_RedLineForbiddenMixin)`：三道闸门 + 八方法 |
+
+- 复用：`GovernanceWorkflowOrchestrator`(3.8.25)、3.8.21 问责原语、`AuditService`/`IdentityService`/`AgentPermissionPolicy`/`red_line`，不重复造轮子。
+- 模型为 dataclass（非 ORM），构造期强校验；冻结语义 `re_executed=False` / `conclusion_included=False`。
+- 红线混入 `_RedLineForbiddenMixin`：`__getattr__` 精确方法名拦截（243 项）+ `safety_invariants_ok()` 断言 `load_engineering_enabled() is False`。
+- T6 审计增强 `audit.py`：枚举 **69 → 72**（`GOVERNANCE_TRACE`/`GOVERNANCE_TIMELINE`/`GOVERNANCE_REPLAY`）+ 3 方法（`record_governance_trace`/`timeline`/`replay`，均 `actor_kind=USER`，无 `record_human_approval`）。
+- 装配层挂载：`agents/enterprise/service.py` + `__init__.py` 暴露 `self.agent_governance_traceability`。
+
+### 33.3 红线守约（六道 fail-closed）
+
+| # | 红线 | 守约证据 |
+|---|---|---|
+| ① | 禁开 `engineering_enabled` | `config.yaml:102` 保持 `false`；`safety_invariants_ok()` 断言。未触碰。 |
+| ② | 禁输出 `engineering_approved` | 本层无该字段/方法；`hasattr(...)==False`；列入禁集负向声明。 |
+| ③ | 禁 AI 自动修改治理记录 | ~145 项禁名落入 `_TRACEABILITY_FORBIDDEN`(243)；精确拦截。 |
+| ④ | 禁 AI 自动生成治理结论 | `_FORBIDDEN_TRACE_FIELDS` 含 conclusion/verdict/root_cause；`conclusion_included=False` 强校验。 |
+| ⑤ | 禁 AI 自动关闭事件 | `close_incident`/`sign_off_audit` 等禁名落入禁集；`re_executed=False` 禁止重放执行。 |
+| ⑥ | 禁 AI 代替审计责任人 | `_require_user` 强制 `USER` + `require_human_actor(USER)`；`AuditViewer.from_user()` 委派责任。 |
+
+三道闸门：`_gate` → `_require_user` → `_ensure_org_scope`（跨组织 + 操作者归属双校验）→ `_ensure_access`（`AgentPermissionPolicy` 默认拒绝 + `IdentityService.check(VIEW_AUDIT)`）。当前仅 `ADMIN` 满足双闸门，未擅扩 `REVIEWER` 资源范围。
+
+### 33.4 测试与验证（T8 + T9）
+
+- 本层测试 `tests/agents/test_enterprise_governance_traceability.py`：**36 passed**（八类 + 集成挂载，全绿）。
+- 关联审计 `tests/agents/test_enterprise_knowledge_governance_audit.py`：**17 passed**（T6 加 3 枚举后刷新 `EXPECTED_CATEGORIES`，含 `governance_trace/timeline/replay`）。
+- `engineering_enabled=false` ✅（未触碰）；无 `engineering_approved` 输出 ✅；装配层 `is_read_only()==True` + `is_activation_safe()==True` ✅；枚举 72 ✅；禁集 243 ✅。
+- 全量 `tests/agents`：16 例 `test_threshold_*` 失败为历史 hygiene 债（`_tmp_drill_*` + `SAFE_DELETE_BULK_CONFIRM_REQUIRED` 护栏），与本层无关、零回归。
+
+### 33.5 交付物
+
+| 类别 | 路径 |
+|---|---|
+| 追踪模型/服务 | `agents/enterprise/governance_traceability/{__init__,forbidden,models,service}.py` |
+| 审计增强 | `agents/enterprise/audit.py`（+3 枚举 +3 方法） |
+| 装配挂载 | `agents/enterprise/service.py`、`agents/enterprise/__init__.py` |
+| 测试 | `tests/agents/test_enterprise_governance_traceability.py`（36）、`tests/agents/test_enterprise_knowledge_governance_audit.py`（+3） |
+| 收口报告 | `.ai/reviews/phase3.8.30_governance_traceability_audit_report.md` |
+| 状态更新 | `.ai/project_status.json`（`phase_3_8_30_status`）+ `.ai/roadmap_v8.md`（§33） |
+
+### 33.6 关键设计决策
+
+1. 复用优于重建：对 audit/orchestrator/knowledge 纯只读，避免第二份事实源。
+2. 模型 dataclass + 构造期强校验：红线在对象诞生即断言，禁止「先构造后校验」绕过窗口。
+3. 精确方法名拦截：`__getattr__` 精确匹配（非子串），杜绝 `auto_modify_audit`/`close_incident` 等越权入口。
+4. 保守授权：当前仅 `ADMIN` 满足双闸门，不为 `REVIEWER` 擅自扩权。
+5. 事实重放 ≠ 重执行：`re_executed=False` 强校验，审计只能重建「发生了什么」，不能「再做一次」。
+
+### 33.7 风险与未决事项
+
+- 本层代码（包 + 测试）为 untracked，未提交；建议独立分支 `feat/phase3.8.30-governance-traceability`，不混入 3.8.28/3.8.29 未提交改动，待主理人审核后提交。
+- threshold 测试雪崩为历史债（`_tmp_drill_*` + 护栏耦合），需单独 hygiene，不影响本层正确性。
+- 真实治理证据（责任人 USER 身份、组织归属、`verified.json` 真实化）由主理人 + 专家线下提交后，人类终端显式置 `engineering_enabled=true` 方可解除 NO-GO。
+
+### 33.8 状态结论与 STOP 纪律
+
+- **状态：🟢 BUILT_NO_GO（已收口）**：Phase 3.8.30 全链路追踪与统一审计智能层交付；六道 fail-closed 红线三层防御纵深逐项验证；本层 36 用例 + 关联审计 17 用例全绿；审计枚举 72、禁集 243；`engineering_enabled=false`，不输出 `engineering_approved`，不 AI 自动修改/生成结论/关事件/代责。
+- **STOP：不进入 Phase 3.8.31**，不自动开启 `engineering_enabled`，不输出 `engineering_approved`，不自动评级/确认/禁用/报价 Agent，不代替人工责任。等待主理人审核授权。
+
+---
+
+## 34. Phase 3.8.31 — Governance Repository Integrity & Release Baseline Consolidation Layer（治理仓库完整性与发布基线收敛层）
+
+> 本阶段**不新增业务功能**，是一次**仓库治理 + SSOT 对齐 + Git 完整性 + 测试基线收敛**。收口报告：`.ai/reviews/phase3.8.31_repository_integrity_release_baseline_closure_report.md`。状态：`.ai/project_status.json`（`phase_3_8_31_status`）。
+
+### 34.1 阶段目标
+
+修补「代码已交付、治理记录却缺位」的结构性缺口：把散落的阶段事实收敛回单一真相源，把易碎的测试契约改为稳固契约，并新建**可执行的门禁**防止缺口复发。
+
+### 34.2 核心发现与处置
+
+| 发现 | 处置 |
+|---|---|
+| **10 个阶段缺 SSOT 登记**：3.8.10–3.8.16（7 个）+ 3.8.27/28/29（3 个），代码与报告均已存在，唯独状态未登记 | 按主理人裁决**原编号补登**，全部标注 `ssot_backfilled_by`，不重编号、不覆盖历史 |
+| **roadmap 缺 3 章**：3.8.27/28/29 无章节，§30 直接跳到 3.8.30 | 补写 §30/§31/§32（本次），原 3.8.30 章重编号为 §33 |
+| **审计总数断言脆性**：全仓多处硬编码 `len(AuditActionCategory) == N`，每加一个类别就要连改十几处旧测试 | 改为**关键类别存在性契约**（子集断言），**总数权威唯一**保留在 `tests/agents/test_enterprise_knowledge_governance_audit.py`（`EXPECTED_CATEGORIES` + `assert len(members) == 72`） |
+| **3.8.29 继承债**（`== 69` 红灯） | 随上一条一并清偿，`backend/tests` 由 291/1failed → **292 passed** |
+| **3.8.26 双报告** | 定性为同一阶段的**批次 A/B**（B 明确引用 A），**非编号冲突**，在基线清单 `known_notes` 标注 |
+| **3.8.27 编号双义** | `governance_workflow/` 包内 "3.8.27" 指基础设施收敛层，**正确不可改**；被误标的追踪层内容按裁决记为 **3.8.30** |
+
+### 34.3 交付物
+
+| 类别 | 路径 | 说明 |
+|---|---|---|
+| 发布基线清单 | `.ai/baselines/phase3.8_governance_release_baseline.json` | 单一发布基线：git HEAD、release gate、审计契约（72 + 6 必需族）、测试基线、**32 条阶段登记**、integrity_invariants（8 条） |
+| 完整性检查器 | `scripts/check_governance_repository_integrity.py` | **只读**，9 条规则，退出码 0/1 |
+| 检查器自检 | `tests/agents/test_governance_repository_integrity_checker.py` | **33 用例**，正例放行 + 反例拦截双向验证 |
+| CI 集成 | `scripts/ci/local_ci.sh` | 新增 **`[11/11]` 治理仓库完整性检查**（步骤总数 10 → 11） |
+| SSOT | `.ai/project_status.json` | 补登 10 个阶段档案 + 状态串 |
+| roadmap | `.ai/roadmap_v8.md` | 本次 §30/§31/§32/§34 + §33 重编号 |
+
+### 34.4 完整性检查器的 9 条规则
+
+1. 基线清单可解析；2. 阶段登记完整（有报告 ⇒ 必须有 SSOT 登记）；3. SSOT 报告路径真实存在；4. 审计总数断言全仓唯一；5. 审计总数与基线一致；6. 必需审计族齐备；7. **红线① `engineering_enabled=false`**；8. **红线② 不产出 `engineering_approved`**；9. 阶段编号唯一无冲突。
+
+> **门禁必须抓得住违规才算门禁**：自检用**反例**验证拦截能力（`engineering_enabled: true` 的各种写法、幽灵报告路径、幻影总数断言、冲突阶段状态、正向 `engineering_approved` 输出），并专门守卫两类误报回归 —— 审计**事件计数**不得被误判为枚举总数、**负向声明**（禁语清单点名）必须放行。另有 `test_checker_is_read_only` 断言检查器源码无任何写操作。
+
+### 34.5 测试基线（实测，清洁运行）
+
+- `tests/agents`：**2190 passed**（含历史长期为红的 `test_threshold_*` 系列，本阶段 hygiene 后转绿）。
+- `backend/tests`：**292 passed**（3.8.29 继承债清零）。
+- 合计 **2482 passed / 0 failed**；治理完整性检查器 9/9 规则通过（EXIT=0）。
+
+### 34.6 红线守约（六道 fail-closed）
+
+| # | 红线 | 守约证据 |
+|---|---|---|
+| ① | 禁开 `engineering_enabled` | `agents/config.yaml:102` 保持 `false`；检查器规则 7 常态化守卫 |
+| ② | 禁输出 `engineering_approved` | 全仓仅负向声明；检查器规则 8 常态化守卫 |
+| ③ | 禁覆盖历史 commit | 全程**零提交、零 rebase、零 amend**；HEAD 始终为 `1377e8b` |
+| ④ | 禁重编号已占用 Phase | 3.8.27/28/29 原编号归位；3.8.30 裁决未动 |
+| ⑤ | 禁删测试/跳失败/改逻辑掩盖失败 | 未删任何测试、未加 skip/xfail；断言由「脆性总数」改为「稳固契约」，覆盖面不降反升 |
+| ⑥ | 禁伪造 commit/测试/文件/SSOT/release 状态 | 所有 commit 均经 `git merge-base --is-ancestor` 验证；测试数字为实跑输出 |
+
+### 34.7 状态结论与 STOP 纪律
+
+- **状态：🟢 BUILT_NO_GO（已收口）**。
+- **STOP：不进入 Phase 3.8.32**，不自动开启 `engineering_enabled`，不输出 `engineering_approved`，不自动放行发布。本阶段产物**全部未提交**，等待主理人审核授权。

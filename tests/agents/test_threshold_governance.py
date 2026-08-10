@@ -164,7 +164,7 @@ def test_verified_missing_expert_sign_fails() -> None:
 # 5/6. version 冲突 / deprecated 拒绝加载
 # ---------------------------------------------------------------------------
 
-def test_deprecated_rejected_from_load() -> None:
+def test_deprecated_rejected_from_load(tmp_path: Path) -> None:
     """场景5/6：threshold_status=deprecated → load_governed_thresholds 拒绝加载（剔除）。"""
 
     raw: dict[str, Any] = {
@@ -186,7 +186,7 @@ def test_deprecated_rejected_from_load() -> None:
     assert reason == GOV_REASON_DEPRECATED
 
     # 通过真实文件加载路径验证拒绝加载（写入临时文件）。
-    tmp = Path("tests/_tmp_dep_verified.json")
+    tmp = tmp_path / "_tmp_dep_verified.json"
     try:
         tmp.write_text(__import__("json").dumps(raw), encoding="utf-8")
         governed = load_governed_thresholds(tmp)

@@ -752,13 +752,17 @@ def test_workflow_service_is_read_only_on_permission() -> None:
 # ---------------------------------------------------------------------------
 
 def test_audit_has_three_new_governance_categories() -> None:
-    """审计枚举新增 task / action / closure 三类，总数 56；3.8.22 +3 → 59；3.8.23 +3 → 62。"""
-    members = [m for m in AuditActionCategory.__members__.values()]
-    values = {m.value for m in members}
+    """审计枚举含 task / action / closure 三类（本层关心的语义契约）。
+
+    Phase 3.8.31 Task 9：此处原有 ``assert len(members) == 72`` 的总数断言。
+    枚举总数是**全局事实**，不是本层的契约；总数权威唯一保留在
+    ``tests/agents/test_enterprise_knowledge_governance_audit.py``。
+    此处只断言本层真正依赖的三类存在，避免"新增一类就要连改十几处旧测试"。
+    """
+    values = {m.value for m in AuditActionCategory.__members__.values()}
     assert "agent_governance_task" in values
     assert "agent_governance_action" in values
     assert "agent_governance_closure" in values
-    assert len(members) == 69
 
 
 def test_audit_records_governance_task_action() -> None:
