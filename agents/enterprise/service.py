@@ -258,6 +258,10 @@ from agents.enterprise.governance_workflow.models import (
 from agents.enterprise.governance_dashboard import (
     GovernanceDashboardService,
 )
+# Phase 3.8.30：企业智能体治理全链路追踪与统一审计智能层（**纯只读**，无任何治理状态写入口）。
+from agents.enterprise.governance_traceability import (
+    GovernanceTraceabilityService,
+)
 
 
 class EnterpriseOperationLayer:
@@ -618,6 +622,19 @@ class EnterpriseOperationLayer:
             audit=self.audit, identity=self.identity,
             visibility=self.knowledge_visibility,
             permission_policy=self.agent_permission_policy,
+        )
+        # Phase 3.8.30：企业智能体治理全链路追踪与统一审计智能层。在驾驶舱之上提供「纯只读」
+        # 的事实串联与重建能力，回答审计责任人的三个问题：牵扯了哪些对象 / 按时间发生了什么 /
+        # 能不能原样重看一遍。本层**没有任何治理状态写入口**，不修改任何被关联对象；三道闸门
+        # （组织隔离 + 权限默认拒绝 + 强制 USER）+ 审计留痕 + 红线①（safety_invariants_ok），
+        # 比驾驶舱更严格（红线③/④/⑤/⑥）。复用同一审计实例、身份层、AgentPermissionPolicy，
+        # 以及 3.8.25 编排器（只读消费其事实，绝不回写）。
+        self.agent_governance_traceability = GovernanceTraceabilityService(
+            org_id=org_id,
+            audit=self.audit,
+            identity=self.identity,
+            permission_policy=self.agent_permission_policy,
+            orchestrator=self.agent_governance_workflow_orchestrator,
         )
 
     def is_activation_safe(self) -> bool:

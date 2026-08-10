@@ -183,6 +183,15 @@ class AuditActionCategory(str, Enum):
     # Phase 3.8.26（Task 7）：新增 VIEW 审计大类（审计动作大类 68 → 69），仅如实记录
     # 「真实人工查看治理工作流」这一事实动作；绝不承载批准/审批/记录为人工责任语义（红线②/⑥）。
     AGENT_GOVERNANCE_WORKFLOW_VIEW = "agent_governance_workflow_view"
+    # Phase 3.8.30（Task 6）：企业智能体治理全链路追踪与统一审计智能层（审计动作大类
+    # 69 → 72）。三类均为**只读事实型**动作：仅如实记录「真实人工登记/查看治理链路
+    # 追踪」「真实人工查看统一审计时间线」「真实人工查看治理事实重放视图」。
+    # 绝不承载批准/报价/审批/自动修改治理记录（auto_modify_audit·auto_delete_record）/
+    # 自动生成治理结论（auto_generate_conclusion·auto_conclude）/ 自动关闭事件
+    # （auto_close_incident·auto_resolve）/ 代替审计责任人语义（红线①/②/③/④/⑤/⑥）。
+    GOVERNANCE_TRACE = "governance_trace"
+    GOVERNANCE_TIMELINE = "governance_timeline"
+    GOVERNANCE_REPLAY = "governance_replay"
 
 
 def require_human_actor(actor_kind: Any) -> None:
@@ -2541,6 +2550,90 @@ class AuditService(_RedLineForbiddenMixin):
             actor_kind=AuditActorKind.USER,
             actor_id=actor_id,
             category=AuditActionCategory.AGENT_GOVERNANCE_WORKFLOW_VIEW,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    # ------------------------------------------------------------------
+    # Phase 3.8.30（Task 6）：治理全链路追踪与统一审计智能层审计入口
+    #
+    # 三个方法均**强制** actor_kind = USER（actor 真实，红线⑥），仅如实记录人工
+    # 发起的只读事实动作；不提供任何「AI 自动写审计」入口，也绝不提供
+    # ``record_human_approval``（已被 ``_FORBIDDEN`` 于 mixin 层拦截，红线②/⑥）。
+    # ------------------------------------------------------------------
+
+    def record_governance_trace(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "register_trace",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工发起的治理链路追踪登记/查看（红线③/④/⑥）。
+
+        仅承载「哪条治理事实由谁在何时被串联/查看」这一客观事实；不承载治理结论、
+        不承载事件关闭、不代替审计责任人。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.GOVERNANCE_TRACE,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_governance_timeline(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "view_timeline",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工查看统一审计时间线（只读，红线③/④/⑥）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.GOVERNANCE_TIMELINE,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_governance_replay(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "view_replay",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工查看治理事实重放视图（只读重建，红线③/④/⑤/⑥）。
+
+        「重放」仅指按时间序**重建既有事实**供人工复核，绝不重新执行任何治理动作。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.GOVERNANCE_REPLAY,
             action=action,
             target=target,
             detail=detail,

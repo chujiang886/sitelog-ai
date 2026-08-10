@@ -401,6 +401,24 @@ from agents.enterprise.governance_dashboard import (
     RiskAlert,
     DashboardSummary,
 )
+# Phase 3.8.30：企业智能体治理全链路追踪与统一审计智能层（纯只读）
+from agents.enterprise.governance_traceability import (
+    GovernanceTraceabilityService,
+    GovernanceTraceabilityError,
+    AuditViewer,
+    GovernanceTrace,
+    GovernanceTraceLink,
+    GovernanceTraceSourceType,
+    GovernanceTraceLinkKind,
+    GovernanceAuditTimeline,
+    GovernanceAuditTimelineEntry,
+    GovernanceReplayView,
+    GovernanceReplayStep,
+    GovernanceTraceReport,
+    SourceTrace as GovernanceTraceSourceTrace,
+    _TRACEABILITY_FORBIDDEN,
+    TRACEABILITY_FORBIDDEN_COUNT,
+)
 
 __all__ = [
     # red line
@@ -713,6 +731,22 @@ __all__ = [
     "ExecutionStatusView",
     "RiskAlert",
     "DashboardSummary",
+    # Phase 3.8.30 治理全链路追踪与统一审计智能层（纯只读）
+    "GovernanceTraceabilityService",
+    "GovernanceTraceabilityError",
+    "AuditViewer",
+    "GovernanceTrace",
+    "GovernanceTraceLink",
+    "GovernanceTraceSourceType",
+    "GovernanceTraceLinkKind",
+    "GovernanceAuditTimeline",
+    "GovernanceAuditTimelineEntry",
+    "GovernanceReplayView",
+    "GovernanceReplayStep",
+    "GovernanceTraceReport",
+    "GovernanceTraceSourceTrace",
+    "_TRACEABILITY_FORBIDDEN",
+    "TRACEABILITY_FORBIDDEN_COUNT",
     # aggregate
     "EnterpriseOperationLayer",
 ]
