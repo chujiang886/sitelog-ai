@@ -43,7 +43,11 @@ class AuditLog(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "action in ('create', 'update', 'delete', 'login', 'logout', 'export', 'import')",
+            # Phase 3.8.29 T4：扩展安全审计动作（login/logout/token_refresh/
+            # permission_denied/identity_failure），全部 append-only。
+            "action in ('create', 'update', 'delete', 'login', 'logout', "
+            "'export', 'import', 'token_refresh', 'permission_denied', "
+            "'identity_failure')",
             name="audit_action_valid",
         ),
         Index("ix_audit_logs_target", "tenant_id", "target_type", "target_id"),

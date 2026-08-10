@@ -29,6 +29,10 @@ from app.middleware.error_handler import register_exception_handlers
 settings = get_settings()
 configure_logging(settings.log_level)
 
+# 生产启动安全红线（T3）：配置违规则拒绝启动，而非带着不安全配置运行。
+if settings.is_production:
+    settings.assert_production_safe()
+
 app = FastAPI(
     title="BOIP Backend",
     description="建筑开口智能设计平台后端 API",

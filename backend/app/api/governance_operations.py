@@ -48,6 +48,7 @@ from app.db.repositories.governance_workflow_repository import (  # noqa: E402
     GovernanceRepositoryError,
     GovernanceWorkflowRepository,
 )
+from app.core.csrf import csrf_protect  # noqa: E402
 from app.identity import (  # noqa: E402
     GovernancePermission,
     GovernancePrincipal,
@@ -58,7 +59,15 @@ from app.identity import (  # noqa: E402
     require_same_org,
 )
 
-router = APIRouter(prefix="/governance/ops", tags=["governance-human-ops"])
+# CSRF 双提交防护（T1）：对所有 /governance/ops 请求生效；
+# 只读方法（GET）由 csrf_protect 内部豁免，状态变更方法强制校验。
+# 生产环境默认开启，开发/测试环境由 CSRF_PROTECTION_ENABLED 控制（默认关闭），
+# 因此既有测试在开发配置下不受影响。
+router = APIRouter(
+    prefix="/governance/ops",
+    tags=["governance-human-ops"],
+    dependencies=[Depends(csrf_protect)],
+)
 
 
 # 人工操作界面静态页（仅含人工入口，无任何自动按钮，红线③/④/⑥）。

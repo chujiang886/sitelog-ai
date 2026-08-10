@@ -152,13 +152,16 @@ class JwtTokenVerifier(TokenVerifier):
 
 
 class OidcTokenVerifier(TokenVerifier):
-    """OpenID Connect（RS256 + JWKS）验证器骨架。
+    """OpenID Connect（RS256 + JWKS）验证器。
 
-    未提供 ``jwks_resolver`` 时 ``verify`` 直接抛 ``IdentityConfigError``。
+    **接口已标准化、生产就绪，但签名验签后端在本阶段保持 fail-closed**：
+    未接入真实身份提供商（issuer / audience / JWKS）时 ``verify`` 直接抛
+    ``IdentityConfigError``，绝不降级、绝不假装验过。
 
-    **为什么不做一个"先解析后端不验签"的临时版**：那样系统会在没有任何
-    密码学保证的情况下表现得完全正常，直到某天被人拿一个自签 token 打穿。
-    一个明确报错的空实现，比一个悄悄放行的半实现安全得多。
+    一旦三方信息齐备，``_jwks_resolver`` 会真实拉取 IdP 的 JWKS（见
+    ``HttpJwksResolver``）；签名验签本身需要 ``cryptography`` 后端，缺失时
+    同样 fail-closed 并明确告知——这不是"先放行后补验"的临时版，而是一个
+    明确报错的真实装配点。
     """
 
     scheme = "oidc"
@@ -183,11 +186,88 @@ class OidcTokenVerifier(TokenVerifier):
         if not self.is_configured():
             raise IdentityConfigError(
                 "OIDC 验证器未配置（需 issuer / audience / JWKS 解析器）。"
-                "Phase 3.8.28 只交付接口，实装需接入真实身份提供商。"
+                "缺少真实身份提供商时，系统整体拒绝，而非降级放行。"
             )
+        # 配置齐全：真实拉取 JWKS 并定位签名密钥；签名验签后端（cryptography）
+        # 缺失时仍 fail-closed，绝不以"已解析"冒充"已验签"。
+        try:
+            self._jwks_resolver.resolve_signing_key(token)
+        except IdentityConfigError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - 任何解析异常都归为配置/验签失败
+            raise IdentityConfigError(
+                f"OIDC JWKS 解析失败：{exc}。未接入可验证的 IdP 前，拒绝放行。"
+            ) from exc
         raise IdentityConfigError(
-            "OIDC 验证器为 Phase 3.8.28 预留骨架，尚未实装签名校验。"
+            "OIDC JWKS 已解析，但 RS256 签名验签后端（cryptography）在本阶段未启用；"
+            "启用真实 IdP 前，系统保持 fail-closed，不假装验签。"
         )
+
+
+class JwksResolver:
+    """JWKS 解析端口：把 token 映射到 IdP 提供的签名公钥。"""
+
+    def resolve_signing_key(self, token: str) -> Any:
+        """返回与 token 头 ``kid`` 对应的公钥材料；找不到即抛 ``IdentityConfigError``。"""
+
+        raise NotImplementedError
+
+
+class HttpJwksResolver(JwksResolver):
+    """通过 HTTP(S) 真实拉取 IdP 的 JWKS（生产就绪接口，无假数据）。
+
+    仅做"拉取 + 按 kid 定位"，不做签名验签——后者交给 RS256 后端。
+    拉取失败或 kid 缺失一律抛 ``IdentityConfigError``，确保"没验过就不放行"。
+    """
+
+    def __init__(self, jwks_url: str, *, client: Any = None) -> None:
+        self._jwks_url = jwks_url
+        self._client = client
+
+    def _fetch(self) -> dict:
+        if self._client is not None:
+            resp = self._client.get(self._jwks_url, timeout=5.0)
+            if getattr(resp, "status_code", 200) >= 400:
+                raise IdentityConfigError(
+                    f"JWKS 端点返回 {getattr(resp, 'status_code', '?')}。"
+                )
+            return resp.json()
+        try:
+            import httpx
+        except ImportError as exc:  # pragma: no cover - httpx 为后端依赖
+            raise IdentityConfigError("缺少 httpx，无法拉取 JWKS。") from exc
+        with httpx.Client(timeout=5.0) as client:
+            resp = client.get(self._jwks_url)
+            if resp.status_code >= 400:
+                raise IdentityConfigError(
+                    f"JWKS 端点返回 {resp.status_code}。"
+                )
+            return resp.json()
+
+    def resolve_signing_key(self, token: str) -> Any:
+        import base64
+        import json
+
+        try:
+            header_b64 = token.split(".")[0]
+        except (ValueError, AttributeError) as exc:
+            raise IdentityConfigError("OIDC token 格式非法。") from exc
+        try:
+            header = json.loads(
+                base64.urlsafe_b64decode(header_b64 + "==")
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise IdentityConfigError("OIDC token 头无法解析。") from exc
+        kid = header.get("kid")
+        if not kid:
+            raise IdentityConfigError("OIDC token 头缺少 kid。")
+
+        jwks = self._fetch()
+        keys = jwks.get("keys") or []
+        for key in keys:
+            if key.get("kid") == kid:
+                return key  # 找到签名密钥材料（交由 RS256 后端验签）
+        raise IdentityConfigError(f"JWKS 中找不到 kid={kid!r} 的密钥。")
 
 
 # --------------------------------------------------------------------------- #

@@ -32,10 +32,7 @@ import {
   type TokenSource,
 } from "@/lib/identity/providers/jwt";
 import { StaticDevIdentityProvider } from "@/lib/identity/providers/static-dev";
-import {
-  clearGovernanceToken,
-  sessionTokenSource,
-} from "@/lib/identity/token-store";
+import { clearGovernanceToken } from "@/lib/identity/token-store";
 import type { IdentityProvider } from "@/lib/identity/types";
 
 export type IdentityProviderId =
@@ -62,7 +59,10 @@ export interface ResolveOptions {
   readonly orgId?: string;
   /** 覆盖角色列表（缺省读 NEXT_PUBLIC_GOVERNANCE_ROLES，逗号分隔）。 */
   readonly roles?: readonly string[];
-  /** token 来源；缺省读 sessionStorage 中的登录凭据。 */
+  /**
+   * token 来源。**显式注入即切到 bearer 模式**（非浏览器客户端 / E2E）。
+   * 不注入时缺省走 cookie 模式，凭据由 HttpOnly Cookie 承载、JS 不经手。
+   */
   readonly tokenSource?: TokenSource;
   /** 后端基址覆盖（测试用）。 */
   readonly baseUrl?: string;
@@ -115,10 +115,16 @@ export function resolveIdentityProvider(
 function buildBackendSession(
   options: ResolveOptions
 ): BackendSessionIdentityProvider {
+  // 3.8.29：缺省走 cookie 模式（凭据在 HttpOnly Cookie，JS 读不到）。
+  // 只有调用方**显式**注入 tokenSource 时才退回 bearer —— 那通常是 E2E
+  // 脚本或非浏览器客户端，属于有意为之，不该被缺省值悄悄决定。
+  const explicitToken = options.tokenSource;
   return new BackendSessionIdentityProvider({
-    tokenSource: options.tokenSource ?? sessionTokenSource,
+    credentialMode: explicitToken ? "bearer" : "cookie",
+    tokenSource: explicitToken,
     baseUrl: options.baseUrl,
     // 后端判定凭据失效时顺手清掉本地残留，避免用户反复看到同一条 401。
+    // cookie 模式下真正的失效由后端下发过期 Set-Cookie 完成，这里只清缓存。
     onCredentialRejected: clearGovernanceToken,
   });
 }

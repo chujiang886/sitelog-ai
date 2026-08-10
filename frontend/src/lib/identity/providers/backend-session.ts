@@ -40,6 +40,7 @@ import {
   toGovernanceHeaders,
 } from "@/lib/identity/guards";
 import type { TokenSource } from "@/lib/identity/providers/jwt";
+import { CSRF_HEADER_NAME, readCsrfToken } from "@/lib/identity/token-store";
 import type {
   ActorKind,
   AuthScheme,
@@ -51,7 +52,11 @@ import type {
 /** 便于测试注入；缺省用全局 fetch。 */
 export type FetchLike = (
   input: string,
-  init?: { readonly headers?: Record<string, string> }
+  init?: {
+    readonly headers?: Record<string, string>;
+    /** Cookie 模式必须为 "include"，否则跨源请求不带凭据 Cookie。 */
+    readonly credentials?: "include" | "same-origin" | "omit";
+  }
 ) => Promise<{
   readonly ok: boolean;
   readonly status: number;
@@ -59,8 +64,25 @@ export type FetchLike = (
   text(): Promise<string>;
 }>;
 
+/**
+ * 凭据通道。
+ *
+ * - ``cookie``（3.8.29 起的默认）：凭据在 HttpOnly Cookie 里，JS 读不到，
+ *   由浏览器自动携带；本适配器只负责回填 CSRF 头。**XSS 偷不走凭据。**
+ * - ``bearer``：JS 持有 token 并放进 Authorization 头。保留给非浏览器客户端
+ *   与尚未迁移的调用点；在页面里用它等于放弃 HttpOnly 的全部收益。
+ */
+export type CredentialMode = "cookie" | "bearer";
+
 export interface BackendSessionProviderOptions {
-  /** access token 来源。未提供即视为"未配置"（fail-closed）。 */
+  /**
+   * 凭据通道，缺省 ``cookie``。
+   *
+   * 缺省值刻意选安全的那个：忘记配置时落到 HttpOnly Cookie 上，
+   * 而不是落回"JS 保管凭据"的旧路径。
+   */
+  readonly credentialMode?: CredentialMode;
+  /** access token 来源（**仅 bearer 模式**）。未提供即视为未配置。 */
   readonly tokenSource?: TokenSource;
   /** 后端基址，缺省读 NEXT_PUBLIC_API_BASE_URL。 */
   readonly baseUrl?: string;
@@ -68,8 +90,10 @@ export interface BackendSessionProviderOptions {
   readonly mePath?: string;
   /** 注入 fetch（测试用）。 */
   readonly fetchImpl?: FetchLike;
-  /** 凭据被后端判定失效时的回调（通常用于清除本地 token）。 */
+  /** 凭据被后端判定失效时的回调（通常用于清除本地状态 / 跳登录）。 */
   readonly onCredentialRejected?: () => void;
+  /** 注入 CSRF 令牌读取（测试用）；缺省读 document.cookie。 */
+  readonly csrfTokenSource?: () => string | null;
 }
 
 /** ``GET /governance/me`` 的响应结构（对应 principal.to_public_dict()）。 */
@@ -101,16 +125,26 @@ export class BackendSessionIdentityProvider implements IdentityProvider {
   /** 凭据形态仍是 Bearer JWT，审计里的 authenticated_via 由后端给出。 */
   readonly scheme: AuthScheme = "jwt";
 
+  private readonly credentialMode: CredentialMode;
   private readonly tokenSource?: TokenSource;
   private readonly baseUrl: string;
   private readonly mePath: string;
   private readonly fetchImpl?: FetchLike;
   private readonly onCredentialRejected?: () => void;
+  private readonly csrfTokenSource: () => string | null;
 
-  /** 按 token 缓存身份，避免同一次渲染里重复问后端。token 变即失效。 */
-  private cache: { token: string; identity: GovernanceIdentity } | null = null;
+  /**
+   * 身份缓存，避免同一次渲染里重复问后端。
+   *
+   * Bearer 模式按 token 作 key（token 变即失效）。Cookie 模式**读不到**凭据，
+   * 无从比较，只能按"一次会话内有效"缓存，并在登出 / 401 时显式清除 ——
+   * 这是 HttpOnly 换来的安全性所必须付出的代价，写清楚而不是假装有 key。
+   */
+  private cache: { token: string | null; identity: GovernanceIdentity } | null =
+    null;
 
   constructor(options: BackendSessionProviderOptions = {}) {
+    this.credentialMode = options.credentialMode ?? "cookie";
     this.tokenSource = options.tokenSource;
     this.baseUrl = (
       options.baseUrl ??
@@ -120,9 +154,12 @@ export class BackendSessionIdentityProvider implements IdentityProvider {
     this.mePath = options.mePath ?? "/governance/me";
     this.fetchImpl = options.fetchImpl;
     this.onCredentialRejected = options.onCredentialRejected;
+    this.csrfTokenSource = options.csrfTokenSource ?? readCsrfToken;
   }
 
   get isConfigured(): boolean {
+    // Cookie 模式无需任何本地配置：凭据由浏览器持有并自动携带。
+    if (this.credentialMode === "cookie") return true;
     return typeof this.tokenSource === "function";
   }
 
@@ -130,12 +167,14 @@ export class BackendSessionIdentityProvider implements IdentityProvider {
     if (!this.tokenSource) {
       throw new IdentityProviderNotConfiguredError(
         this.id,
-        "未注入 tokenSource；请在登录成功后写入凭据，或显式注入 token 来源。"
+        "bearer 模式未注入 tokenSource；请注入 token 来源，" +
+          "或改用缺省的 cookie 模式（凭据由 HttpOnly Cookie 承载）。"
       );
     }
     return this.tokenSource;
   }
 
+  /** 读取 Bearer token；**仅 bearer 模式**调用。 */
   private async readToken(): Promise<string> {
     const source = this.assertConfigured();
     const token = await source();
@@ -147,6 +186,16 @@ export class BackendSessionIdentityProvider implements IdentityProvider {
       );
     }
     return token.trim();
+  }
+
+  /** 当前请求应携带的凭据相关请求头。 */
+  private async credentialHeaders(): Promise<Record<string, string>> {
+    if (this.credentialMode === "cookie") {
+      // 凭据由浏览器自动带（HttpOnly Cookie），这里只补 CSRF 双提交令牌。
+      const csrf = this.csrfTokenSource();
+      return csrf ? { [CSRF_HEADER_NAME]: csrf } : {};
+    }
+    return { Authorization: `Bearer ${await this.readToken()}` };
   }
 
   private resolveFetch(): FetchLike {
@@ -162,12 +211,16 @@ export class BackendSessionIdentityProvider implements IdentityProvider {
   }
 
   /** 拉取权威主体。任何非 2xx 一律不产出身份。 */
-  private async fetchPrincipal(token: string): Promise<GovernanceIdentity> {
+  private async fetchPrincipal(): Promise<GovernanceIdentity> {
     const doFetch = this.resolveFetch();
     let response: Awaited<ReturnType<FetchLike>>;
     try {
       response = await doFetch(`${this.baseUrl}${this.mePath}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: await this.credentialHeaders(),
+        // Cookie 模式下这一条是命门：不写 include，跨源请求根本不带凭据
+        // Cookie，表现为"明明登录了却一直 401"。
+        credentials:
+          this.credentialMode === "cookie" ? "include" : "same-origin",
       });
     } catch (cause) {
       // 网络不可达时**不给身份**。缓存一个"上次的身份"继续渲染按钮，
@@ -215,31 +268,57 @@ export class BackendSessionIdentityProvider implements IdentityProvider {
   }
 
   async getIdentity(): Promise<GovernanceIdentity> {
-    const token = await this.readToken();
+    // Bearer 模式能拿到 token，用它当缓存 key；Cookie 模式拿不到，key 为 null。
+    const token =
+      this.credentialMode === "bearer" ? await this.readToken() : null;
     if (this.cache && this.cache.token === token) {
       return this.cache.identity;
     }
-    const identity = await this.fetchPrincipal(token);
+    const identity = await this.fetchPrincipal();
     this.cache = { token, identity };
     return identity;
   }
 
   /**
-   * 治理请求头：凭据 + 组织复述。
+   * 治理请求头：凭据（或 CSRF 令牌）+ 组织复述。
    *
    * 注意这里**先取身份再发头**：如果凭据已经失效，调用方拿到的是一个异常，
    * 而不是一组"看起来没问题、打过去必然 401"的请求头。
+   *
+   * Cookie 模式下返回的头里**没有** Authorization —— 凭据在 HttpOnly Cookie
+   * 里由浏览器自动携带。调用方必须同时设置 ``credentials: "include"``，
+   * 这也是 ``governanceFetchInit()`` 存在的理由。
    */
   async getAuthHeaders(): Promise<Readonly<Record<string, string>>> {
-    const token = await this.readToken();
+    const credential = await this.credentialHeaders();
     const identity = await this.getIdentity();
     return {
-      Authorization: `Bearer ${token}`,
+      ...credential,
       ...toGovernanceHeaders(identity),
     };
   }
 
+  /**
+   * 供调用方直接铺进 ``fetch`` 的初始化片段（头 + credentials）。
+   *
+   * 单给 headers 不够：Cookie 模式漏掉 ``credentials: "include"`` 就会静默
+   * 退化成匿名请求。把两者绑在一起返回，让"忘记带 Cookie"这个错误无法发生。
+   */
+  async getFetchInit(): Promise<{
+    headers: Record<string, string>;
+    credentials: "include" | "same-origin";
+  }> {
+    return {
+      headers: { ...(await this.getAuthHeaders()) },
+      credentials:
+        this.credentialMode === "cookie" ? "include" : "same-origin",
+    };
+  }
+
   async signOut(): Promise<void> {
+    // Cookie 模式下凭据在服务端签发的 HttpOnly Cookie 里，JS 删不掉它，
+    // 必须由后端 /api/auth/logout 下发过期 Set-Cookie。这里只清本地缓存，
+    // 并通过回调让上层去调登出端点 —— 不制造"前端以为登出了"的假象。
     this.cache = null;
     this.onCredentialRejected?.();
   }

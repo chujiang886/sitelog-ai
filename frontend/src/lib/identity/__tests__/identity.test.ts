@@ -381,23 +381,41 @@ describe("BackendSessionIdentityProvider —— 身份由后端回答（生产�
     body: unknown,
     { ok = true, status = 200 }: { ok?: boolean; status?: number } = {}
   ) =>
-    jest.fn(async () => ({
+    // 形参显式声明，`mock.calls` 才有真实类型。写成 `async () => ...` 时
+    // TS 推断调用签名为零参，`mock.calls[0]` 变成 `[]`，下面取 init 只能靠
+    // 强制断言绕过——那等于让类型系统对"请求到底带没带 credentials/头"
+    // 失去检查能力，而这恰恰是本组测试要守的东西。
+    jest.fn(async (_url: string, _init?: RequestInit) => ({
       ok,
       status,
       json: async () => body,
       text: async () => JSON.stringify(body),
     }));
 
-  it("未注入 tokenSource 时 fail-closed", async () => {
-    const provider = new BackendSessionIdentityProvider();
+  it("bearer 模式未注入 tokenSource 时 fail-closed", async () => {
+    // 3.8.29：显式声明 bearer 才需要 tokenSource；cookie 模式无需本地配置。
+    const provider = new BackendSessionIdentityProvider({
+      credentialMode: "bearer",
+    });
     expect(provider.isConfigured).toBe(false);
     await expect(provider.getIdentity()).rejects.toThrow(
       IdentityProviderNotConfiguredError
     );
   });
 
-  it("没有凭据时报「未登录」而不是「未配置」", async () => {
+  it("cookie 模式无需本地配置即可用（凭据由浏览器持有）", async () => {
+    // 凭据在 HttpOnly Cookie 里，JS 读不到也不需要读 —— 因此"没注入
+    // tokenSource"在 cookie 模式下不是配置缺失，而是正常状态。
     const provider = new BackendSessionIdentityProvider({
+      fetchImpl: fakeFetch(ME),
+    });
+    expect(provider.isConfigured).toBe(true);
+    expect((await provider.getIdentity()).actorId).toBe(ME.actor_id);
+  });
+
+  it("bearer 模式没有凭据时报「未登录」而不是「未配置」", async () => {
+    const provider = new BackendSessionIdentityProvider({
+      credentialMode: "bearer",
       tokenSource: () => null,
       fetchImpl: fakeFetch(ME),
     });
@@ -409,6 +427,7 @@ describe("BackendSessionIdentityProvider —— 身份由后端回答（生产�
   it("带 Bearer 调 /governance/me 并采信后端主体", async () => {
     const impl = fakeFetch(ME);
     const provider = new BackendSessionIdentityProvider({
+      credentialMode: "bearer",
       tokenSource: () => "tok-1",
       baseUrl: "http://api.test",
       fetchImpl: impl,
@@ -417,11 +436,48 @@ describe("BackendSessionIdentityProvider —— 身份由后端回答（生产�
 
     expect(impl).toHaveBeenCalledWith("http://api.test/governance/me", {
       headers: { Authorization: "Bearer tok-1" },
+      credentials: "same-origin",
     });
     expect(identity.actorId).toBe(ME.actor_id);
     expect(identity.orgId).toBe("org-a");
     expect(identity.displayName).toBe("治理员");
     expect(identity.permissions).toEqual(ME.permissions);
+  });
+
+  it("cookie 模式带 credentials:include 且不发 Authorization 头", async () => {
+    // 两条断言各挡一个真实故障：
+    // ① 漏 credentials:include ⇒ 跨源请求不带 Cookie，表现为"登录了还 401"；
+    // ② 若还发 Authorization ⇒ 说明 JS 仍持有凭据，HttpOnly 就白做了。
+    const impl = fakeFetch(ME);
+    const provider = new BackendSessionIdentityProvider({
+      baseUrl: "http://api.test",
+      fetchImpl: impl,
+      csrfTokenSource: () => "csrf-abc",
+    });
+    await provider.getIdentity();
+
+    expect(impl).toHaveBeenCalledWith("http://api.test/governance/me", {
+      headers: { "X-CSRF-Token": "csrf-abc" },
+      credentials: "include",
+    });
+    const [, init] = impl.mock.calls[0];
+    expect(init?.headers ?? {}).not.toHaveProperty("Authorization");
+  });
+
+  it("cookie 模式读不到 CSRF 令牌时照发请求，由后端裁决", async () => {
+    // 前端不替后端做安全判断：读不到令牌就不带，后端会以 403 拒绝。
+    // 提前拦截只会把"后端说了算"变成"前端猜"。
+    const impl = fakeFetch(ME);
+    const provider = new BackendSessionIdentityProvider({
+      baseUrl: "http://api.test",
+      fetchImpl: impl,
+      csrfTokenSource: () => null,
+    });
+    await provider.getIdentity();
+    expect(impl).toHaveBeenCalledWith("http://api.test/governance/me", {
+      headers: {},
+      credentials: "include",
+    });
   });
 
   it("权限完全来自后端，不被前端角色表放大", async () => {
@@ -525,6 +581,7 @@ describe("BackendSessionIdentityProvider —— 身份由后端回答（生产�
     let token = "tok-1";
     const impl = fakeFetch(ME);
     const provider = new BackendSessionIdentityProvider({
+      credentialMode: "bearer",
       tokenSource: () => token,
       fetchImpl: impl,
     });
@@ -537,8 +594,23 @@ describe("BackendSessionIdentityProvider —— 身份由后端回答（生产�
     expect(impl).toHaveBeenCalledTimes(2);
   });
 
+  it("cookie 模式按会话缓存，登出后重新问后端", async () => {
+    // Cookie 模式读不到凭据，无法按 token 作 key，只能按会话缓存。
+    // 因此 signOut 必须真的清掉缓存，否则登出后仍显示旧身份。
+    const impl = fakeFetch(ME);
+    const provider = new BackendSessionIdentityProvider({ fetchImpl: impl });
+    await provider.getIdentity();
+    await provider.getIdentity();
+    expect(impl).toHaveBeenCalledTimes(1);
+
+    await provider.signOut();
+    await provider.getIdentity();
+    expect(impl).toHaveBeenCalledTimes(2);
+  });
+
   it("请求头 = 凭据 + 组织复述，绝无身份头", async () => {
     const provider = new BackendSessionIdentityProvider({
+      credentialMode: "bearer",
       tokenSource: () => "tok-1",
       fetchImpl: fakeFetch(ME),
     });
@@ -548,6 +620,30 @@ describe("BackendSessionIdentityProvider —— 身份由后端回答（生产�
       "org-id": "org-a",
     });
     expect(() => assertNoLegacyIdentityHeaders(headers)).not.toThrow();
+  });
+
+  it("cookie 模式请求头 = CSRF 令牌 + 组织复述，无 Authorization", async () => {
+    const provider = new BackendSessionIdentityProvider({
+      fetchImpl: fakeFetch(ME),
+      csrfTokenSource: () => "csrf-abc",
+    });
+    const headers = await provider.getAuthHeaders();
+    expect(headers).toEqual({
+      "X-CSRF-Token": "csrf-abc",
+      "org-id": "org-a",
+    });
+    expect(() => assertNoLegacyIdentityHeaders(headers)).not.toThrow();
+  });
+
+  it("getFetchInit 把 headers 与 credentials 绑在一起返回", async () => {
+    // 只给 headers 会让调用方漏掉 credentials:include，静默退化成匿名请求。
+    const provider = new BackendSessionIdentityProvider({
+      fetchImpl: fakeFetch(ME),
+      csrfTokenSource: () => "csrf-abc",
+    });
+    const init = await provider.getFetchInit();
+    expect(init.credentials).toBe("include");
+    expect(init.headers["X-CSRF-Token"]).toBe("csrf-abc");
   });
 
   it("凭据失效时 getAuthHeaders 抛错，而不是给一组注定 401 的头", async () => {
@@ -655,10 +751,32 @@ describe("registry —— 唯一装配点", () => {
   });
 
   it("缺省适配器在未登录时抛未认证，而不是给个匿名身份", async () => {
-    const provider = resolveIdentityProvider({ nodeEnv: "production" });
-    await expect(provider.getIdentity()).rejects.toThrow(
-      IdentityUnauthenticatedError
-    );
+    // 3.8.29：缺省已是 cookie 模式，未登录的形状是"浏览器没有有效 Cookie，
+    // 后端回 401"，而不是"本地读不到 token"。这里如实模拟后端的 401。
+    const original = (globalThis as { fetch?: unknown }).fetch;
+    (globalThis as { fetch?: unknown }).fetch = jest.fn(async () => ({
+      ok: false,
+      status: 401,
+      json: async () => ({ detail: "unauthenticated" }),
+      text: async () => "unauthenticated",
+    }));
+    try {
+      const provider = resolveIdentityProvider({ nodeEnv: "production" });
+      await expect(provider.getIdentity()).rejects.toThrow(
+        IdentityUnauthenticatedError
+      );
+    } finally {
+      (globalThis as { fetch?: unknown }).fetch = original;
+    }
+  });
+
+  it("缺省装配为 cookie 模式（不把凭据交回给 JS 保管）", () => {
+    // 这条断言守的是一个容易被"顺手改回去"的决定：缺省必须是 cookie。
+    // 一旦缺省退回 bearer，HttpOnly 的全部收益立刻归零，且不会有任何报错。
+    const provider = resolveIdentityProvider({
+      nodeEnv: "production",
+    }) as BackendSessionIdentityProvider;
+    expect(provider.isConfigured).toBe(true);
   });
 
   it("未知适配器 id 抛错，不静默回退", () => {
@@ -704,15 +822,29 @@ describe("registry —— 唯一装配点", () => {
     expect(hasPermission(identity, "governance:audit:read")).toBe(true);
   });
 
-  it("缺省适配器读 sessionStorage 中的登录凭据", async () => {
-    writeGovernanceToken("tok-from-login");
+  it("缺省适配器走 Cookie 模式：配置判定不依赖 sessionStorage", async () => {
+    // 3.8.28 时缺省适配器确实靠 sessionStorage 里的 token 判断"是否已配置"。
+    // 3.8.29 把凭据搬进 HttpOnly Cookie 后，JS **根本读不到**它，旧语义会
+    // 直接制造事故：用户明明登录成功（Cookie 已下发），页面却因为
+    // sessionStorage 空而判定"未配置/未登录"，把人挡在门外。
+    // 因此这里钉死的新契约是：无 JS 侧 token 也算已配置，由后端裁决身份。
+    clearGovernanceToken();
     const provider = resolveIdentityProvider({
       nodeEnv: "development",
       baseUrl: "http://api.test",
     }) as BackendSessionIdentityProvider;
-    // 不联网：只验证它确实认为自己已配置且会去读那个 token。
     expect(provider.isConfigured).toBe(true);
-    expect(readGovernanceToken()).toBe("tok-from-login");
+
+    // 反向守卫：sessionStorage 里有残留 token 也不该改变缺省模式的判定 ——
+    // 缺省就是 cookie 模式，不因本地存储的存在与否而漂移。
+    writeGovernanceToken("stale-token-should-not-matter");
+    const again = resolveIdentityProvider({
+      nodeEnv: "development",
+      baseUrl: "http://api.test",
+    }) as BackendSessionIdentityProvider;
+    expect(again.isConfigured).toBe(true);
+    clearGovernanceToken();
+    expect(readGovernanceToken()).toBeNull();
   });
 
   it("单例可注入与重置（SSR / 登录态装配）", async () => {

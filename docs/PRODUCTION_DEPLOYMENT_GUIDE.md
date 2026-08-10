@@ -1,0 +1,629 @@
+# BOIP 生产部署指南（Production Deployment Guide）
+
+> 适用版本：Phase 3.8.29 企业生产安全与部署强化层
+> 适用对象：负责把 BOIP 治理平台部署到生产环境的运维/SRE/平台工程
+> 文档性质：**可执行的部署契约**。文中每一条硬性要求都在代码里有对应的强制点
+> （启动校验、依赖拒绝、CI 门禁），不是"建议最佳实践"。
+
+---
+
+## 0. 阅读须知：本系统的 fail-closed 立场
+
+BOIP 是企业智能体**治理**平台，它记录的是"谁批准了什么"。因此系统在安全上
+采取的一贯立场是：**配置不清楚时拒绝启动，而不是挑个默认值先跑起来。**
+
+具体表现为三层强制，部署前请先建立这个心理预期：
+
+| 层 | 强制点 | 违规后果 |
+|---|---|---|
+| 启动期 | `Settings.assert_production_safe()`（`backend/app/main.py` 在 `is_production` 时调用） | 进程**拒绝启动**并打印全部违规项 |
+| 装配期 | `build_identity_service()`（`backend/app/identity/dependencies.py`） | 身份提供方配置不全 → `IdentityConfigError`，请求一律 401 |
+| 交付期 | `scripts/lint/check_production_security.py`（CI 门禁，7 条红线） | CI 失败，**禁止合并** |
+
+如果你在生产环境看到服务"启动失败并抱怨配置"，那不是 bug，是设计。请照错误
+信息补配置，**不要**通过降级配置项绕过。
+
+---
+
+## 1. 部署拓扑
+
+```
+                       ┌──────────────────────────┐
+  浏览器 ──HTTPS──────▶ │  反向代理 / 网关 (TLS 终止) │
+                       └───────────┬──────────────┘
+                                   │  X-Forwarded-Proto: https
+                     ┌─────────────┴─────────────┐
+                     ▼                           ▼
+            ┌─────────────────┐         ┌──────────────────┐
+            │ Next.js 前端     │         │ FastAPI 后端      │
+            │ (frontend/)     │  fetch  │ (backend/app)    │
+            │ :3000           │────────▶│ :8000            │
+            └─────────────────┘         └────────┬─────────┘
+                                                 │
+                        ┌────────────────────────┼───────────────┐
+                        ▼                        ▼               ▼
+                  PostgreSQL              Redis(可选)      对象存储(可选)
+                  （含 audit_logs）
+```
+
+### 1.1 同源部署 vs 跨域部署（必须先做的一个决定）
+
+这个决定会连锁影响 CORS、SameSite、Cookie Domain 三项配置，**先定它**：
+
+- **方案 A：同源部署（推荐）**
+  前端与后端挂在同一域名下（如 `https://boip.example.com` 走前端，
+  `https://boip.example.com/api` 反代到后端）。
+  → `CORS_ORIGINS=none`、`COOKIE_SAMESITE=lax`、`COOKIE_DOMAIN` 留空。
+  安全面最小，不需要任何跨域授权。
+
+- **方案 B：跨子域部署**
+  前端 `https://app.example.com`、后端 `https://api.example.com`。
+  → `CORS_ORIGINS=https://app.example.com`、`COOKIE_DOMAIN=.example.com`、
+  `COOKIE_SAMESITE=lax`（同注册域属 same-site，Lax 够用）。
+
+- **方案 C：完全跨站部署（不推荐）**
+  前后端分属不同注册域。此时凭据 Cookie 必须 `SameSite=none`，浏览器要求
+  同时 `Secure`，且第三方 Cookie 拦截策略会让链路脆弱。
+  → 若无法避免，`COOKIE_SAMESITE=none` + `CORS_ORIGINS` 精确列举，
+  并**必须**保持 CSRF 开启（此时它是主要防线，不再只是纵深防御）。
+
+> `CORS_ORIGINS` 在生产**不允许留空**，也不允许 `*`。留空被判为"遗漏"，
+> 通配符被判为"把携带凭据的跨域请求向全世界开放"。同源部署请显式填 `none`，
+> 表示"我已就跨域表过态：不需要"。
+
+---
+
+## 2. 环境要求
+
+| 组件 | 版本要求 | 说明 |
+|---|---|---|
+| Python | 3.11+ | 后端运行时；仓库以 `backend/.venv` 为准 |
+| Node.js | 18+（推荐 20 LTS） | 前端构建与运行 |
+| PostgreSQL | 14+ | 主数据库；`audit_logs` 表在此 |
+| Redis | 6+ | 可选，用于缓存/队列（未配置则相关功能降级但不影响身份链路） |
+
+**关于 RS256 / OIDC 的额外依赖**：若 `IDENTITY_PROVIDER=oidc`，运行环境必须
+安装 `cryptography`（RS256 验签后端）。缺失时验签器**不会假装验过**，而是
+直接 fail-closed 拒绝——这是刻意的，见 §5.2。
+
+---
+
+## 3. 安装与构建
+
+### 3.1 后端
+
+```bash
+cd BOIP/backend
+python3.11 -m venv .venv
+./.venv/bin/pip install --upgrade pip
+./.venv/bin/pip install -r requirements.txt
+```
+
+### 3.2 前端
+
+```bash
+cd BOIP            # 注意：npm workspaces 单仓，必须在根目录安装
+npm install
+npm run build --workspace frontend
+```
+
+> 单仓陷阱：在 `frontend/` 子目录里跑 `npm install` 会误报 `up to date`
+> 而实际没装东西（依赖被提升到 `BOIP/node_modules`）。**始终在 `BOIP/` 根目录安装。**
+
+---
+
+## 4. 环境变量完整清单
+
+以下变量由 `backend/app/core/config.py::Settings` 读取。标注 **【生产必填】**
+的项若缺失或非法，`assert_production_safe()` 会拒绝启动。
+
+### 4.1 运行环境
+
+| 变量 | 取值 | 缺省 | 说明 |
+|---|---|---|---|
+| `APP_ENV` | `development` / `testing` / `production` | `development` | **【生产必填】** 必须精确为 `production` 才会启用生产红线 |
+| `LOG_LEVEL` | `INFO` / `WARNING` / ... | `INFO` | 日志级别 |
+
+> `APP_ENV` 写错（比如 `prod`、`Production`）会被判为**非生产**，于是所有
+> 生产红线静默失效。部署后请务必用 §8.1 的自检确认环境判定生效。
+
+### 4.2 数据存储
+
+| 变量 | 缺省 | 说明 |
+|---|---|---|
+| `DATABASE_URL` | 空 | PostgreSQL 连接串，如 `postgresql+asyncpg://user:pass@host:5432/boip` |
+| `REDIS_URL` | 空 | 可选 |
+| `QDRANT_URL` | 空 | 可选，向量检索 |
+| `MINIO_ENDPOINT` / `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` / `MINIO_BUCKET` | 空 | 可选，对象存储 |
+
+### 4.3 身份与凭据
+
+| 变量 | 缺省 | 说明 |
+|---|---|---|
+| `JWT_SECRET` | 空 | **【生产必填】** HS256 签名密钥。禁止使用已知测试密钥（见 §4.6） |
+| `IDENTITY_PROVIDER` | `jwt` | `jwt` / `oidc` / `sso-gateway`。生产禁止 `static-dev` |
+| `STATIC_DEV_IDENTITY_ENABLED` | `false` | **【生产必须 false】** 开发逃生舱开关 |
+| `OIDC_ISSUER` | 空 | `IDENTITY_PROVIDER=oidc` 时必填 |
+| `OIDC_AUDIENCE` | 空 | 同上 |
+| `OIDC_JWKS_URL` | 空 | 同上 |
+| `SSO_GATEWAY_TRUSTED` | `false` | `IDENTITY_PROVIDER=sso-gateway` 时必须显式 `true` |
+| `TOKEN_TTL_MINUTES` | `60` | access token 有效期 |
+| `REFRESH_GRACE_MINUTES` | `15` | 过期后仍可 `/refresh` 的宽限期 |
+
+### 4.4 Cookie 策略
+
+| 变量 | 缺省 | 说明 |
+|---|---|---|
+| `AUTH_COOKIE_NAME` | `boip_access_token` | HttpOnly 凭据 Cookie 名 |
+| `COOKIE_SECURE` | `false` | 生产由 `effective_cookie_secure` **强制为 true**，无法关闭 |
+| `COOKIE_SAMESITE` | `lax` | `lax` / `strict` / `none`（非法值回落 `lax`） |
+| `COOKIE_DOMAIN` | 空 | 留空则不写 Domain 属性（严格同域）；跨子域填 `.example.com` |
+
+### 4.5 CSRF
+
+| 变量 | 缺省 | 说明 |
+|---|---|---|
+| `CSRF_COOKIE_NAME` | `boip_csrf_token` | 非 HttpOnly，供 JS 读取回填 |
+| `CSRF_HEADER_NAME` | `X-CSRF-Token` | 回填的请求头名 |
+| `CSRF_PROTECTION_ENABLED` | `false` | 生产由 `effective_csrf_enabled` **强制为 true** |
+
+### 4.6 CORS
+
+| 变量 | 缺省 | 说明 |
+|---|---|---|
+| `CORS_ORIGINS` | 空 | **【生产必填】** 逗号分隔白名单，或填 `none`/`disabled` 声明同源部署 |
+
+### 4.7 被拒绝的密钥黑名单
+
+以下字面量出现在 `JWT_SECRET` 中，生产启动即失败
+（`KNOWN_TEST_SECRETS`，`backend/app/core/config.py`）：
+
+```
+test-jwt-secret-not-for-production, changeme, change-me, secret, test, password, ""(空)
+```
+
+生成合规密钥：
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+### 4.8 前端环境变量
+
+| 变量 | 说明 |
+|---|---|
+| `NEXT_PUBLIC_API_BASE_URL` | 后端基址，如 `https://boip.example.com`（同源部署可用相对路径策略） |
+| `NEXT_PUBLIC_IDENTITY_PROVIDER` | 前端身份适配器选择；生产应为后端会话模式，**不得**指向 static-dev |
+| `NEXT_PUBLIC_GOVERNANCE_DEV_TOKEN` | **生产严禁设置**。它是开发期注入令牌的口子 |
+
+> 前端凡是 `NEXT_PUBLIC_*` 的值都会被打进产物、对任何访客可见。
+> 生产构建前请确认这些变量里**没有任何机密**。
+
+### 4.9 生产 `.env` 参考（同源部署，方案 A）
+
+```dotenv
+APP_ENV=production
+LOG_LEVEL=INFO
+
+DATABASE_URL=postgresql+asyncpg://boip:<STRONG_PASSWORD>@db.internal:5432/boip
+
+JWT_SECRET=<python -c "import secrets;print(secrets.token_urlsafe(48))" 的输出>
+IDENTITY_PROVIDER=jwt
+STATIC_DEV_IDENTITY_ENABLED=false
+
+AUTH_COOKIE_NAME=boip_access_token
+COOKIE_SECURE=true
+COOKIE_SAMESITE=lax
+COOKIE_DOMAIN=
+
+CSRF_PROTECTION_ENABLED=true
+CSRF_COOKIE_NAME=boip_csrf_token
+CSRF_HEADER_NAME=X-CSRF-Token
+
+TOKEN_TTL_MINUTES=60
+REFRESH_GRACE_MINUTES=15
+
+# 同源部署：显式声明不需要跨域
+CORS_ORIGINS=none
+```
+
+---
+
+## 5. 身份链路配置
+
+### 5.1 凭据是怎么走的（部署方必须理解的一张图）
+
+```
+① 登录  POST /api/auth/login  {email, password}
+        ↓
+   后端签发 HS256 token
+        ↓
+   Set-Cookie: boip_access_token=<token>; HttpOnly; Secure; SameSite=Lax
+   Set-Cookie: boip_csrf_token=<random>;              Secure; SameSite=Lax
+        （前者 JS 读不到，后者故意让 JS 读）
+
+② 后续请求
+   浏览器自动带上两条 Cookie
+   前端 JS 读出 csrf cookie → 放进 X-CSRF-Token 头
+        ↓
+   后端 csrf_protect 比对「Cookie 值 == 请求头值」（常量时间比较）
+        ↓
+   身份解析：resolve_raw_token(request, Authorization)
+        ├─ 有 Authorization 头 → 只认它（显式独占，非法也不回落 Cookie）
+        └─ 完全没有头       → 用 Cookie 兜底
+```
+
+**凭据通道优先级不可反转**，这是安全语义而非风格偏好：
+
+`Authorization` 头是调用方**本次显式声明**的身份；Cookie 是浏览器**自动附带**
+的环境凭据。若让 Cookie 压过显式头，会出现真实事故：同一浏览器登录过 A，
+运维脚本带着 B 的 Bearer 头调 `/api/auth/refresh`，实际续的是 A 的会话、审计
+也记成 A —— 在多租户治理场景里这就是**责任人张冠李戴**。
+
+同理，若 `Authorization` 头存在但非法（如 `Basic xxx`），系统**不回落 Cookie**，
+直接判无凭据返回 401。宁可让调用方改正，也不做静默的身份替换。
+
+### 5.2 三种身份提供方
+
+由 `IDENTITY_PROVIDER` 选择，装配逻辑见 `backend/app/identity/dependencies.py::build_identity_service`。
+
+#### (a) `jwt`（默认，当前生产可用）
+
+HS256 JWT + 数据库权威解析（角色/权限以 DB 为准，不信任 token 里的自述）。
+只需 `JWT_SECRET`。
+
+#### (b) `oidc`（对接企业 IdP）
+
+必须三点齐全，缺一即 `IdentityConfigError` 拒绝启动：
+
+```dotenv
+IDENTITY_PROVIDER=oidc
+OIDC_ISSUER=https://idp.example.com/
+OIDC_AUDIENCE=boip-governance
+OIDC_JWKS_URL=https://idp.example.com/.well-known/jwks.json
+```
+
+`HttpJwksResolver` 会真实发起 HTTP 拉取公钥。**重要**：若运行环境缺少
+RS256 验签后端（`cryptography`），验签器不会退化成"跳过验签"，而是直接
+失败。一个"不能验签却放行"的 OIDC 比没有 OIDC 危险得多。
+
+对接 checklist：
+- [ ] IdP 侧已为 BOIP 注册 client，audience 与 `OIDC_AUDIENCE` 一致
+- [ ] JWKS URL 从**后端所在网络**可达（注意内网出口/代理）
+- [ ] 已确认公钥轮换周期，并接受 JWKS 拉取的缓存/重试行为
+- [ ] `cryptography` 已随 `requirements.txt` 安装
+
+#### (c) `sso-gateway`（信任前置网关）
+
+仅当后端**在网络层面不可从网关外直达**时才允许：
+
+```dotenv
+IDENTITY_PROVIDER=sso-gateway
+SSO_GATEWAY_TRUSTED=true
+```
+
+`SSO_GATEWAY_TRUSTED` 是部署方的**书面担保**。若后端可被绕过网关直接访问，
+攻击者伪造网关头即可冒充任意身份。开启前请先用 §8.3 验证网络隔离。
+
+### 5.3 生产禁用项
+
+| 项 | 生产状态 | 强制点 |
+|---|---|---|
+| `static-dev` 身份提供方 | **禁止** | `PRODUCTION_FORBIDDEN_IDENTITY_PROVIDERS` + 启动校验 + 装配校验 |
+| `STATIC_DEV_IDENTITY_ENABLED=true` | **禁止** | `assert_production_safe()` |
+| 已废止身份头 `X-Actor-Id` / `X-Actor-Kind` | **报错**，不静默忽略 | `assert_no_legacy_identity_headers()` |
+
+最后一条值得解释：静默忽略这些头在功能上是安全的（后端本来就不读），但在
+运维语义上很危险——调用方会**以为**自己成功指定了责任人。治理系统里"我以为
+记的是张三、实际记的是李四"属于责任错置，比直接失败严重得多。
+
+---
+
+## 6. 数据库与审计
+
+### 6.1 迁移
+
+```bash
+cd BOIP/backend
+./.venv/bin/alembic upgrade head
+```
+
+Phase 3.8.29 引入迁移 `5d1a2b3c4e40_phase3_8_29_security_audit`
+（`down_revision = 4c9d7e1f2a30`），作用是扩展 `audit_logs.action` 的
+CheckConstraint，允许新增三种安全动作。
+
+### 6.2 审计表是 append-only
+
+`audit_logs` 记录五类安全事件，写入口径唯一
+（`app.core.security_audit.record_security_event`）：
+
+| action | 触发时机 |
+|---|---|
+| `login` | 登录成功 |
+| `logout` | 登出 |
+| `token_refresh` | 令牌刷新成功 |
+| `permission_denied` | 治理权限被拒（403） |
+| `identity_failure` | 身份校验失败（401 / 身份类 403） |
+
+约束方式是**结构性**的，不是靠约定：
+
+- 本模块**只提供写入**，没有 UPDATE/DELETE 路径，路由层也不暴露；
+- `action` 受数据库 CheckConstraint 约束，写入范围外的动作被数据库挡回；
+- 新增动作必须**先加迁移改约束**，再写代码。
+
+审计写入使用独立提交：即使后续业务事务回滚，安全留痕也保留。
+
+### 6.3 未知主体的记法
+
+身份失败时往往还不知道"是谁"（坏 token、跨组织复用）。`tenant_id` 非空约束
+不能破，故用全零 UUID `SECURITY_AUDIT_SYSTEM_TENANT`
+（`00000000-0000-0000-0000-000000000000`）标记"该事件不属于任何真实租户"。
+
+运维排查时可直接筛：
+
+```sql
+SELECT created_at, action, actor_id, target_id, payload
+FROM audit_logs
+WHERE tenant_id = '00000000-0000-0000-0000-000000000000'
+ORDER BY created_at DESC
+LIMIT 100;
+```
+
+### 6.4 备份要求
+
+审计表是问责链的物证。备份策略至少满足：
+
+- [ ] 每日全量 + WAL 归档（PITR 能力）
+- [ ] 备份介质与主库**隔离账号**，主库账号无权删除备份
+- [ ] 定期演练恢复（备份没恢复过 = 没有备份）
+
+---
+
+## 7. 反向代理与 TLS
+
+### 7.1 必须项
+
+- [ ] 全站 HTTPS，HTTP 一律 301 到 HTTPS
+- [ ] 代理向后端透传 `X-Forwarded-Proto: https`（否则 Secure Cookie 行为可能异常）
+- [ ] 代理**不得**改写或剥离 `X-CSRF-Token` 头
+- [ ] 代理**不得**注入 `Authorization` 头（会覆盖调用方显式凭据，见 §5.1）
+
+### 7.2 Nginx 参考（同源部署）
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name boip.example.com;
+
+    ssl_certificate     /etc/ssl/boip/fullchain.pem;
+    ssl_certificate_key /etc/ssl/boip/privkey.pem;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+---
+
+## 8. 上线自检（Go/No-Go Checklist）
+
+### 8.1 启动前静态检查
+
+```bash
+cd BOIP
+python3 scripts/lint/check_production_security.py --root .
+```
+
+该扫描器覆盖 7 条红线（纯标准库，无外部依赖）：
+
+| # | 规则 | 拦截的事故 |
+|---|---|---|
+| 1 | Cookie 单一出口 | 绕过 `auth_cookies.py` 直接 `set_cookie`，漏掉 HttpOnly/Secure/SameSite |
+| 2 | 禁 JS 保管凭据 | 页面层把 token 写进 sessionStorage/localStorage，重新打开 XSS 窃取面 |
+| 3 | 禁 CORS 通配符 | `allow_origins=["*"]` 配合凭据 Cookie 等于向全网开放 |
+| 4 | 禁关闭 TLS 校验 | `verify=False` / `check_hostname=False` 等 |
+| 5 | 禁测试密钥进源码 | 测试密钥被误当默认值带上生产 |
+| 6 | `engineering_enabled` 必须 false | 最高红线①（`agents/config.yaml`） |
+| 7 | 身份提供方缺省不得为 `static-dev` | 缺省即开发身份，等于默认无认证 |
+
+退出码 `0` 通过、`1` 有违规。**扫描器是"以后也回不到错的写法"的保险，
+与测试互补**：测试证明当前实现正确，扫描证明未来不会退回错误写法。
+
+### 8.2 启动后运行时验证
+
+```bash
+BASE=https://boip.example.com
+
+# ① 登录应下发两条 Cookie，凭据 Cookie 必须 HttpOnly + Secure
+curl -si -X POST "$BASE/api/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@example.com","password":"<PASSWORD>"}' \
+  | grep -i 'set-cookie'
+# 期望：boip_access_token=...; HttpOnly; Secure; SameSite=lax
+#       boip_csrf_token=...;             Secure; SameSite=lax   （无 HttpOnly）
+
+# ② 无 CSRF 头的状态变更请求必须 403
+curl -si -X POST "$BASE/api/auth/logout" -b cookies.txt | head -1
+# 期望：HTTP/1.1 403
+
+# ③ 非法 Authorization 头不得回落 Cookie
+curl -si "$BASE/api/auth/me" -b cookies.txt -H 'Authorization: Basic Zm9vOmJhcg==' | head -1
+# 期望：HTTP/1.1 401（而不是 200）
+
+# ④ 已废止身份头必须报错而非忽略
+curl -si "$BASE/api/governance/me" -b cookies.txt -H 'X-Actor-Id: someone' | head -1
+# 期望：4xx
+```
+
+### 8.3 `sso-gateway` 专项验证（仅当启用）
+
+```bash
+# 从网关外部直接访问后端端口，必须不可达
+curl -m 5 -si http://<backend-internal-ip>:8000/api/auth/me
+# 期望：连接超时 / 拒绝。若能通，立刻停用 sso-gateway 模式
+```
+
+### 8.4 清单
+
+- [ ] `APP_ENV=production` 且服务成功启动（说明 `assert_production_safe()` 已通过）
+- [ ] `JWT_SECRET` 为随机强密钥，不在黑名单内，且**与非生产环境不同**
+- [ ] `CORS_ORIGINS` 已表态（白名单或 `none`），不含 `*`
+- [ ] 凭据 Cookie 实测带 `HttpOnly; Secure`
+- [ ] CSRF 缺头请求实测 403
+- [ ] `alembic upgrade head` 已执行，`audit_logs` 新约束生效
+- [ ] 数据库备份与恢复演练完成
+- [ ] `check_production_security.py` 退出码 0
+- [ ] CI 全绿（含依赖扫描 `pip-audit` / `npm audit`）
+- [ ] `agents/config.yaml` 的 `engineering_enabled` 仍为 `false`
+
+---
+
+## 9. CI/CD 门禁
+
+工作流 `.github/workflows/identity-governance.yml` 共 7 个 job，
+**任一失败即禁止合并**（依赖扫描不设 `continue-on-error`）：
+
+| Job | 内容 |
+|---|---|
+| `identity-static-scan` | 遗留身份头等静态扫描 |
+| `production-security-scan` | 上述 7 条生产红线 |
+| `backend-identity-tests` | 身份链路 pytest |
+| `backend-production-security` | `backend/tests/test_production_security.py` |
+| `governance-permission-tests` | RBAC / 问责 / 扫描器测试 |
+| `dependency-audit` | `pip-audit --strict` + `npm audit --audit-level=high` |
+| `frontend-identity-tests` | 前端 identity 层 jest |
+
+本地等价执行：
+
+```bash
+bash scripts/ci/local_ci.sh     # 共 10 步，第 10 步为生产红线扫描
+```
+
+---
+
+## 10. 回滚方案
+
+### 10.1 决策原则
+
+**代码可以快速回滚，数据库迁移和密钥轮换不行。** 因此回滚顺序固定为：
+先回代码 → 判断是否必须回迁移 → 最后才考虑密钥。
+
+### 10.2 应用回滚
+
+```bash
+# 后端（以 git 部署为例）
+git checkout <上一个已知良好 tag>
+cd backend && ./.venv/bin/pip install -r requirements.txt
+systemctl restart boip-backend
+
+# 前端
+cd BOIP && npm install && npm run build --workspace frontend
+systemctl restart boip-frontend
+```
+
+### 10.3 数据库回滚
+
+Phase 3.8.29 的迁移只**放宽** CheckConstraint（新增三种允许的 action），
+因此：
+
+- **回退代码但不回退迁移是安全的**：旧代码只写旧动作，新约束是超集。
+- **只有在必须回到 4c9d7e1f2a30 之前**才需要降级，且降级前必须先清理新动作
+  行，否则约束重建会失败：
+
+```bash
+# 1) 确认是否存在新动作记录
+psql "$DATABASE_URL" -c "SELECT action, count(*) FROM audit_logs \
+  WHERE action IN ('token_refresh','permission_denied','identity_failure') GROUP BY action;"
+
+# 2) 若存在：审计不可删除。请改为「保留迁移、只回代码」，不要执行 downgrade。
+#    确需降级时，必须先经主理人书面批准并完成审计归档导出。
+
+# 3) 归档导出后（且获批）方可降级
+cd BOIP/backend && ./.venv/bin/alembic downgrade 4c9d7e1f2a30
+```
+
+> **审计数据不得为了让迁移降级成功而删除。** 删审计记录以配合回滚，等于为了
+> 技术方便销毁问责证据，属于本平台的性质错误。默认答案是"保留迁移、只回代码"。
+
+### 10.4 凭据紧急失效（怀疑密钥泄露）
+
+轮换 `JWT_SECRET` 会使**所有在途 token 立即失效**，全体用户被强制登出。
+这是紧急止血手段，不是常规操作：
+
+```bash
+NEW=$(python3 -c "import secrets; print(secrets.token_urlsafe(48))")
+# 写入密钥管理系统后重启后端
+systemctl restart boip-backend
+```
+
+轮换后请在审计表确认异常主体的活动窗口：
+
+```sql
+SELECT created_at, action, actor_id, target_id
+FROM audit_logs
+WHERE action IN ('login','token_refresh','identity_failure')
+  AND created_at >= now() - interval '7 days'
+ORDER BY created_at DESC;
+```
+
+### 10.5 回滚后必做
+
+- [ ] 复跑 §8.2 运行时验证
+- [ ] 确认审计写入正常（做一次登录，查 `audit_logs` 是否新增 `login`）
+- [ ] 在变更单登记回滚原因与影响范围
+
+---
+
+## 11. 故障排查
+
+| 现象 | 最可能原因 | 处理 |
+|---|---|---|
+| 启动即报"生产配置安全检查未通过" | `assert_production_safe()` 拦截 | 照错误列表逐条补配置，**不要**改 `APP_ENV` 绕过 |
+| 启动报 `IdentityConfigError` | OIDC 三项不全 / `SSO_GATEWAY_TRUSTED` 缺失 / provider 拼写错 | 补齐 §5.2 对应配置 |
+| 登录成功但后续请求全 401 | 前端未带 `credentials: "include"`；或 Cookie Domain/SameSite 与部署拓扑不匹配 | 核对 §1.1 方案选择 |
+| 所有 POST 都 403 且提示 CSRF | 前端未回填 `X-CSRF-Token`，或代理剥离了该头 | 检查代理配置（§7.1） |
+| 浏览器不保存 Cookie | 站点非 HTTPS 而 Cookie 带 `Secure` | 生产必须 HTTPS，这是强制的 |
+| OIDC 模式一律验签失败 | 缺 `cryptography`，或 JWKS URL 从后端网络不可达 | 装依赖 / 打通网络；**禁止**改成跳过验签 |
+| 脚本用 Bearer 头却以别人身份执行 | 不应再出现（3.8.29 已修复）；若出现说明有旁路解析 | 检查是否有绕过 `resolve_raw_token` 的自写解析 |
+
+---
+
+## 12. 安全边界声明（部署方必须知晓）
+
+本系统在设计上**不会**做以下事情，部署时请不要期待它们存在：
+
+1. **不会自动降级身份。** 任何身份配置不全的情况都表现为拒绝，而不是回落到
+   开发身份或匿名放行。
+2. **不会由 AI 获得治理权限。** 审批、评级、禁用、修改等治理动作必须由
+   `USER` 类型的真实主体执行，系统强制 human-in-the-loop。
+3. **不会自动执行治理决定。** 平台产出建议与证据，落地动作需人工确认。
+4. **不会静默忽略可疑输入。** 废止的身份头、非法的 Authorization、缺失的
+   CSRF 头，一律报错而非忽略。
+
+`agents/config.yaml` 的 `engineering_enabled` 在本阶段仍为 `false`，
+工程能力窗口保持 `OPEN_EMPTY`，需主理人与专家线下提交真实证据后由人类终端
+显式开启——**不得**通过部署配置绕过。
+
+---
+
+## 附录 A：变更记录
+
+| 版本 | 变更 |
+|---|---|
+| Phase 3.8.29 | 首次发布。HttpOnly Cookie + CSRF 双提交、OIDC/SSO 适配器、环境隔离红线、append-only 安全审计、CI 生产门禁、本部署指南 |

@@ -129,9 +129,20 @@ def rbac_env(monkeypatch, tmp_path):
         return client.post("/api/auth/login", json={"email": email, "password": password})
 
     def _token_for(email: str, password: str) -> str:
+        """只取 token 字符串，并清掉登录带来的 Cookie 会话副作用。
+
+        自 Phase 3.8.29 起 ``/api/auth/login`` 会种 HttpOnly 凭据 Cookie，
+        而 ``TestClient`` 自带 cookie jar 会把它持久化到后续每个请求上。
+        若不清理，"不带凭据应 401"这类断言会因为残留 Cookie 而拿到 200 ——
+        测试想验的是 Bearer 头通道，不该被隐式 Cookie 会话污染。
+        Cookie 通道本身由 ``test_production_security.py`` 专门覆盖。
+        """
+
         resp = _login(email, password)
         assert resp.status_code == 200, resp.text
-        return resp.json()["data"]["access_token"]
+        token = resp.json()["data"]["access_token"]
+        client.cookies.clear()
+        return token
 
     env = {
         "client": client,
@@ -303,11 +314,20 @@ def governance_env(monkeypatch, tmp_path):
     client = TestClient(app)
 
     def _token_for(email: str) -> str:
+        """只取 token 字符串，并清掉登录带来的 Cookie 会话副作用。
+
+        理由同 ``rbac_env._token_for``：3.8.29 起登录会种 HttpOnly Cookie，
+        ``TestClient`` 的 cookie jar 会让它渗进后续每个请求，把"匿名应 401"
+        和"跨租户应不可见"这类断言污染成误通过 / 误失败。
+        """
+
         resp = client.post(
             "/api/auth/login", json={"email": email, "password": pw}
         )
         assert resp.status_code == 200, resp.text
-        return resp.json()["data"]["access_token"]
+        token = resp.json()["data"]["access_token"]
+        client.cookies.clear()
+        return token
 
     def _bearer(token: str) -> dict:
         return {"Authorization": f"Bearer {token}"}

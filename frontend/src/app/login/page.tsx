@@ -1,19 +1,31 @@
 "use client";
 
 /**
- * Phase 3.8.28 T3(c) —— 治理登录页（占位页的实装）。
+ * 治理登录页（3.8.28 T3(c) 建立；**3.8.29 T1 迁移到 HttpOnly Cookie**）。
  *
  * 这一页存在的意义只有一句话：**让审计里的名字变成真人的名字**。
  *
  * 3.8.26/3.8.27 的治理驾驶舱靠**写死的常量身份**充当责任人，
  * 于是"谁确认的"这个问题在系统里没有答案。现在它的答案来自这里：
- *   邮箱+密码 → 后端签发 Bearer 凭据 → 后端 /governance/me 反算主体 → 页面渲染。
+ *   邮箱+密码 → 后端种下 HttpOnly 凭据 Cookie → /governance/me 反算主体 → 渲染。
  *
- * 三个刻意的克制：
- *   1. 本页**不解析 token**，不从 payload 里读角色。登录成功只代表"拿到了凭据"，
+ * ## 3.8.29 的关键变化：本页不再经手凭据
+ *
+ * 旧版把响应体里的 ``access_token`` 写进 sessionStorage，等于让 JS 保管治理
+ * 凭据 —— 页面上任何一处 XSS 都能把它读走。现在凭据由后端以
+ * ``Set-Cookie: boip_access_token; HttpOnly`` 下发，**JS 读不到也写不了**：
+ *
+ *   - 登录请求必须带 ``credentials: "include"``，否则浏览器不收 Set-Cookie，
+ *     表现为"登录返回 200 但随后一直 401"；
+ *   - 响应体里仍有 ``access_token``（留给非浏览器客户端走 Bearer），
+ *     本页**刻意不读它**，读了就等于把刚关上的口子重新打开；
+ *   - 登出必须调后端 ``POST /api/auth/logout``（带 CSRF 头）下发过期 Cookie。
+ *     前端自己清状态只是"看起来登出了"，服务端会话依然有效。
+ *
+ * 三个刻意的克制（沿用）：
+ *   1. 本页**不解析 token**，不从 payload 里读角色。登录成功只代表"服务端认了"，
  *      "这个人有什么治理权限"一律由后端回答，前端复述。
- *   2. 登录失败不区分"用户不存在"与"密码错误"（后端已统一文案），
- *      前端也不做任何推断式提示。
+ *   2. 登录失败不区分"用户不存在"与"密码错误"（后端已统一文案）。
  *   3. 登录成功后**不自动跳转**到治理驾驶舱，先把后端返回的身份摆出来让人确认
  *      是不是自己 —— 共用电脑上"以为是自己其实是同事"的账号误用，
  *      在治理场景里等同于责任错记。
@@ -23,20 +35,14 @@ import Link from "next/link";
 import { useState } from "react";
 
 import {
-  clearGovernanceToken,
+  csrfHeaders,
   getIdentityProvider,
   resetIdentityProvider,
-  writeGovernanceToken,
   type GovernanceIdentity,
 } from "@/lib/identity";
 
 const API_BASE: string =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-
-interface LoginResponse {
-  readonly success?: boolean;
-  readonly data?: { readonly access_token?: unknown };
-}
 
 export default function LoginPage(): JSX.Element {
   const [email, setEmail] = useState<string>("");
@@ -45,18 +51,34 @@ export default function LoginPage(): JSX.Element {
   const [error, setError] = useState<string>("");
   const [identity, setIdentity] = useState<GovernanceIdentity | null>(null);
 
+  /** 调后端登出端点，让服务端下发过期 Cookie；失败不阻断本地状态复位。 */
+  const revokeServerSession = async (): Promise<void> => {
+    try {
+      await fetch(`${API_BASE}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+        headers: { ...csrfHeaders() },
+      });
+    } catch {
+      // 网络不可达时本地照样复位。真正的凭据仍在服务端有效，
+      // 这一点由后续请求的 401 兜底，而不是在这里假装成功。
+    }
+  };
+
   const submit = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
     setBusy(true);
     setError("");
     setIdentity(null);
-    // 先清旧凭据：登录失败后仍带着上一个人的身份，是最容易出责任事故的状态。
-    clearGovernanceToken();
+    // 先清旧会话：登录失败后仍带着上一个人的 Cookie，是最容易出责任事故的状态。
+    await revokeServerSession();
     resetIdentityProvider();
 
     try {
       const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
+        // 命门：不带 include 浏览器就不收 Set-Cookie，凭据根本没落地。
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
@@ -67,20 +89,16 @@ export default function LoginPage(): JSX.Element {
             : `登录失败（${res.status}）。`
         );
       }
-      const body = (await res.json()) as LoginResponse;
-      const token = body.data?.access_token;
-      if (typeof token !== "string" || !token.trim()) {
-        throw new Error("后端未返回可用凭据。");
-      }
-      writeGovernanceToken(token);
+      // 刻意不读响应体里的 access_token：凭据已在 HttpOnly Cookie 中，
+      // 前端再存一份就等于把 XSS 窃取面重新打开。
 
-      // 关键一步：不解析 token，而是拿它去问后端"我是谁、我能做什么"。
+      // 关键一步：不解析 token，而是带着 Cookie 去问后端"我是谁、我能做什么"。
       // 这里若抛错，说明凭据虽已签发但主体不被治理层接受（停用/非真人），
-      // 此时必须把凭据丢掉，不能让页面停在"半登录"状态。
+      // 此时必须把服务端会话也撤掉，不能让页面停在"半登录"状态。
       const me = await getIdentityProvider().getIdentity();
       setIdentity(me);
     } catch (e) {
-      clearGovernanceToken();
+      await revokeServerSession();
       resetIdentityProvider();
       setError(e instanceof Error ? e.message : "登录失败。");
     } finally {
@@ -88,8 +106,8 @@ export default function LoginPage(): JSX.Element {
     }
   };
 
-  const signOut = (): void => {
-    clearGovernanceToken();
+  const signOut = async (): Promise<void> => {
+    await revokeServerSession();
     resetIdentityProvider();
     setIdentity(null);
   };
@@ -141,7 +159,7 @@ export default function LoginPage(): JSX.Element {
             {busy ? "登录中…" : "登录"}
           </button>
           <p className="text-xs text-slate-400">
-            凭据仅保存在当前标签页（sessionStorage），关闭标签页即失效。
+            凭据由服务端以 HttpOnly Cookie 下发，页面脚本无法读取；退出登录时由服务端撤销。
           </p>
         </form>
       ) : (
@@ -183,7 +201,7 @@ export default function LoginPage(): JSX.Element {
             </Link>
             <button
               type="button"
-              onClick={signOut}
+              onClick={() => void signOut()}
               className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-600"
             >
               不是我，退出

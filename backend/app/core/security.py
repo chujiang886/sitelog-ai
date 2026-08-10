@@ -25,10 +25,11 @@ import uuid
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth_cookies import resolve_raw_token
 from app.core.config import get_settings
 from app.db.models.rbac import Permission, Role, RolePermission, UserRole
 from app.db.models.user import User
@@ -187,6 +188,23 @@ def create_access_token(
 def decode_access_token(token: str) -> dict:
     """校验并解析 HS256 token；任何失败抛 ``AuthError``。"""
 
+    return _decode_access_token(token, enforce_exp=True)
+
+
+def peek_access_token(token: str) -> dict:
+    """仅验签、不验过期地解析 token（Phase 3.8.29 刷新用）。
+
+    返回 payload 并附 ``expired`` 标志，供刷新逻辑判断"是否在宽限期内"。
+    签名非法仍抛 ``AuthError``——被篡改的 token 没有刷新资格。
+    """
+
+    payload = _decode_access_token(token, enforce_exp=False)
+    exp = payload.get("exp")
+    payload["expired"] = isinstance(exp, int) and int(time.time()) > exp
+    return payload
+
+
+def _decode_access_token(token: str, *, enforce_exp: bool) -> dict:
     try:
         header_b64, payload_b64, sig_b64 = token.split(".")
     except ValueError:
@@ -206,9 +224,10 @@ def decode_access_token(token: str) -> dict:
         payload = json.loads(_b64url_decode(payload_b64).decode("utf-8"))
     except (ValueError, UnicodeDecodeError, base64.binascii.Error):
         raise AuthError("Token payload invalid")
-    exp = payload.get("exp")
-    if not isinstance(exp, int) or int(time.time()) > exp:
-        raise AuthError("Token expired")
+    if enforce_exp:
+        exp = payload.get("exp")
+        if not isinstance(exp, int) or int(time.time()) > exp:
+            raise AuthError("Token expired")
     if payload.get("type") != "access":
         raise AuthError("Wrong token type")
     return payload
@@ -231,19 +250,21 @@ class CurrentUser:
 
 
 async def get_current_user(
+    request: Request,
     authorization: Annotated[str | None, Header(alias="Authorization")] = None,
     db: AsyncSession = Depends(async_get_db),
 ) -> CurrentUser:
-    """解析 Bearer token，校验用户存在且 active，返回 ``CurrentUser``。"""
+    """解析 Bearer token（或 HttpOnly Cookie），校验用户存在且 active。
 
-    if not authorization:
+    凭据来源两条通道，**显式头优先、Cookie 兜底**（见 ``resolve_raw_token``）：
+    浏览器同源请求自动携带 HttpOnly ``boip_access_token``（JS 读不到），
+    API 客户端 / 脚本用 ``Authorization: Bearer`` 头并可覆盖残留 Cookie。
+    """
+
+    token = resolve_raw_token(request, authorization)
+    if not token:
         raise HTTPException(
-            status_code=401, detail="Missing Authorization header"
-        )
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not token:
-        raise HTTPException(
-            status_code=401, detail="Invalid Authorization header scheme"
+            status_code=401, detail="Missing credentials (header or cookie)"
         )
 
     try:
@@ -381,6 +402,7 @@ __all__ = [
     "decode_access_token",
     "get_current_user",
     "hash_password",
+    "peek_access_token",
     "RBAC_ROLES",
     "require_permission",
     "resolve_principals",

@@ -43,8 +43,12 @@ export { JwtIdentityProvider, decodeJwtPayload } from "@/lib/identity/providers/
 export { StaticDevIdentityProvider } from "@/lib/identity/providers/static-dev";
 
 export {
+  CSRF_COOKIE_NAME,
+  CSRF_HEADER_NAME,
   GOVERNANCE_TOKEN_KEY,
   clearGovernanceToken,
+  csrfHeaders,
+  readCsrfToken,
   readGovernanceToken,
   sessionTokenSource,
   writeGovernanceToken,
