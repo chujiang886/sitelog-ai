@@ -7,6 +7,7 @@
  */
 
 import type { ApiResponse } from "@/types/contracts";
+export type { ApiResponse };
 
 export type ChatRole = "user" | "assistant" | "system";
 

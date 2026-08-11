@@ -512,6 +512,7 @@ export default function ConsultPage(): JSX.Element {
   );
 }
 
-// Re-export helper so tests can verify the assistant fallback (unused in
-// production render but useful when a hydrating flow has no assistant row).
-export { buildAssistantMessage };
+// NOTE: `buildAssistantMessage` is intentionally NOT re-exported from this page
+// module. Next.js page modules must only export route-level symbols; re-exporting
+// an internal helper triggers a `.next/types` page-constraint type error. The
+// helper remains available for the in-page render flow.

@@ -78,7 +78,7 @@ describe("apiFetch", () => {
     );
 
     await expect(apiFetch("/api/missing")).rejects.toEqual(
-      expect.objectContaining<ApiRequestError>({
+      expect.objectContaining({
         code: "HTTP_404",
         message: "Resource not found",
       }),
@@ -91,7 +91,7 @@ describe("apiFetch", () => {
     );
 
     await expect(apiFetch("/api/projects")).rejects.toEqual(
-      expect.objectContaining<ApiRequestError>({
+      expect.objectContaining({
         code: "INVALID_RESPONSE",
         message: "API returned invalid JSON",
       }),

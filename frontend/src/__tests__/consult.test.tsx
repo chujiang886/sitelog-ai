@@ -37,8 +37,8 @@ describe("ConsultPage", () => {
     // 通过 mock 全局 fetch 让 /api/analysis/run 网络失败，
     // 触发 runAnalysis 抛 AnalysisError → 咨询页展示错误横幅。
     const fetchMock = jest
-      .fn()
-      .mockRejectedValue(new TypeError("network down"));
+      .fn<typeof fetch>()
+      .mockImplementation(() => Promise.reject(new TypeError("network down")));
     global.fetch = fetchMock as unknown as typeof fetch;
 
     render(<ConsultPage />);

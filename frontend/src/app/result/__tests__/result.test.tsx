@@ -144,12 +144,14 @@ describe("ResultPage", () => {
     );
     // 通过 mock 全局 fetch 让 /api/report/generate 返回 500，
     // 触发 downloadReport 抛 AnalysisError → 结果页展示错误横幅。
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-      json: async () => ({}),
-      blob: async () => new Blob([]),
-    } as unknown as Response);
+    const fetchMock = jest.fn<typeof fetch>().mockImplementation(() =>
+      Promise.resolve({
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+        blob: async () => new Blob([]),
+      } as Response),
+    );
     global.fetch = fetchMock as unknown as typeof fetch;
 
     render(<ResultPage />);
