@@ -265,6 +265,9 @@ from agents.enterprise.governance_traceability import (
 from agents.enterprise.production_readiness import (
     ProductionReadinessPreparationService,
 )
+from agents.enterprise.staging_validation import (
+    StagingValidationDisasterRecoveryService,
+)
 
 
 class EnterpriseOperationLayer:
@@ -650,6 +653,17 @@ class EnterpriseOperationLayer:
             audit=self.audit,
             identity=self.identity,
             permission_policy=self.agent_permission_policy,
+        )
+        # Phase 3.9.1：预生产验证与灾难恢复演练层。在准备层之上提供「纯验证 / 演练」
+        # 能力——把「生产准备体系是否可靠」以只读验证、模拟部署、回滚演练、恢复校验、
+        # 故障目录结构沉淀。本层复用同一审计实例、身份层；构造即断言
+        # safety_invariants_ok()（engineering_enabled 必须 False），且通过
+        # _RedLineForbiddenMixin 结构拦截开生产 / 出 approved / 真部署 / 改真实数据 /
+        # 写真实密钥 / 自动授权 / 代生产负责人（红线①~⑦）。不执行任何真实动作。
+        self.agent_staging_validation = StagingValidationDisasterRecoveryService(
+            org_id=org_id,
+            audit=self.audit,
+            identity=self.identity,
         )
 
     def is_activation_safe(self) -> bool:

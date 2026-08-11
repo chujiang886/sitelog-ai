@@ -199,6 +199,15 @@ class AuditActionCategory(str, Enum):
     PRODUCTION_READINESS_CHECK = "production_readiness_check"
     DEPLOYMENT_MANIFEST = "deployment_manifest"
     ROLLBACK_PLAN = "rollback_plan"
+    # Phase 3.9.1（T6）：预生产验证与灾难恢复演练层（审计动作大类 75 → 79）。四类均为
+    # **只读事实型**动作：仅如实记录「真实人工查看/登记预生产验证」「真实人工查看/
+    # 登记部署模拟」「真实人工查看/登记回滚演练」「真实人工查看/登记恢复校验」。
+    # 绝不承载批准/放行/自动部署/自动数据覆盖/自动密钥写入/代替生产负责人语义
+    # （红线①~⑦）。
+    STAGING_VALIDATION = "staging_validation"
+    DEPLOYMENT_SIMULATION = "deployment_simulation"
+    ROLLBACK_DRILL = "rollback_drill"
+    RECOVERY_VALIDATION = "recovery_validation"
 
 
 def require_human_actor(actor_kind: Any) -> None:
@@ -2718,6 +2727,98 @@ class AuditService(_RedLineForbiddenMixin):
             actor_kind=AuditActorKind.USER,
             actor_id=actor_id,
             category=AuditActionCategory.ROLLBACK_PLAN,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_staging_validation(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "review_staging_validation",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工查看/登记预生产验证（只读，红线①/③/⑦）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.STAGING_VALIDATION,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_deployment_simulation(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "review_deployment_simulation",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工查看/登记部署模拟（只读，禁止真实部署，红线②/③/⑦）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.DEPLOYMENT_SIMULATION,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_rollback_drill(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "review_rollback_drill",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工查看/登记回滚演练（只读，红线③/⑦）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.ROLLBACK_DRILL,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_recovery_validation(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "review_recovery_validation",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工查看/登记恢复校验（只读，禁止覆盖真实数据，红线④/⑤/⑦）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.RECOVERY_VALIDATION,
             action=action,
             target=target,
             detail=detail,

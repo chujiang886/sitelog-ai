@@ -18,11 +18,11 @@
     "authorization": "放行决策仅限主理人在人类终端执行；本基线不构成任何放行依据。"
   },
   "audit_category_contract": {
-    "total": 75,
+    "total": 79,
     "authority_file": "tests/agents/test_enterprise_knowledge_governance_audit.py",
-    "authority_assertion": "assert len(members) == 75",
+    "authority_assertion": "assert len(members) == 79",
     "policy": "全仓仅允许权威文件断言枚举总数；其余各层一律改用存在性契约（子集断言），避免『新增一类就要连改十几处旧测试』的脆性。",
-    "history": "3.8.25 起 68 → 3.8.26 +1(VIEW) = 69 → 3.8.30 +3(TRACE/TIMELINE/REPLAY) = 72 → 3.9.0 +3(PRODUCTION_READINESS_CHECK/DEPLOYMENT_MANIFEST/ROLLBACK_PLAN) = 75",
+    "history": "3.8.25 起 68 → 3.8.26 +1(VIEW) = 69 → 3.8.30 +3(TRACE/TIMELINE/REPLAY) = 72 → 3.9.0 +3(PRODUCTION_READINESS_CHECK/DEPLOYMENT_MANIFEST/ROLLBACK_PLAN) = 75 → 3.9.1 +4(STAGING_VALIDATION/DEPLOYMENT_SIMULATION/ROLLBACK_DRILL/RECOVERY_VALIDATION) = 79",
     "required_families": {
       "governance_traceability_3_8_30": [
         "GOVERNANCE_TRACE",
@@ -33,6 +33,12 @@
         "PRODUCTION_READINESS_CHECK",
         "DEPLOYMENT_MANIFEST",
         "ROLLBACK_PLAN"
+      ],
+      "staging_validation_3_9_1": [
+        "STAGING_VALIDATION",
+        "DEPLOYMENT_SIMULATION",
+        "ROLLBACK_DRILL",
+        "RECOVERY_VALIDATION"
       ],
       "governance_workflow": [
         "AGENT_GOVERNANCE_WORKFLOW_CREATE",
