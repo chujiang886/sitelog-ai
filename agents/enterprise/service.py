@@ -262,6 +262,9 @@ from agents.enterprise.governance_dashboard import (
 from agents.enterprise.governance_traceability import (
     GovernanceTraceabilityService,
 )
+from agents.enterprise.production_readiness import (
+    ProductionReadinessPreparationService,
+)
 
 
 class EnterpriseOperationLayer:
@@ -635,6 +638,18 @@ class EnterpriseOperationLayer:
             identity=self.identity,
             permission_policy=self.agent_permission_policy,
             orchestrator=self.agent_governance_workflow_orchestrator,
+        )
+        # Phase 3.9.0：生产就绪与受控激活准备层。在追踪层之上提供「纯准备」能力——
+        # 把上线前该检查 / 准备 / 由谁决策以只读结构与计划文档沉淀。本层复用同一审计
+        # 实例、身份层、AgentPermissionPolicy；构造即断言 safety_invariants_ok()
+        # （engineering_enabled 必须 False），且通过 _RedLineForbiddenMixin 结构拦截
+        # 开生产 / 出 approved / 真激活 / 改真实数据 / 写真实密钥 / 自动授权 /
+        # 代生产负责人（红线①~⑥）。不持有任何生产状态，绝不自动放行。
+        self.agent_production_readiness = ProductionReadinessPreparationService(
+            org_id=org_id,
+            audit=self.audit,
+            identity=self.identity,
+            permission_policy=self.agent_permission_policy,
         )
 
     def is_activation_safe(self) -> bool:

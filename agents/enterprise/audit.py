@@ -192,6 +192,13 @@ class AuditActionCategory(str, Enum):
     GOVERNANCE_TRACE = "governance_trace"
     GOVERNANCE_TIMELINE = "governance_timeline"
     GOVERNANCE_REPLAY = "governance_replay"
+    # Phase 3.9.0（T7）：生产就绪与受控激活准备层（审计动作大类 72 → 75）。三类均为
+    # **只读事实型**动作：仅如实记录「真实人工查看/登记生产就绪检查」「真实人工查看/
+    # 登记部署清单」「真实人工查看/登记回滚计划」。绝不承载批准/放行/自动激活/
+    # 自动修改生产状态（红线①~⑥）。
+    PRODUCTION_READINESS_CHECK = "production_readiness_check"
+    DEPLOYMENT_MANIFEST = "deployment_manifest"
+    ROLLBACK_PLAN = "rollback_plan"
 
 
 def require_human_actor(actor_kind: Any) -> None:
@@ -2634,6 +2641,83 @@ class AuditService(_RedLineForbiddenMixin):
             actor_kind=AuditActorKind.USER,
             actor_id=actor_id,
             category=AuditActionCategory.GOVERNANCE_REPLAY,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    # ------------------------------------------------------------------
+    # Phase 3.9.0（T7）：生产就绪与受控激活准备层审计入口
+    #
+    # 三个方法均**强制** actor_kind = USER（actor 真实，红线⑥），仅如实记录人工
+    # 发起的只读事实动作；不提供任何「AI 自动写审计」入口，也绝不提供
+    # ``record_human_approval``（已被 ``_FORBIDDEN`` 于 mixin 层拦截，红线②/⑥）。
+    # ------------------------------------------------------------------
+
+    def record_production_readiness_check(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "review_readiness_checklist",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工查看/登记生产就绪检查（只读，红线①/③/⑥）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.PRODUCTION_READINESS_CHECK,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_deployment_manifest(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "review_deployment_manifest",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工查看/登记部署清单（只读，禁止写真实密钥，红线②/⑤/⑥）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.DEPLOYMENT_MANIFEST,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_rollback_plan(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "review_rollback_plan",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工查看/登记回滚计划（只读，红线③/⑤/⑥）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.ROLLBACK_PLAN,
             action=action,
             target=target,
             detail=detail,
