@@ -541,7 +541,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v4.0.0</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v4.1.0</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -757,22 +757,16 @@
   >
     <div class="bg-white rounded-xl p-6 w-full max-w-lg shadow-2xl" @click.stop>
       <div class="flex items-center justify-between mb-4">
-        <h3 class="font-bold text-lg text-slate-900">📄 导出 PDF 操作指引</h3>
+        <h3 class="font-bold text-lg text-slate-900">📄 导出文档操作指引</h3>
         <button @click="closeExportGuide()" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">×</button>
       </div>
 
       <div class="space-y-3 text-sm text-slate-700 leading-relaxed">
-        <p class="font-semibold text-slate-900">点击下方「⬇️ 立即下载 PDF」，浏览器会自动把报告保存为 PDF 文件，无需再选打印机。</p>
+        <p class="font-semibold text-slate-900">现在导出的 PDF，AI 识别的文字是<strong>真实文字</strong>（不是图片），可选中、复制、在 Acrobat / WPS 里直接改。发现识别不对，<strong>先改再发客户</strong>。</p>
 
         <div class="bg-blue-50 border-l-4 border-blue-500 rounded p-4 space-y-2">
-          <p><strong class="text-blue-900">第 1 步</strong>：点「<strong>立即下载 PDF</strong>」按钮。</p>
-          <p><strong class="text-blue-900">第 2 步</strong>：浏览器弹出文件夹选择窗口，你可以选：</p>
-          <ul class="ml-4 space-y-1 text-slate-600">
-            <li>• 桌面（最方便）</li>
-            <li>• 业主专属文件夹</li>
-            <li>• 网盘同步目录（OneDrive / iCloud / 百度网盘）</li>
-          </ul>
-          <p><strong class="text-blue-900">第 3 步</strong>：点「<strong>保存</strong>」 → 完成！文件就在你刚选的文件夹里。</p>
+          <p><strong class="text-blue-900">下载 PDF（文字可改）</strong>：点「⬇️ 下载 PDF」→ 浏览器弹打印窗口 → 目标选「另存为 PDF」→ <strong>务必勾选「背景图形」</strong>（否则墨绿封面会变白）→ 保存。</p>
+          <p><strong class="text-blue-900">需要大改文字</strong>：点「📝 导出可编辑文档」下载 .html，用浏览器 / WPS 打开直接改，改完同样「打印 → 另存为 PDF」。</p>
         </div>
 
         <div class="bg-amber-50 border-l-4 border-amber-500 rounded p-3 text-xs text-amber-900">
@@ -798,7 +792,8 @@
 
       <div class="flex justify-end gap-2 pt-4 mt-4 border-t border-slate-200">
         <button @click="closeExportGuide()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition">取消</button>
-        <button @click="generatePDF()" class="px-5 py-2 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800 transition">⬇️ 立即下载 PDF</button>
+        <button @click="exportEditableHTML()" class="px-5 py-2 bg-[#1F3D2A] text-white rounded-lg text-sm hover:opacity-90 transition">📝 导出可编辑文档</button>
+        <button @click="generatePDF()" class="px-5 py-2 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800 transition">⬇️ 下载 PDF（文字可改）</button>
       </div>
     </div>
   </div>
@@ -1824,230 +1819,110 @@
         async generatePDF() {
           // 同步最后一次编辑到 reportHtml
           this.syncToReport();
-
           const container = document.getElementById('report-content');
           if (!container) {
             this.showToast('❌ 未找到报告内容，请刷新后重试', 'error');
             return;
           }
 
-          // ═══════════════════════════════════════════════════════
-          // ★ 关键架构变更 v2.5.0：放弃 cloneNode 离屏方案
-          //   cloneNode 产生的节点脱离文档流 → html2canvas 算不出布局
-          //   （offsetWidth/offsetHeight 全为 0）→ 空 canvas → 0 字节 PDF
-          //
-          //   新方案：「临时隐藏 → 渲染 → 恢复」
-          //   直接操作真实 DOM，html2canvas 能正确计算尺寸
-          // ═══════════════════════════════════════════════════════
-
-          // 1. 收集需要临时隐藏的元素及其原始 display 值
-          const hiddenStack = [];
-          function hide(selector) {
-            container.querySelectorAll(selector).forEach(el => {
-              hiddenStack.push({ el, backup: el.style.display });
-              el.style.display = 'none';
-            });
-          }
-          // ═══ PDF 导出时只隐藏「交互元素」和「调试信息」═══
-          // 不再隐藏 .pending-confirm —— 已分析的图片节点必须进 PDF
-          // （AI 分析完默认 aiConfirmed=false，全藏了就只剩文字模板）
-          hide('button[data-action="confirm"]'); // 确认/撤销按钮不进 PDF
-          hide('button[data-action="reanalyze"]'); // 重分析按钮不进 PDF
-          hide('details.debug-panel');            // 调试面板不进 PDF
-          // 隐藏 node-block 里的操作按钮行（保留内容，去掉交互）
-          container.querySelectorAll('.node-block .flex.gap-1').forEach(el => {
-            if (el.querySelector('button')) {
-              hiddenStack.push({ el, backup: el.style.display });
-              el.style.display = 'none';
-            }
-          });
-
-          // ═══════════════════════════════════════════════════════
-          // ★ v4.0.0：A4 版心锁定
-          //   把 #report-content 宽度强制为 680px（= 180mm @96dpi，
-          //   即 A4 去掉左右各 15mm 页边距后的内容区宽度）
-          //   → 无论同事用手机、平板还是 27 寸宽屏导出，
-          //     PDF 的字号 / 换行 / 图文比例完全一致，不会再各看各的样
-          //   注意：以下全部为「同步」DOM 操作，不能插入 await，
-          //         否则会丢失用户手势上下文导致 showSaveFilePicker 报错
-          // ═══════════════════════════════════════════════════════
-          const styleBackup = container.getAttribute('style');
-          container.classList.add('pdf-exporting');
-
-          // 导出遮罩（盖住版心切换的瞬间跳动）
-          const mask = document.createElement('div');
-          mask.className = 'pdf-export-mask';
-          mask.innerHTML =
-            '<div class="pdf-export-mask-box">' +
-              '<div class="pdf-export-spinner"></div>' +
-              '<div class="t">正在按 A4 规范排版</div>' +
-              '<div class="s">逐页计算分页点，卡片不会被切开…</div>' +
-            '</div>';
-          document.body.appendChild(mask);
-
-          // 优先用用户输入的文件名，否则从 h1 取，再否则用 reportTitle
+          // 文件名
           let baseName = '';
           if (this.pdfFilename && this.pdfFilename.trim()) {
             baseName = this.pdfFilename.trim();
           } else {
             const h1 = container.querySelector('h1');
-            if (h1 && h1.innerText.trim()) {
-              baseName = h1.innerText.trim();
-            } else {
-              baseName = this.reportTitle || '施工归档';
-            }
+            baseName = (h1 && h1.innerText.trim()) ? h1.innerText.trim() : (this.reportTitle || '施工归档');
           }
-          const cleanName = baseName.replace(/\.pdf$/i, '').replace(/[\\/:*?"<>|]/g, '_').trim();
-          const filename = (cleanName || '施工归档') + '.pdf';
+          const cleanName = baseName.replace(/\.pdf$/i, '').replace(/[\/:*?"<>|]/g, '_').trim() || '施工归档';
 
-          // 关闭弹窗
           this.exportGuideOpen = false;
-          this.showToast('📄 正在生成 PDF，请稍候...');
+          this.showToast('📄 正在准备打印，请在弹窗选「另存为 PDF」…');
 
           try {
-            // 前置检查：依赖库是否加载
-            if (typeof window.html2pdf !== 'function') throw new Error('html2pdf 库未加载，请刷新页面重试');
-            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) throw new Error('jsPDF 库未加载，请刷新页面重试');
-            if (typeof window.html2canvas === 'undefined') throw new Error('html2canvas 库未加载，请刷新页面重试');
+            // ═══ v4.1.0：浏览器原生打印（文字真实可选中 / 可编辑的 PDF） ═══
+            // 告别 html2canvas 截图（文字被烤成图片 → 无法修改、无法复制）
+            // 做法：把报告区克隆进隐藏 iframe，注入打印样式后调用 iframe.print()
+            // 用户在打印窗口选「另存为 PDF」即可，得到的 PDF 文字是真实文字层
+            let css = '';
+            document.querySelectorAll('style').forEach(st => { css += st.textContent + NL; });
 
-            // ═══ v4.0.0 A4 规范化排版配置 ═══
-            // margin 顺序：[上, 左, 下, 右]（mm）
-            //   上 14 / 左右 15 / 下 16（下方 16mm 留给统一页脚）
-            //   内容区 = 180mm × 267mm，正是打印安全区
-            const opt = {
-              margin:       [14, 15, 16, 15],
-              filename:     filename,
-              image:        { type: 'jpeg', quality: 0.92 },   // 0.92 在 A4 打印下已看不出损失，体积却小一大截
-              html2canvas:  { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
-              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-              // 不可切割块：分页时若切点落在其内部，整块推到下一页
-              pagebreak: {
-                avoid: [
-                  '.node-card',          // 图文节点卡片（断层重灾区）
-                  '.pdf-cover',          // 封面
-                  '.pdf-section-header', // 章节标题（避免孤行）
-                  '.pdf-editable-box',   // 文字段落框
-                  '.pdf-info-card',      // 影像追溯卡
-                  '.pdf-check-card',     // 自检卡
-                  '.pdf-callout',        // SOP / 声明框
-                  '.pdf-footer'          // 落款页脚
-                ],
-                after: ['.pdf-cover']    // 封面之后强制换页 → 封面独占第 1 页
-              },
-              footer: {
-                enabled:   true,
-                text:      '汕头市初匠门窗科技有限公司 · 工程影像归档',
-                pageLabel: ''
-              }
-            };
+            const clone = container.cloneNode(true);
+            clone.removeAttribute('id');
+            clone.setAttribute('id', 'report-content');
+            clone.querySelectorAll('button, [data-action], details.debug-panel').forEach(el => el.remove());
 
-            console.log('📄 [PDF] v4.0.0 A4 规范化排版:', filename,
-              '版心:', container.offsetWidth + 'x' + container.offsetHeight,
-              '(目标 680px)',
-              '隐藏元素数:', hiddenStack.length);
+            const printCss =
+              '@page{size:A4;margin:14mm 15mm 16mm 15mm}'
+              + '*,*::before,*::after{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
+              + 'html,body{margin:0!important;padding:0!important;background:#fff!important}'
+              + '#report-content{width:100%!important;max-width:none!important;margin:0!important;padding:0!important;box-shadow:none!important;border:none!important;background:#fff!important}'
+              + '.node-card,.pdf-editable-box,.pdf-section-header,.pdf-info-card,.pdf-check-card,.pdf-callout,.pdf-footer,.pdf-cover{break-inside:avoid;page-break-inside:avoid}'
+              + '.pdf-cover{break-after:page;page-break-after:always}'
+              + 'button,[data-action],.no-print{display:none!important}'
+              + '[contenteditable]:hover,[contenteditable]:focus{background:transparent!important}';
 
-            // ── A. 尝试原生「另存为」对话框（需 https / localhost）──
-            let saveHandle = null;
-            let useNativePicker = false;
-            if (typeof window.showSaveFilePicker === 'function') {
-              try {
-                saveHandle = await window.showSaveFilePicker({
-                  suggestedName: filename,
-                  types: [{ description: 'PDF 文档', accept: { 'application/pdf': ['.pdf'] } }]
-                });
-                useNativePicker = true;
-                console.log('📄 [PDF] ✅ 拿到原生保存句柄');
-              } catch (e) {
-                if (e && e.name === 'AbortError') { this.showToast('已取消保存'); return; }
-                console.warn('📄 [PDF] 原生选择器不可用，降级:', e.message);
-                saveHandle = null;
-              }
-            }
+            const docHtml =
+              '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
+              + '<title>' + cleanName + '</title>'
+              + '<style>' + css + '</style>'
+              + '<style>' + printCss + '</style>'
+              + '</head><body>' + clone.outerHTML + '</body></html>';
 
-            // ── A2. 等浏览器按 680px 版心完成重排（关键！）──
-            //   分页坐标是渲染前从真实 DOM 量出来的，
-            //   必须确保此刻布局已经是 A4 版心，否则坐标全错
-            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-            // 等图片在新宽度下解码完成，避免量到 0 高度
-            const imgs = Array.from(container.querySelectorAll('img'));
-            await Promise.all(imgs.map(im => (im.complete && im.naturalHeight)
+            const iframe = document.createElement('iframe');
+            iframe.setAttribute('aria-hidden', 'true');
+            iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+            document.body.appendChild(iframe);
+            const idoc = iframe.contentDocument || iframe.contentWindow.document;
+            idoc.open(); idoc.write(docHtml); idoc.close();
+
+            await new Promise(r => setTimeout(r, 700));
+            const imgs = Array.from(idoc.images);
+            await Promise.all(imgs.map(im => (im.complete && im.naturalWidth)
               ? Promise.resolve()
-              : new Promise(res => { im.onload = im.onerror = res; setTimeout(res, 1500); })));
-            console.log('📄 [PDF] 版心重排完成:', container.offsetWidth + 'px', '图片数:', imgs.length);
+              : new Promise(res => { im.onload = im.onerror = res; setTimeout(res, 2500); })));
 
-            // ── B. 渲染 PDF（操作真实 DOM 容器）──
-            const pdfInstance = await html2pdf().set(opt).from(container).build();
-            console.log('📄 [PDF] 渲染完成, 页数:',
-              pdfInstance ? pdfInstance.internal.getNumberOfPages() : 'NULL');
+            const w = iframe.contentWindow;
+            w.focus();
+            w.print();
 
-            // ── C. 输出 PDF 数据（用 datauristring —— 与 save() 同路径，最稳定）──
-            const dataUri = pdfInstance.output('datauristring');
-            console.log('📄 [PDF] dataURI 长度:', dataUri.length,
-              '前缀:', dataUri.slice(0, 40));
-
-            // 校验数据非空
-            if (!dataUri || dataUri.length < 100) {
-              throw new Error('PDF 数据异常（长度=' + (dataUri||'').length + '），可能是渲染失败');
-            }
-
-            // base64 → 二进制
-            const b64Part = dataUri.split(',')[1];
-            if (!b64Part) {
-              throw new Error('PDF dataURI 格式异常，找不到 base64 数据部分');
-            }
-            const rawBinary = atob(b64Part);
-            const bytes = new Uint8Array(rawBinary.length);
-            for (let i = 0; i < rawBinary.length; i++) {
-              bytes[i] = rawBinary.charCodeAt(i);
-            }
-            console.log('📄 [PDF] 二进制大小:', bytes.length, '字节',
-              '(约', (bytes.length / 1024).toFixed(1), 'KB)');
-
-            // 校验 PDF 文件头
-            const header = String.fromCharCode(...bytes.slice(0, 5));
-            if (header !== '%PDF-') {
-              throw new Error('PDF 文件头异常: "' + header + '"，期望 "%PDF-"');
-            }
-
-            // ── D. 写入目标 ──
-            if (useNativePicker && saveHandle) {
-              // D1. 原生文件句柄写入
-              const writable = await saveHandle.createWritable();
-              await writable.write(bytes);
-              await writable.close();
-              console.log('📄 [PDF] ✅ 已通过原生对话框写入:', bytes.length, '字节');
-              this.showToast('✅ PDF 已保存：' + filename);
-            } else {
-              // D2. 降级：走 jsPDF.save() 自动下载（已验证能产出正常文件）
-              console.log('📄 [PDF] 降级使用 jsPDF.save() 自动下载');
-              pdfInstance.save(filename);
-              this.showToast('✅ PDF 已下载：' + filename + '（如需选择位置请用 Chrome 打开 https 版本）', 'info', 5000);
-            }
-
+            this.showToast('✅ 已呼起打印窗口，选「另存为 PDF」即可（建议勾选「背景图形」）', 'info', 6000);
+            setTimeout(() => { if (iframe.parentNode) iframe.parentNode.removeChild(iframe); }, 1500);
           } catch (err) {
-            console.error('❌ [PDF] v4.0.0 生成失败:', err.message, err.stack);
-            const hint = err.message.includes('jsPDF') || err.message.includes('jspdf')
-              ? '（jsPDF 库加载失败 → 刷新页面即可）'
-              : err.message.includes('html2canvas') || err.message.includes('canvas')
-                ? '（页面渲染截图失败 → 检查图片是否过大或网络问题）'
-                : '';
-            this.showToast('❌ PDF 生成失败: ' + err.message.slice(0, 80) + hint, 'error');
-          } finally {
-            // ═══ 无论成功失败，必须完全还原页面状态 ═══
-            hiddenStack.forEach(({ el, backup }) => {
-              el.style.display = backup;  // '' 还原为 CSS 默认值
-            });
-            // 解除 A4 版心锁定，回到正常网页浏览宽度
-            container.classList.remove('pdf-exporting');
-            if (styleBackup === null) {
-              container.removeAttribute('style');
-            } else {
-              container.setAttribute('style', styleBackup);
-            }
-            // 移除导出遮罩
-            if (mask && mask.parentNode) mask.parentNode.removeChild(mask);
-            console.log('📄 [PDF] 已还原页面：', hiddenStack.length, '个隐藏元素 + A4 版心解锁');
+            console.error('❌ [PDF] v4.1.0 打印失败:', err.message, err.stack);
+            this.showToast('❌ PDF 导出失败: ' + err.message.slice(0, 80), 'error');
           }
+        },
+
+        // ===== 导出可编辑 HTML（文字 100% 可改，给需要大改的场景） =====
+        exportEditableHTML() {
+          this.syncToReport();
+          const container = document.getElementById('report-content');
+          if (!container) { this.showToast('❌ 未找到报告内容，请刷新后重试', 'error'); return; }
+          let css = '';
+          document.querySelectorAll('style').forEach(st => { css += st.textContent + NL; });
+          const clone = container.cloneNode(true);
+          clone.removeAttribute('id');
+          clone.setAttribute('id', 'report-content');
+          clone.querySelectorAll('button, [data-action], details.debug-panel').forEach(el => el.remove());
+          const safeName = (this.pdfFilename && this.pdfFilename.trim())
+            ? this.pdfFilename.trim().replace(/\.pdf$/i, '').replace(/[\/:*?"<>|]/g, '_')
+            : '施工归档';
+          const tip = '<p class="export-tip">✏️ 直接点击文中任意文字即可修改。改完后用浏览器菜单「打印 → 另存为 PDF」生成可发给客户的文件（文字真实可选中，可在 Acrobat / WPS 中继续编辑）。</p>';
+          const docHtml =
+            '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
+            + '<title>' + safeName + '</title>'
+            + '<style>' + css + '</style>'
+            + '<style>body{padding:24px;background:#eef0f3}'
+            + '.export-tip{font:14px/1.6 system-ui,"Segoe UI",sans-serif;color:#1F3D2A;background:#fff8e6;border:1px solid #f0d999;border-radius:8px;padding:12px 16px;margin:0 auto 18px;max-width:840px}'
+            + '[contenteditable]:focus{outline:2px solid #B8924A;background:#fffdf5;border-radius:3px}'
+            + '</style></head><body>' + tip + clone.outerHTML + '</body></html>';
+          const blob = new Blob([docHtml], { type: 'text/html;charset=utf-8' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = safeName + '.html';
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+          this.showToast('✅ 可编辑文档已下载（.html），用浏览器/WPS 打开即可改文字');
         },
 
         // 关闭导出指引
