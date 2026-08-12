@@ -1,0 +1,28 @@
+{
+  "phase": "3.9.2",
+  "layer": "Enterprise Production Release Gate & Evidence Package Layer",
+  "generated_at": "2026-08-12T03:51:07.630545+00:00",
+  "commit_a_head": "ea5724532075c40f7d6c568cfbf6036b8bc11bff",
+  "tool": "scripts/generate_production_release_manifest.py",
+  "total_count": 16,
+  "missing_count": 0,
+  "entries": {
+    "agents/enterprise/production_release/__init__.py": "4656101c46739c01b17cc7b075c94c0d25c49653fca0ea981dc4c096008da1e7",
+    "agents/enterprise/production_release/forbidden.py": "77491bfdbf17c290f88a0c20ae80f99a3baafc7bcc4d7bca9d3b32e63b4185d1",
+    "agents/enterprise/production_release/models.py": "38c16eaee4dd15861aa9e7b2c71fd8050416145a734100115d8a40b0c8eb48d5",
+    "agents/enterprise/production_release/evidence.py": "7d2b1480f5ca404846731027c6492242a1e2d1e64cd84e85e8e9e94f93caf083",
+    "agents/enterprise/production_release/gate.py": "f4ae0ad04f813323bf36a57e4d071118281bb6fb1071857aef84a78b182c5e2f",
+    "agents/enterprise/production_release/package.py": "46f6948477f0fd095627be1ca0f0876b1a870e71e01ee9236f67753eb91066e1",
+    "agents/enterprise/production_release/service.py": "750eeac039c7342d8f8462928c68d168800b051c7bc3f58875050c785a1f52ad",
+    "backend/app/api/governance_release.py": "c218c27374d6cd0583a9bba190dac10a96b52530f0a3a833d8fbda534c9fef60",
+    "tests/agents/test_production_release_gate_evidence.py": "ac8f0ace052fbcc3d6a56ba51dbe568ca51f8508e50e495c718e0f6eb892bc70",
+    ".ai/runbooks/production_release/controlled_activation.md": "eba23575231c7f2c4c0a6b158abf1566f7cb3cd54c7b59cbb4542b16a56ce728",
+    ".ai/runbooks/production_release/rollback.md": "4001d5b0a1c4a176f26b632f1b8f03eabb2df883047dde9df9023aef99ac0cbc",
+    ".ai/runbooks/production_release/disaster_recovery_drill.md": "ef274a2eea99ac4c4497fc1a1f0f81efc46422cfa0fa3a8fb7880913b00421b6",
+    ".ai/reviews/phase3.9.2_production_release_gate_evidence_package_report.md": "d9420f7c02009954b4556addc447d315030e3ee9fafd6e35895492748135431c",
+    ".ai/project_status.json": "01f9a7aef27215f8789c95e3981678c26cddb5a47a269a16632306e95617490e",
+    ".ai/baselines/phase3.8_governance_release_baseline.json": "fbe6f7aa258644c89e27e9f46b9bf7666fc9bf39c1f834dfefa97ca8afcbf1a4",
+    "scripts/generate_production_release_manifest.py": "040c88aa4b91dcbb522f4fa14cd3ae55907cf114b92157bfffc5fa1896280eca"
+  },
+  "note": "manifest 仅描述 Commit A 交付产物的哈希与 HEAD；不包含真实密钥、真实权限、真实激活。真实生产部署与 engineering_enabled 开启只能源于人类终端。"
+}
