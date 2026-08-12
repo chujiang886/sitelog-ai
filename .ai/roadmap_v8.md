@@ -1899,9 +1899,9 @@ GovernanceWorkflowRepository (require_human_actor + OrgScopeError)  ──snapsh
 - **STOP：不进入 Phase 3.8.32**，不自动开启 `engineering_enabled`，不输出 `engineering_approved`，不自动放行发布。本阶段产物**全部未提交**，等待主理人审核授权。
 ---
 
-## 35. Phase 3.9.0–3.9.3 生产发布闸门与可观测性体系（概览）
+## 35. Phase 3.9.0–3.9.4 生产发布闸门与可观测性体系（概览）
 
-四阶段构成「生产发布前」的镜像验证、闸门收口与可观测性准备链，全部 **BUILT_NO_GO**，等待主理人线下授权：
+五阶段构成「生产发布前」的镜像验证、闸门收口与可观测性准备链，全部 **BUILT_NO_GO**，等待主理人线下授权：
 
 | 阶段 | 定位 | 包 / 报告 | 审计总数 |
 |------|------|----------|---------|
@@ -1909,16 +1909,21 @@ GovernanceWorkflowRepository (require_human_actor + OrgScopeError)  ──snapsh
 | 3.9.1 | 预生产验证与灾难恢复演练层（只验证能否扛住验证/灾难） | `agents/enterprise/staging_validation/` · `phase3.9.1_staging_validation_disaster_recovery_report.md` | 79→83（本链 +4） |
 | 3.9.2 | 企业生产发布闸门与证据包层（只核验是否达到人工签署门槛） | `agents/enterprise/production_release/` · `phase3.9.2_production_release_gate_evidence_package_report.md` | 83 |
 | 3.9.3 | 企业生产可观测性、SRE 与事故响应准备层（只建准备层，不真接入/不真告警/不自动修复） | `agents/enterprise/production_observability/` · `phase3.9.3_production_observability_incident_readiness_report.md` | 89→96（本链 +7；含 3.9.2 受控激活/RC冻结层遗留 +6） |
+| 3.9.4 | 生产遥测接入适配与合成运维验证层（只建适配层与合成演练，不真接入/不真外发告警/不自动回滚/不替代 SRE） | `agents/enterprise/telemetry/` · `phase3.9.4_telemetry_synthetic_operations_report.md` | 96→100（本链 +4，归属详见 `.ai/progress/phase3.9.4_audit_contract_provenance.md`） |
 
 ### 35.1 3.9.2 交付物与门禁
 
-- **包**：`agents/enterprise/production_release/`（forbidden / models / evidence / gate / package / service / __init__ 七文件）；`PRODUCTION_RELEASE_FORBIDDEN_COUNT = 314`，Gate `CHECK_KEYS = 13`。
+- **包**：`agents/enterprise/production_release/`（forbidden / models / evidence / gate / package / service / __init__ 七文件 + 本 turn 新增 release_candidate / freeze_manifest / freeze_checker / activation_evidence / activation_gate / human_approval / freeze_forbidden）；`PRODUCTION_RELEASE_FORBIDDEN_COUNT = 314`，Gate `CHECK_KEYS = 13`；受控激活禁名集 `FREEZE_ACTIVATION_FORBIDDEN_COUNT = 327`。
+- **RC 冻结 / 受控激活增量（本 turn）**：`release_candidate.py`（RC 模型，activation_approved 恒 False）/ `freeze_manifest.py`（SHA-256 自洽）/ `freeze_checker.py`（7 维只读判定 FROZEN↔DRIFTED）/ `activation_evidence.py`（is_complete 缺真实签署恒 False）/ `activation_gate.py`（ControlledActivationGate，三态 + 永不 ACTIVATED_BY_HUMAN）/ `human_approval.py`（契约只读 + 禁名拦截，不翻转 engineering_enabled）。
 - **后端接线**：`backend/app/api/governance_release.py`（只读 + 签署端点，强制真实 USER 主体，AI 主体 403）。
 - **前端**：`frontend/src/app/governance-release/page.tsx`（只读展示 + 人工签署，无自动上线 / 无 AI 批准按钮）；`frontend/src/lib/identity/{types,guards}.ts` 同步 `governance:release:read` / `governance:release:signoff`。
-- **测试**：`tests/agents/test_production_release_gate_evidence.py`（23 例）、`tests/agents/test_enterprise_production_release.py`（27 例）、`backend/tests/test_governance_release.py`（31 例）全绿；agents 全量套件 2305 passed / 0 failed；backend 323 passed；frontend jest 117 passed；tsc 0 error。
+- **测试**：`tests/agents/test_production_release_gate_evidence.py`（23 例）、`tests/agents/test_enterprise_production_release.py`（27 例）、`backend/tests/test_governance_release.py`（31 例）、`tests/agents/test_enterprise_rc_freeze_activation_gate.py`（42 例）全绿；agents 全量套件 **2372 passed / 1 failed**（真实复跑；1 失败为 `test_main_on_real_repository_exits_zero`，因仓库级 `phase_3_9_4.report` 幽灵缺口触发，属 3.9.4 线缺陷，非本层）；backend **374 passed**；frontend jest 117 passed；tsc 0 error。
+- **CI 门禁**：`scripts/ci_release_gate.py`（只读 fail-closed）+ `.github/workflows/release-gate.yml`（三 job）+ `.ai/release-gate/rc-spec.3.9.2.json`；已修正 `engineering_enabled` 摘要误标（曾把 grep 命中 'engineering_enabled: false' 反向标为 true，现用 `load_engineering_enabled()` 真实读取为 false）。
 - **清单（SHA-256）**：由 `ProductionReleaseService.build_manifest` 在运行时生成（T6），缺文件标 `<missing>`，不伪造——非独立脚本；证据完整性链见 `ProductionReleaseEvidenceService.verify_integrity`。
-- **SSOT**：`.ai/project_status.json` 已登记 `phase_3_9_0/1/2_status`（均 `BUILT_NO_GO`）；治理仓库完整性检查器 9/9 通过。
-- **十项最高红线**（绝对不可修改 / 弱化）：①`engineering_enabled=false` ②禁 `engineering_approved` ③禁 AI 自动批准发布 ④禁 AI 自动执行部署 ⑤禁 AI 修改真实企业数据 ⑥禁 AI 写真实生产密钥 ⑦禁 AI 自动授予生产权限 ⑧禁 AI 代签 ⑨禁把 staging/drill 描述成 production verified ⑩禁通过跳测试 / 改安全断言 / 伪造证据让 Gate 变绿——全部 fail-closed，门禁 `ProductionReleaseGate` 永不返回 `APPROVED`/`GO`。
+- **运行手册**：`docs/PRODUCTION_ACTIVATION_ROLLBACK_RUNBOOK.md`（fail-closed 放行前置 / 标准放行 / 回滚 / 红线）。
+- **SSOT**：`.ai/project_status.json` 已登记 `phase_3_9_0/1/2_status`（均 `BUILT_NO_GO`），`phase_3_9_2` 详情对象补 RC 候选 id `boip-rc-3.9.2`、闸门状态、冻结状态、报告路径（见本文件）。
+- **仓库级完整性外部缺口（透明披露）**：当下治理完整性检查报告 1 处缺口（实测 **8/9**）——`phase_3_9_4.report` 指向 `.ai/reviews/phase3.9.4_telemetry_synthetic_operations_report.md`（不存在，3.9.4 线既有幽灵登记）。其 SSOT 登记 `audit=100`，与权威基线 `total=100` **一致，无冲突**（3.9.4 telemetry +4 已随 9201a7d / 6ddb9a3 提交）。此缺口独立于 3.9.2，须由 3.9.4 负责人线下补齐报告或修正 SSOT 路径；补齐后仓库级完整性恢复 9/9，3.9.2 冻结检查器 `governance_integrity_9_9` 子项随之通过。注意：roadmap §35.1 的 3.9.4 段仍记"2373 passed/0 failed、完整性 9/9"，该记录写于幽灵登记之前，已与实时检查器（2372 passed/1 failed、8/9）不一致，属 3.9.4 段口径滞后，非本层问题。3.9.2 自身的组件哈希 / 清单自洽 / engineering_enabled=false / RC 状态等冻结维度独立判定均通过。
+- **十项最高红线**（绝对不可修改 / 弱化）：①`engineering_enabled=false` ②禁 `engineering_approved` ③禁 AI 自动批准发布 ④禁 AI 自动执行部署 ⑤禁 AI 修改真实企业数据 ⑥禁 AI 写真实生产密钥 ⑦禁 AI 自动授予生产权限 ⑧禁 AI 代签 ⑨禁把 staging/drill 描述成 production verified ⑩禁通过跳测试 / 改安全断言 / 伪造证据让 Gate 变绿——全部 fail-closed，门禁 `ProductionReleaseGate` / `ControlledActivationGate` 永不返回 `APPROVED`/`GO`/`ACTIVATED_BY_HUMAN`。
 
 ### 35.2 3.9.3 交付物与门禁（企业生产可观测性、SRE 与事故响应准备层）
 
@@ -1930,7 +1935,24 @@ GovernanceWorkflowRepository (require_human_actor + OrgScopeError)  ──snapsh
 - **SSOT**：`.ai/project_status.json` 已登记 `phase_3_9_3_status`（`BUILT_NO_GO`）；基线 `audit_category_contract.total = 96`、权威测试 `== 96` 同步（另含 3.9.2 受控激活/RC冻结层遗留 +6，详见 `.ai/progress/phase3.9.4_audit_contract_provenance.md`）。
 - **十二项最高红线**（绝对不可修改 / 弱化）：①`engineering_enabled=false` ②禁 `engineering_approved` ③禁 AI 自动批准发布 ④禁 AI 自动执行部署 ⑤禁 AI 修改真实企业数据 ⑥禁 AI 写真实生产密钥 ⑦禁 AI 自动授予生产权限 ⑧禁 AI 自动关闭 Incident ⑨禁 AI 代 SRE/production-owner/security-owner/incident-commander 责任签署 ⑩禁 AI 代替人工责任 ⑪禁把模拟监控数据描述成真实 production observation ⑫禁通过删安全断言 / 跳失败测试 / 降权 / 伪造监控证据让观测门禁变绿——全部 fail-closed。
 
-### 35.3 状态结论与 STOP 纪律
+### 35.3 状态结论与 STOP 纪律（3.9.0–3.9.3）
 
-- **状态：🟢 BUILT_NO_GO（已收口，2026-08-12）**。
-- **STOP：不进入 Phase 3.9.4+**，不真接入生产可观测性数据源、不真发送告警、不自动修复/回滚/关单、不自动开启 `engineering_enabled`，不输出 `engineering_approved`。本阶段产物待主理人审核授权后精路径 commit（包 + 测试 + API/前端 + 审计 + SSOT + 部署指南 §14 + 本指南 + roadmap + 24 节收口报告）。
+- **状态：🟢 BUILT_NO_GO（3.9.0–3.9.3 已收口，2026-08-12）**。
+- **STOP：不进入 Phase 3.9.4 的「真接入/真外发」阶段**，不真接入生产可观测性数据源、不真发送告警、不自动修复/回滚/关单、不自动开启 `engineering_enabled`，不输出 `engineering_approved`。3.9.0–3.9.3 产物待主理人审核授权后精路径 commit（包 + 测试 + API/前端 + 审计 + SSOT + 部署指南 §14 + 本指南 + roadmap + 24 节收口报告）。
+
+### 35.4 3.9.4 交付物与门禁（生产遥测接入适配与合成运维验证层）
+
+- **包**：`agents/enterprise/telemetry/`（forbidden / models / provider / normalizer / aggregator / registry / alerts / synthetic / metrics / health / correlation / service / __init__ 十三文件）；`TelemetryProvider` 端口（ABC + 5 抽象方法）+ 具体适配器（Synthetic/Prometheus/OTel），未配置真实源→空/`NOT_CONFIGURED`，**绝不降级伪装为 Synthetic（红线⑪）**；`TelemetryNormalizer` 把信封统一为 `production_observability/models.py` 的 `ServiceHealth`/`MetricSnapshot` 等；`TelemetryAggregator` 在「仅合成源」时返回 `synthetic_only`（不判 `operational`）。
+- **告警路由**：`TelemetryAlertRouter`——合成源仅 `SIMULATED_DELIVERY`（不真实外发），未配置源→`null`；禁真实发送 PagerDuty/企业微信/Slack/Email（红线⑫）；Runbook 仅引用不执行（红线⑬）。
+- **后端接线**：`backend/app/api/governance_telemetry.py`（9 路由，OBSERVABILITY_READ + INCIDENT_ACTION；生产环境 `is_production=True` 时合成演练 403；真实 USER 强制、AI 主体 403；`auto_*` 全 False 显式声明）；`backend/app/identity/permissions.py` 复用 3.9.3 的 `governance:observability:read` / `governance:incident:action`。
+- **前端**：`frontend/src/app/governance-observability/page.tsx` 扩展「生产遥测接入与合成运维验证」区块——Provider 卡片 + `SYNTHETIC`/`PRODUCTION` 徽章（PRODUCTION 仅在 `kind!=synthetic && status==configured && simulation_only==false` 时显示）+ 合成故障演练 UI（scenario 下拉 + 运行 + fail-closed 结果声明，无 Auto/AI/真实外发按钮）；tsc 0 error / jest 117 passed。
+- **测试**：`tests/agents/test_enterprise_telemetry_core.py`（29 例）、`tests/agents/test_enterprise_synthetic_drill.py`（E2E drill 全链路）、`backend/tests/test_governance_telemetry.py`（28 例）全绿；agents 全量套件 **2373 passed / 0 failed**；backend 374 run / 373 passed（1 例 `test_jwt_verifier_config_missing_secret_fails_closed` 为 3.8.28 身份代码既有失败，与 3.9.4 无关，已验证在 9201a7d 基线上同样失败）；frontend jest 117 passed；tsc 0 error；治理仓库完整性检查器 9/9（审计总数唯一 + 与基线 total=100 一致）；生产安全 7/7、身份头 0 命中、硬编码 0 命中（telemetry 交付物）、防编造扫描仅命中历史 `wind_pressure` 文档（零本阶段交付物）。
+- **审计**：`agents/enterprise/audit.py` +4 枚举（`TELEMETRY_PROVIDER_CHECKED` / `SYNTHETIC_DRILL_STARTED` / `SYNTHETIC_DRILL_COMPLETED` / `TELEMETRY_EVIDENCE_RECORDED`），`actor_kind` 恒 `USER`，当前总数 100（96 → 100，与 `.ai/baselines/phase3.8_governance_release_baseline.json` `audit_category_contract.total = 100` 一致）。
+- **CI 门禁**：`.github/workflows/telemetry-quality-gate.yml`（4 job：unit-and-contract / api / scanners / regression，任一失败整条失败 fail-closed）。
+- **SSOT**：`.ai/project_status.json` 已登记 `phase_3_9_4_status`（`BUILT_NO_GO`）+ `phase_3_9_4` 嵌套块；基线 `audit_category_contract.total = 100`。
+- **十四项最高红线**（绝对不可修改 / 弱化）：①`engineering_enabled=false` ②禁 `engineering_approved` ③禁 AI 自动批准发布 ④禁 AI 自动部署 ⑤禁 AI 自动回滚 ⑥禁 AI 改真实企业数据 ⑦禁 AI 写真实生产密钥 ⑧禁 AI 自动授真实权限 ⑨禁 AI 自动 ACK/RESOLVE/CLOSE Incident ⑩禁代替 SRE/incident-commander/production-owner ⑪禁把 Synthetic Telemetry 描述成真实 production ⑫禁真实发送 PagerDuty/企业微信/Slack/Email 告警 ⑬禁自动执行 Runbook ⑭禁为测试通过跳测试/删断言/降权/伪造证据——全部 fail-closed。
+
+### 35.5 状态结论与 STOP 纪律（3.9.4）
+
+- **状态：🟢 BUILT_NO_GO（3.9.4 已收口，2026-08-12）**。
+- **STOP：不进入 Phase 3.9.5+ 的「真接入/真外发」阶段**，不真接入生产遥测数据源（Prometheus/OpenTelemetry/Loki 等需主理人线下配置）、不真发送告警、不自动修复/回滚/关单/执行 Runbook、不自动开启 `engineering_enabled`，不输出 `engineering_approved`。3.9.4 产物待主理人审核授权后精路径 commit（telemetry 包 + 测试 + API/前端 + 审计 + SSOT + 部署指南 §15 + 本指南 §35.4 + 21 节治理指南 + 36 节收口报告）。

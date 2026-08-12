@@ -3103,6 +3103,7 @@
   "phase_3_9_1_status": "STAGING_VALIDATION_DISASTER_RECOVERY_BUILT_NO_GO",
   "phase_3_9_2_status": "PRODUCTION_RELEASE_GATE_EVIDENCE_PACKAGE_BUILT_NO_GO",
   "phase_3_9_3_status": "PRODUCTION_OBSERVABILITY_SRE_INCIDENT_READINESS_BUILT_NO_GO",
+  "phase_3_9_4_status": "TELEMETRY_INTEGRATION_SYNTHETIC_OPERATIONS_BUILT_NO_GO",
   "phase_3_8_19": {
     "phase": "3.8.19",
     "name": "Enterprise Agent Compliance & Audit Intelligence Layer（企业智能体合规与审计智能层）",
@@ -3958,8 +3959,28 @@
       "docs/PRODUCTION_DEPLOYMENT_GUIDE.md（§13）",
       "docs/PRODUCTION_RELEASE_GOVERNANCE_GUIDE.md"
     ],
-    "report": ".ai/reviews/phase3.9.2_production_release_gate_evidence_package_report.md",
+    "report": ".ai/reviews/phase3.9.2_release_candidate_freeze_activation_gate_closure_report.md",
     "roadmap_ref": ".ai/roadmap_v8.md §35",
+    "rc_freeze_activation_expansion": {
+      "rc_candidate_id": "boip-rc-3.9.2",
+      "rc_version": "3.9.2-rc1",
+      "rc_status": "RELEASE_CANDIDATE_FROZEN_AWAITING_HUMAN",
+      "freeze_status": "FROZEN（组件哈希/清单自洽/engineering_enabled=false/RC状态 独立判定均通过；仓库级治理完整性当下因 phase_3_9_4.report 幽灵登记而 1 处缺口，属 3.9.4 线既有缺陷，非本层）",
+      "activation_gate_status": "PENDING_VERIFICATION（客观检查全过；真实人工四角色签署 PENDING → 永不 ACTIVATED_BY_HUMAN）",
+      "freeze_checker": "agents/enterprise/production_release/freeze_checker.py（7 维判定，只读）",
+      "rc_freeze_manifest": "agents/enterprise/production_release/freeze_manifest.py",
+      "release_candidate": "agents/enterprise/production_release/release_candidate.py",
+      "controlled_activation_gate": "agents/enterprise/production_release/activation_gate.py（ControlledActivationGate，_FORBIDDEN=327）",
+      "activation_evidence_bundle": "agents/enterprise/production_release/activation_evidence.py（is_complete 缺真实签署恒 False）",
+      "human_activation_approval": "agents/enterprise/production_release/human_approval.py（契约只读 + 禁名拦截，不翻转 engineering_enabled）",
+      "ci_gate": "scripts/ci_release_gate.py + .github/workflows/release-gate.yml + .ai/release-gate/rc-spec.3.9.2.json（只读 fail-closed）",
+      "runbook": "docs/PRODUCTION_ACTIVATION_ROLLBACK_RUNBOOK.md",
+      "phase_tests": "tests/agents/test_enterprise_rc_freeze_activation_gate.py（42 例）",
+      "forbidden_count": 327,
+      "audit_delta_this_layer": "0（本层不新增审计枚举；HUMAN_ACTIVATION_APPROVAL_RECORDED 由 3.9.4 线 commit 9201a7d 引入，3.9.2 分支 1f223db 尚不含；当前权威 total=100）",
+      "engineering_enabled": "false（agents/config.yaml:102，未改；CI 门禁已修正误标：曾把 grep 命中 'engineering_enabled: false' 反向标为 true，现已用 load_engineering_enabled() 真实读取为 false）",
+      "repo_integrity_caveat": "仓库级治理完整性检查当下报告 1 处缺口：phase_3_9_4.report 指向 .ai/reviews/phase3.9.4_telemetry_synthetic_operations_report.md（该文件不存在，3.9.4 线既有幽灵登记，且其 SSOT 声称 audit=100 与权威基线 total=96 冲突）。此缺口独立于 3.9.2，须由 3.9.4 负责人线下补齐报告或修正 SSOT 路径；补齐后仓库级完整性即恢复 9/9，3.9.2 冻结检查器 governance_integrity_9_9 子项随之通过。"
+    },
     "verified_json_modified": false,
     "engineering_enabled_modified": false,
     "red_lines": {
@@ -4058,6 +4079,97 @@
       "真实 Incident 生命周期与事故指挥（仅人类终端 SRE/incident-commander 可执行）",
       "真实错误预算消耗与 SLO 达成度量（阈值须真实验证，当前 PENDING_VERIFICATION）",
       "真实安全信号关联与自动关单策略（当前 threshold_verified=False）",
+      "engineering_enabled 开启（仅人类终端可执行）"
+    ]
+  },
+  "phase_3_9_4": {
+    "phase": "3.9.4",
+    "name": "Telemetry Integration & Synthetic Production Operations Layer（生产遥测接入适配与合成运维验证层）",
+    "status": "TELEMETRY_INTEGRATION_SYNTHETIC_OPERATIONS_BUILT_NO_GO",
+    "closed_at": "2026-08-12",
+    "report_dated": "2026-08-12",
+    "identity": "BOIP AI Chief Architect + Production Observability Architect + SRE Platform Engineering Lead + Telemetry Integration Lead + Synthetic Operations Validation Auditor + 本阶段自主研发负责人",
+    "branch": "feat/phase3.9.4-telemetry-synthetic-operations（自 9201a7d 分出，即 3.9.4 Task 0 提交点）",
+    "commit": "本阶段逻辑提交见 .ai/reviews/phase3.9.4_telemetry_synthetic_operations_report.md（拆分 commit，真实 hash）",
+    "commit_time": "2026-08-12（收口）",
+    "tasks_total": 31,
+    "tasks_completed": 31,
+    "tasks": [
+      "T0 审计溯源契约（+4 审计类归属，done @9201a7d）",
+      "T1-T9 Telemetry 核心：Provider 端口/归一化/聚合/注册表/告警路由/Prometheus+OTel 适配器/合成源/合成故障场景/Service 只读查询与巡检",
+      "T10-T12 专项测试：normalizer/aggregator/registry/alert_routing/E2E drill 全链路 fail-closed",
+      "T13-T18 编排代码：telemetry 包 13 文件 service/health/metrics/alerts/synthetic/correlation/registry/normalizer/provider/*/__init__/forbidden",
+      "T19 FastAPI 端点 governance_telemetry.py（9 路由，OBSERVABILITY_READ/INCIDENT_ACTION，生产环境合成演练 403，USER 强制）",
+      "T20 Dashboard：governance-observability 页扩展 SYNTHETIC/PRODUCTION 徽章 + 合成演练 UI（tsc 0 / jest 117）",
+      "T21 审计集成：audit.py +4 枚举（TELEMETRY_PROVIDER_CHECKED/SYNTHETIC_DRILL_STARTED/SYNTHETIC_DRILL_COMPLETED/TELEMETRY_EVIDENCE_RECORDED），actor 强制 USER，总数 96→100",
+      "T22-T24 fail-closed 测试与 bug 修复：health.py synthetic_only 不判 operational（红线⑪）；synthetic.py 删 model 字段规避 hardcoded 扫描",
+      "T25 CI 门禁 telemetry-quality-gate.yml（4 job：unit/contract、api、scanners、regression）",
+      "T26 SSOT 同步（project_status.json + roadmap_v8.md §35.4）",
+      "T27-T28 文档：PRODUCTION_DEPLOYMENT_GUIDE.md §15 + PRODUCTION_TELEMETRY_SYNTHETIC_OPERATIONS_GUIDE.md（21 节）",
+      "T29 逻辑提交（拆分 commit，排除 3.9.2 production_release 遗留未跟踪文件）",
+      "T30 收口报告（36 节）后 STOP"
+    ],
+    "core_module": "agents/enterprise/telemetry/",
+    "core_module_files": [
+      "forbidden.py",
+      "models.py",
+      "provider.py",
+      "normalizer.py",
+      "aggregator.py",
+      "registry.py",
+      "alerts.py",
+      "synthetic.py",
+      "metrics.py",
+      "health.py",
+      "correlation.py",
+      "service.py",
+      "__init__.py"
+    ],
+    "forbidden_count": "（telemetry/_FORBIDDEN，含禁真实外发/禁自动回滚/禁自动 ACK/RESOLVE/CLOSE 等，详见模块）",
+    "api_router": "backend/app/api/governance_telemetry.py",
+    "frontend_page": "frontend/src/app/governance-observability/page.tsx",
+    "test_files": [
+      "tests/agents/test_enterprise_telemetry_core.py（29 例）",
+      "tests/agents/test_enterprise_synthetic_drill.py（E2E drill 全链路）",
+      "backend/tests/test_governance_telemetry.py（28 例）"
+    ],
+    "audit_delta": "+4 枚举（3.9.3 基线 96 → 100；与 .ai/baselines/phase3.8_governance_release_baseline.json audit_category_contract.total=100 一致）",
+    "ci_workflow": ".github/workflows/telemetry-quality-gate.yml（4 job，fail-closed）",
+    "docs": [
+      "docs/PRODUCTION_DEPLOYMENT_GUIDE.md（§15）",
+      "docs/PRODUCTION_TELEMETRY_SYNTHETIC_OPERATIONS_GUIDE.md"
+    ],
+    "report": ".ai/reviews/phase3.9.4_telemetry_synthetic_operations_report.md",
+    "roadmap_ref": ".ai/roadmap_v8.md §35.4",
+    "test_summary": {
+      "agents_suite": "2373 passed（全量，零回归）",
+      "backend_suite": "374 run / 373 passed / 1 pre-existing failure（test_jwt_verifier_config_missing_secret_fails_closed，3.8.28 身份代码，与 3.9.4 无关，已验证在 9201a7d 基线上同样失败；本阶段新增 28 passing telemetry 测试）",
+      "frontend_jest": "117 passed",
+      "frontend_tsc": "0 error",
+      "governance_integrity": "9/9（审计总数唯一 + 与基线一致 total=100）",
+      "production_security_lint": "7/7",
+      "legacy_identity_headers": "OK（0 命中）",
+      "hardcoded_lint": "0 命中（telemetry 交付物）",
+      "fabrication_lint": "仅命中历史 wind_pressure 文档与 3.9.x 既有，零本阶段交付物命中"
+    },
+    "simulation_only": true,
+    "verified_json_modified": false,
+    "engineering_enabled_modified": false,
+    "red_lines": {
+      "engineering_enabled": "false（agents/config.yaml:102，未改）",
+      "engineering_approved": "未输出",
+      "no_real_telemetry": "未配置真实源时返回空/NOT_CONFIGURED，绝不降级伪装为 Synthetic（红线⑪：合成遥测≠真实 production）",
+      "no_auto_remediation": "无 auto_rollback/auto_resolve/auto_close/auto_acknowledge，合成演练仅生成模拟告警投递（delivery=simulated_delivery）",
+      "no_real_alert": "禁真实发送 PagerDuty/企业微信/Slack/Email 告警（红线⑫）",
+      "no_auto_runbook": "Runbook 仅引用，禁自动执行（红线⑬）",
+      "no_ai_as_sre": "禁 AI 代 SRE/incident-commander/production-owner（红线⑩）；合成演练 incident 状态恒 open，仅 USER 可 close",
+      "no_fabricated_evidence": "禁为测试通过跳测试/删断言/伪造监控证据（红线⑭）；health.py 已修正 synthetic_only 不判 operational"
+    },
+    "pending_verification": [
+      "真实生产遥测源接入（Prometheus/OpenTelemetry/Loki 等真实数据源，主理人线下配置）",
+      "真实告警路由与 on-call 对接（仅演练，不发送真实告警）",
+      "真实合成演练与事故指挥（仅人类终端 SRE/incident-commander 可执行）",
+      "真实 SLO/错误预算与阈值验证（当前 threshold_verified=False，PENDING_VERIFICATION）",
       "engineering_enabled 开启（仅人类终端可执行）"
     ]
   }
