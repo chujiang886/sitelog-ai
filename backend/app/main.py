@@ -15,6 +15,7 @@ from app.api import (
     governance_operations_router,
     governance_release_router,
     governance_observability_router,
+    governance_telemetry_router,
     health_router,
     knowledge_router,
     projects_router,
@@ -56,5 +57,6 @@ app.include_router(governance_dashboard_router)
 app.include_router(governance_operations_router)
 app.include_router(governance_release_router)
 app.include_router(governance_observability_router)
+app.include_router(governance_telemetry_router)
 register_cors(app)
 register_exception_handlers(app)

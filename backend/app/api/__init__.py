@@ -10,6 +10,7 @@ from app.api.governance_identity import router as governance_identity_router
 from app.api.governance_operations import router as governance_operations_router
 from app.api.governance_release import router as governance_release_router
 from app.api.governance_observability import router as governance_observability_router
+from app.api.governance_telemetry import router as governance_telemetry_router
 from app.api.knowledge import router as knowledge_router
 from app.api.projects import router as projects_router
 from app.api.rag import router as rag_router
@@ -28,6 +29,7 @@ __all__ = [
     "governance_operations_router",
     "governance_release_router",
     "governance_observability_router",
+    "governance_telemetry_router",
     "knowledge_router",
     "projects_router",
     "rag_router",
