@@ -216,7 +216,18 @@ def test_jwt_verifier_config_missing_secret_fails_closed(monkeypatch) -> None:
     class _EmptySecret:
         jwt_secret = ""
 
+    # 必须同时替换两个命名空间：
+    #  - ``app.core.config.get_settings``  ：被 ``verifier.is_configured`` 通过
+    #    方法内的 ``from app.core.config import get_settings`` 局部导入在调用时查到；
+    #  - ``app.core.security.get_settings``：被 ``decode_access_token`` →
+    #    ``_get_jwt_secret`` 通过 ``security.py`` 顶层的
+    #    ``from app.core.config import get_settings`` 绑定引用。
+    # 只 patch config 一侧时，monkeypatch 只改写 config 模块的属性，不会改掉
+    # security 模块里已绑定的同名引用，于是真实 secret 仍被读到、token 验签通过，
+    # 导致"缺失 secret 必须 fail-closed"这一关键断言从未真正执行（历史误报为通过/
+    # 实际 DID NOT RAISE）。本修复让该 fail-closed 路径真正被覆盖。
     monkeypatch.setattr("app.core.config.get_settings", lambda: _EmptySecret())
+    monkeypatch.setattr("app.core.security.get_settings", lambda: _EmptySecret())
     verifier = JwtTokenVerifier()
     assert verifier.is_configured() is False
     # 需传结构合法的 3 段 token，decode 才会走到 secret 校验（空 secret）分支。
