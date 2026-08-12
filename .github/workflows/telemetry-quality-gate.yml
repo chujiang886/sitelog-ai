@@ -1,0 +1,95 @@
+name: Telemetry & Synthetic Operations Quality Gate
+
+# Phase 3.9.4 T25 —— 生产遥测接入与合成运维验证质量门禁。
+#
+# 与 identity-governance.yml / ci.yml 互补：本流水线只盯遥测接入与合成演练这一高风险面，
+# 跑得更窄、更快、更不可跳过。任何 job 失败即整条流水线失败（fail-closed）。
+#
+#   1. telemetry-unit-and-contract  agents 层遥测核心 + 归一化 + 健康聚合 + 注册表 + 告警路由
+#                                   + 合成演练 E2E + 故障注入拒绝真实源（unit/contract/synthetic-E2E/injection-denial）；
+#   2. telemetry-api                backend 层遥测 API（权限矩阵 / 合成演练落审计 / 生产环境 403 / 不自动关闭）；
+#   3. telemetry-scanners          硬编码扫描（0 命中）+ 治理仓库完整性（9/9）；
+#   4. telemetry-regression         agents 全量套件回归（确保遥测层未破坏既有契约）。
+#
+# 与本阶段红线一致：合成演练绝不真实外发告警 / 自动回滚 / 自动关闭 Incident；未配置真实源
+# 一律 fail-closed 返回空，绝不降级伪装为生产（红线⑨/⑪/⑫/⑭）。
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "feat/phase3.9.4-telemetry-synthetic-operations"
+      - "main"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: boip-telemetry-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  telemetry-unit-and-contract:
+    name: Telemetry unit / contract / synthetic-E2E / injection-denial
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --requirement backend/requirements.txt
+      - name: Run telemetry core + synthetic drill suites
+        run: python -m pytest tests/agents/test_enterprise_telemetry_core.py tests/agents/test_enterprise_synthetic_drill.py -q
+
+  telemetry-api:
+    name: Telemetry API fail-closed tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --requirement backend/requirements.txt
+      - name: Run telemetry API suite
+        working-directory: backend
+        env:
+          JWT_SECRET: test-jwt-secret-not-for-production
+        run: python -m pytest tests/test_governance_telemetry.py -q
+
+  telemetry-scanners:
+    name: Telemetry hard-coded & governance integrity scans
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Hard-coded business config scan
+        run: python scripts/lint/check_hardcoded.py
+      - name: Governance repository integrity check
+        run: python scripts/check_governance_repository_integrity.py
+
+  telemetry-regression:
+    name: Telemetry regression (full agents suite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --requirement backend/requirements.txt
+      - name: Run full agents test suite
+        run: python -m pytest tests/agents -q
