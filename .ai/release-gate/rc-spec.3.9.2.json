@@ -1,0 +1,43 @@
+{
+  "rc_id": "boip-rc-3.9.2",
+  "version": "3.9.2-rc1",
+  "commit_sha": "@git",
+  "branch": "@git",
+  "component_specs": {
+    "production_release_pkg_init": "agents/enterprise/production_release/__init__.py",
+    "production_release_service": "agents/enterprise/production_release/service.py",
+    "release_candidate": "agents/enterprise/production_release/release_candidate.py",
+    "freeze_manifest": "agents/enterprise/production_release/freeze_manifest.py",
+    "freeze_checker": "agents/enterprise/production_release/freeze_checker.py",
+    "activation_gate": "agents/enterprise/production_release/activation_gate.py",
+    "activation_evidence": "agents/enterprise/production_release/activation_evidence.py",
+    "human_approval": "agents/enterprise/production_release/human_approval.py",
+    "freeze_forbidden": "agents/enterprise/production_release/freeze_forbidden.py",
+    "production_release_forbidden": "agents/enterprise/production_release/forbidden.py",
+    "production_release_models": "agents/enterprise/production_release/models.py",
+    "production_release_evidence": "agents/enterprise/production_release/evidence.py",
+    "production_release_gate": "agents/enterprise/production_release/gate.py",
+    "production_release_package": "agents/enterprise/production_release/package.py",
+    "audit": "agents/enterprise/audit.py",
+    "config_yaml": "agents/config.yaml",
+    "governance_integrity": "scripts/check_governance_repository_integrity.py",
+    "deploy_guide": "docs/PRODUCTION_DEPLOYMENT_GUIDE.md"
+  },
+  "required_evidence_types": [
+    "staging_validation",
+    "rollback_drill",
+    "recovery_validation",
+    "governance_integrity",
+    "production_security_scan"
+  ],
+  "provided_evidence_types": [
+    "staging_validation",
+    "rollback_drill",
+    "recovery_validation",
+    "governance_integrity",
+    "production_security_scan"
+  ],
+  "human_signoff_roles": [],
+  "rollback_reference_present": true,
+  "recovery_validation_present": true
+}
