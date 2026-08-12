@@ -216,6 +216,31 @@ class AuditActionCategory(str, Enum):
     RELEASE_GATE_EVALUATED = "release_gate_evaluated"
     RELEASE_SIGNOFF_RECORDED = "release_signoff_recorded"
     RELEASE_MANIFEST_GENERATED = "release_manifest_generated"
+    # Phase 3.9.3（T22）：企业生产可观测性、SRE 与事故响应准备层（审计动作大类 83 → 90）。
+    # 七类均为**只读事实型 / 责任留痕型**动作：仅如实记录「健康检查」「告警候选生成」
+    # 「事故创建」「真实人工 ACK 事故」「真实人工 RESOLVE 事故」「真实人工 CLOSE 事故」
+    # 「复盘草稿创建」。绝不承载自动 ACK / 自动 RESOLVE / 自动 CLOSE / AI 代指挥 / 自动
+    # 回滚 / 自动部署语义（红线①~⑫）。
+    OBSERVABILITY_HEALTH_CHECK = "observability_health_check"
+    ALERT_CANDIDATE_CREATED = "alert_candidate_created"
+    INCIDENT_CREATED = "incident_created"
+    INCIDENT_HUMAN_ACKNOWLEDGED = "incident_human_acknowledged"
+    INCIDENT_HUMAN_RESOLVED = "incident_human_resolved"
+    INCIDENT_HUMAN_CLOSED = "incident_human_closed"
+    POSTMORTEM_DRAFT_CREATED = "postmortem_draft_created"
+    # Phase 3.9.2（T11 冻结 / 受控激活增量）：5 类只读事实型 / 责任留痕型动作。仅如实
+    # 记录「真实人工生成 RC 冻结清单」「真实人工核验 RC 冻结」「真实人工执行冻结检查通过」
+    # 「真实人工评估受控激活闸门」「真实人工生成激活证据包」。绝不承载批准 / 放行 / 自动
+    # 部署 / 自动数据覆盖 / 自动密钥写入 / 代替生产负责人语义（红线①~⑦/⑧/⑩）。
+    RC_FREEZE_GENERATED = "rc_freeze_generated"
+    RC_FREEZE_VERIFIED = "rc_freeze_verified"
+    RC_FREEZE_CHECK_PASSED = "rc_freeze_check_passed"
+    CONTROLLED_ACTIVATION_GATE_EVALUATED = "controlled_activation_gate_evaluated"
+    ACTIVATION_EVIDENCE_BUNDLE_GENERATED = "activation_evidence_bundle_generated"
+    # Phase 3.9.2（T11 受控激活批准契约）：真实人工对 RC 激活的最终责任签署留痕。
+    # 仅如实记录「真实人工完成激活 GO / NO-GO 签署」，承载真实人类责任（红线⑥/⑧）；
+    # 不承载 AI 构造 / 代签 / 翻转 engineering_enabled / 宣布 Production GO（红线①~⑦/⑩）。
+    HUMAN_ACTIVATION_APPROVAL_RECORDED = "human_activation_approval_recorded"
 
 
 def require_human_actor(actor_kind: Any) -> None:
@@ -2921,6 +2946,310 @@ class AuditService(_RedLineForbiddenMixin):
             actor_kind=AuditActorKind.USER,
             actor_id=actor_id,
             category=AuditActionCategory.RELEASE_MANIFEST_GENERATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_observability_health_check(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "health_check",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次健康检查（只读事实，红线①/⑪）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.OBSERVABILITY_HEALTH_CHECK,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_alert_candidate_created(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "create_alert_candidate",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次告警候选生成（AI 检测 / 聚合，红线⑪）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.ALERT_CANDIDATE_CREATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_incident_created(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "create_incident",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次事故创建（AI 由告警候选生成，红线⑨/⑪）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.INCIDENT_CREATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_incident_human_acknowledged(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "acknowledge_incident",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工 ACK 事故（责任留痕，actor_kind 恒 USER，红线⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.INCIDENT_HUMAN_ACKNOWLEDGED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_incident_human_resolved(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "resolve_incident",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工 RESOLVE 事故（红线⑨/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.INCIDENT_HUMAN_RESOLVED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_incident_human_closed(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "close_incident",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工 CLOSE 事故（红线⑨/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.INCIDENT_HUMAN_CLOSED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_postmortem_draft_created(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "create_postmortem_draft",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次复盘草稿创建（责任留痕，actor_kind 恒 USER，红线⑩/⑫）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.POSTMORTEM_DRAFT_CREATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_rc_freeze_generated(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "generate_rc_freeze",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工生成 RC 冻结清单（只读事实，红线⑧/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.RC_FREEZE_GENERATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_rc_freeze_verified(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "verify_rc_freeze",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工核验 RC 冻结（只读事实，红线⑧/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.RC_FREEZE_VERIFIED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_rc_freeze_check_passed(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "check_rc_freeze_passed",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工执行 RC 冻结检查通过（只读事实，红线⑧/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.RC_FREEZE_CHECK_PASSED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_controlled_activation_gate_evaluated(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "evaluate_controlled_activation_gate",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工评估受控激活闸门（闸门永不 AI 自决放行，红线⑥/⑧）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.CONTROLLED_ACTIVATION_GATE_EVALUATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_activation_evidence_bundle_generated(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "generate_activation_evidence_bundle",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工生成激活证据包（只读事实，缺真实人工签署则 incomplete，红线⑧/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.ACTIVATION_EVIDENCE_BUNDLE_GENERATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_human_activation_approval_recorded(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "record_human_activation_approval",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工激活批准（责任留痕，actor_kind 恒 USER，红线⑥/⑧）。
+
+        本方法**不**构造 ``HumanActivationApproval``（那是真实人工在外部完成的）；
+        这里仅把"已发生的真实人工激活 GO / NO-GO 签署"如实审计留痕，并强制 actor 为
+        真实 USER。服务永不在本方法内翻转 ``engineering_enabled``。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.HUMAN_ACTIVATION_APPROVAL_RECORDED,
             action=action,
             target=target,
             detail=detail,

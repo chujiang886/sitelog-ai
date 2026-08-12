@@ -1899,15 +1899,16 @@ GovernanceWorkflowRepository (require_human_actor + OrgScopeError)  ──snapsh
 - **STOP：不进入 Phase 3.8.32**，不自动开启 `engineering_enabled`，不输出 `engineering_approved`，不自动放行发布。本阶段产物**全部未提交**，等待主理人审核授权。
 ---
 
-## 35. Phase 3.9.0–3.9.2 生产发布闸门体系（概览）
+## 35. Phase 3.9.0–3.9.3 生产发布闸门与可观测性体系（概览）
 
-三阶段构成「生产发布前」的镜像验证与闸门收口链，全部 **BUILT_NO_GO**，等待主理人线下授权：
+四阶段构成「生产发布前」的镜像验证、闸门收口与可观测性准备链，全部 **BUILT_NO_GO**，等待主理人线下授权：
 
 | 阶段 | 定位 | 包 / 报告 | 审计总数 |
 |------|------|----------|---------|
 | 3.9.0 | 生产就绪准备层（只验证准备体系） | `agents/enterprise/production_readiness/` · `phase3.9.0_production_readiness_preparation_report.md` | 79 |
 | 3.9.1 | 预生产验证与灾难恢复演练层（只验证能否扛住验证/灾难） | `agents/enterprise/staging_validation/` · `phase3.9.1_staging_validation_disaster_recovery_report.md` | 79→83（本链 +4） |
 | 3.9.2 | 企业生产发布闸门与证据包层（只核验是否达到人工签署门槛） | `agents/enterprise/production_release/` · `phase3.9.2_production_release_gate_evidence_package_report.md` | 83 |
+| 3.9.3 | 企业生产可观测性、SRE 与事故响应准备层（只建准备层，不真接入/不真告警/不自动修复） | `agents/enterprise/production_observability/` · `phase3.9.3_production_observability_incident_readiness_report.md` | 88→95（本链 +7） |
 
 ### 35.1 3.9.2 交付物与门禁
 
@@ -1919,7 +1920,17 @@ GovernanceWorkflowRepository (require_human_actor + OrgScopeError)  ──snapsh
 - **SSOT**：`.ai/project_status.json` 已登记 `phase_3_9_0/1/2_status`（均 `BUILT_NO_GO`）；治理仓库完整性检查器 9/9 通过。
 - **十项最高红线**（绝对不可修改 / 弱化）：①`engineering_enabled=false` ②禁 `engineering_approved` ③禁 AI 自动批准发布 ④禁 AI 自动执行部署 ⑤禁 AI 修改真实企业数据 ⑥禁 AI 写真实生产密钥 ⑦禁 AI 自动授予生产权限 ⑧禁 AI 代签 ⑨禁把 staging/drill 描述成 production verified ⑩禁通过跳测试 / 改安全断言 / 伪造证据让 Gate 变绿——全部 fail-closed，门禁 `ProductionReleaseGate` 永不返回 `APPROVED`/`GO`。
 
-### 35.2 状态结论与 STOP 纪律
+### 35.2 3.9.3 交付物与门禁（企业生产可观测性、SRE 与事故响应准备层）
 
-- **状态：🟢 BUILT_NO_GO（已收口）**。
-- **STOP：不进入 Phase 3.9.3+**，不自动开启 `engineering_enabled`，不输出 `engineering_approved`，不自动放行发布。本阶段产物待主理人审核授权后双 commit（A=包+测试+runbooks+generator+收口+SSOT+roadmap；B=manifest JSON）。
+- **包**：`agents/enterprise/production_observability/`（forbidden / models / health / metrics / slo / correlation / alerts / incidents / service / __init__ 十文件）；`PRODUCTION_OBSERVABILITY_FORBIDDEN_COUNT = 337`，含 `auto_rollback` / `auto_resolve` / `auto_close` / `auto_acknowledge` / `assign_self_as_commander` / `act_as_incident_commander` / `silence_alert` / `fabricate_observability_evidence` 等禁名结构拦截。
+- **后端接线**：`backend/app/api/governance_observability.py`（只读 + 人工 ACK/RESOLVE/CLOSE 端点，强制真实 `USER` 主体、AI 主体 403、`auto_state_transition=false`）；`backend/app/identity/permissions.py` 新增 `governance:observability:read` / `governance:incident:action`（职责分离：incident 动作仅 admin）。
+- **前端**：`frontend/src/app/governance-observability/page.tsx`（只读展示 Overall/Component(11)/SLO/Metrics/Active Incidents + 真实人工 ACK/RESOLVE/CLOSE，无 Auto Fix / Auto Rollback / Auto Resolve / Auto Close / AI Approve 按钮）；`frontend/src/lib/identity/{types,guards}.ts` 同步两权限词表。
+- **测试**：`tests/agents/test_enterprise_production_observability.py`（24 例）、`backend/tests/test_governance_observability.py`（23 例）全绿；agents 全量套件 **2329 passed / 0 failed**；backend 346 passed；frontend jest 117 passed；tsc 0 error；治理仓库完整性检查器 9/9 通过；生产安全 / 身份头 / 硬编码扫描通过（防编造扫描 20 处命中均为 3.9.3 之前历史 `.ai/` 文档与 `wind_pressure` 接口测试夹具，无一处位于本阶段交付物）。
+- **审计**：`agents/enterprise/audit.py` +7 枚举（`OBSERVABILITY_HEALTH_CHECK` / `ALERT_CANDIDATE_CREATED` / `INCIDENT_CREATED` / `INCIDENT_HUMAN_ACKNOWLEDGED` / `INCIDENT_HUMAN_RESOLVED` / `INCIDENT_HUMAN_CLOSED` / `POSTMORTEM_DRAFT_CREATED`），`actor_kind` 恒 `USER`，总数 88 → 95。
+- **SSOT**：`.ai/project_status.json` 已登记 `phase_3_9_3_status`（`BUILT_NO_GO`）；基线 `audit_category_contract.total = 95`、权威测试 `== 95` 同步。
+- **十二项最高红线**（绝对不可修改 / 弱化）：①`engineering_enabled=false` ②禁 `engineering_approved` ③禁 AI 自动批准发布 ④禁 AI 自动执行部署 ⑤禁 AI 修改真实企业数据 ⑥禁 AI 写真实生产密钥 ⑦禁 AI 自动授予生产权限 ⑧禁 AI 自动关闭 Incident ⑨禁 AI 代 SRE/production-owner/security-owner/incident-commander 责任签署 ⑩禁 AI 代替人工责任 ⑪禁把模拟监控数据描述成真实 production observation ⑫禁通过删安全断言 / 跳失败测试 / 降权 / 伪造监控证据让观测门禁变绿——全部 fail-closed。
+
+### 35.3 状态结论与 STOP 纪律
+
+- **状态：🟢 BUILT_NO_GO（已收口，2026-08-12）**。
+- **STOP：不进入 Phase 3.9.4+**，不真接入生产可观测性数据源、不真发送告警、不自动修复/回滚/关单、不自动开启 `engineering_enabled`，不输出 `engineering_approved`。本阶段产物待主理人审核授权后精路径 commit（包 + 测试 + API/前端 + 审计 + SSOT + 部署指南 §14 + 本指南 + roadmap + 24 节收口报告）。

@@ -77,13 +77,22 @@ EXPECTED_CATEGORIES = {
     # Phase 3.9.2：企业生产发布闸门与证据包层（+4）
     "release_candidate_created", "release_gate_evaluated",
     "release_signoff_recorded", "release_manifest_generated",
+    # Phase 3.9.3：企业生产可观测性、SRE 与事故响应准备层（+7）
+    "observability_health_check", "alert_candidate_created", "incident_created",
+    "incident_human_acknowledged", "incident_human_resolved",
+    "incident_human_closed", "postmortem_draft_created",
+    # Phase 3.9.2（T11 冻结 / 受控激活增量）：+5
+    "rc_freeze_generated", "rc_freeze_verified", "rc_freeze_check_passed",
+    "controlled_activation_gate_evaluated", "activation_evidence_bundle_generated",
+    # Phase 3.9.2（受控激活批准契约）：+1
+    "human_activation_approval_recorded",
 }
 
 
 def test_audit_action_category_has_knowledge_members() -> None:
     members = {c.value for c in AuditActionCategory}
     assert members == EXPECTED_CATEGORIES
-    assert len(members) == 83
+    assert len(members) == 96
     # 程序化校验：枚举每个成员名均存在（规避手写元组形近污染，3.8.11 教训）。
     for name in AuditActionCategory.__members__:
         assert hasattr(AuditActionCategory, name)

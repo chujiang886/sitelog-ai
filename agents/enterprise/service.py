@@ -277,6 +277,9 @@ from agents.enterprise.staging_validation import (
 from agents.enterprise.production_release import (
     ProductionReleaseService,
 )
+from agents.enterprise.production_observability import (
+    ProductionObservabilityService,
+)
 
 
 class EnterpriseOperationLayer:
@@ -681,6 +684,13 @@ class EnterpriseOperationLayer:
         # 自动批准 RC / 代生产负责人签署 / 宣布生产 GO（红线①~⑦/⑩）。
         # AI 路径永不直接返回生产 GO / APPROVED。
         self.agent_production_release = ProductionReleaseService(
+            org_id=org_id,
+            audit=self.audit,
+            identity=self.identity,
+        )
+        # Phase 3.9.3：企业生产可观测性、SRE 与事故响应准备层。纯只读 / 事实描述 /
+        # 候选 / 草稿；AI 不自动 ACK / RESOLVE / CLOSE / 回滚（红线⑤/⑨/⑩）。
+        self.agent_production_observability = ProductionObservabilityService(
             org_id=org_id,
             audit=self.audit,
             identity=self.identity,

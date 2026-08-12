@@ -60,14 +60,18 @@ export type GovernancePermission =
   | "governance:workflow:close"
   // Phase 3.9.2：发布闸门与证据包（只读查看 / 真实人工签署，无 AI 批准位）
   | "governance:release:read"
-  | "governance:release:signoff"; // 真实人工签署自己的 GO/NO-GO/NEED_MORE_EVIDENCE
+  | "governance:release:signoff"
+  // Phase 3.9.3：可观测性与事故响应（只读查看 / 真实人工事故动作，无 auto_* 位）
+  | "governance:observability:read"
+  | "governance:incident:action";
 
 /**
  * 全部合法权限（运行时白名单，用于校验适配器返回值）。
  *
  * 【必须与后端逐字一致】对应 ``backend/app/identity/permissions.py`` 的
  * ``GovernancePermission``。3.8.27 时这里只有 6 项，后端 3.8.28 落地了 9 项，
- * 3.9.2 又扩展 2 项（release:read / release:signoff）—— 共 11 项。
+ * 3.9.2 扩展 2 项（release:read / release:signoff），3.9.3 又扩展 2 项
+ * （observability:read / incident:action）—— 共 13 项。
  *
  * 词表对不上会产生两种故障，后一种更危险：
  *   - 前端算出"能点"、后端判"不能做" → 按钮亮着却永远失败，运维只能靠猜；
@@ -89,6 +93,8 @@ export const ALL_GOVERNANCE_PERMISSIONS: readonly GovernancePermission[] = [
   "governance:workflow:close",
   "governance:release:read",
   "governance:release:signoff",
+  "governance:observability:read",
+  "governance:incident:action",
 ] as const;
 
 /**

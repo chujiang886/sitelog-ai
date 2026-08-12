@@ -661,9 +661,37 @@ ORDER BY created_at DESC;
 
 ---
 
+## 14. 生产可观测性、SRE 与事故响应准备层（Phase 3.9.3）
+
+### 14.1 它做什么、不做什么
+
+- **做**：建成「生产可观测性 / SRE / 事故响应准备层」——服务健康模型（11 类组件，状态 `HEALTHY/DEGRADED/UNHEALTHY/UNKNOWN`）、指标聚合（可用性 / 延迟分位，全 `simulation_only`）、SLI/SLO（阈值未验证 → `PENDING_VERIFICATION`）、错误预算（只计算不触停发布/回滚）、告警候选与去重关联、事故模型（SEV0–3、8 态无 `AUTO_*`）、事故时间线（append-only）、事故指挥指派（仅 `USER`）、Runbook 引用（只引用不执行）、事故响应草稿（`requires_human_review=True`）、恢复校验、Postmortem 草稿、治理整改关联、发布/安全信号关联。
+- **不做**：不真接入 Prometheus/OpenTelemetry/Loki 等真实数据源；不真发送告警 / 不触真实 on-call；不自动修复、不自动回滚、不自动关单、不自动 ACK；不以任何方式描述模拟数据为真实 production observation。
+
+### 14.2 关键 fail-closed 不变量
+
+- `ServiceHealthService.overall_status`：`UNKNOWN` 绝不回退为 `HEALTHY`（探测缺失 = 不健康，宁错杀）。
+- 告警/事故所有 `RESOLVE` / `CLOSE` / `ACKNOWLEDGE` 仅接受 `actor_kind == "user"`，AI 主体一律 403 或抛 `EnterpriseRedLineViolationError`。
+- `correlate_release` 只注入 `rollback_reference`，显式 `auto_rollback=False`；`correlate_security_signals` 中 `threshold_verified=False`，绝不自动关 Incident。
+- `forbidden.py` 含 **337** 项禁名（`auto_rollback_incident` / `auto_resolve_incident` / `auto_close_incident` / `assign_self_as_commander` / `act_as_incident_commander` / `silence_alert` / `fabricate_observability_evidence` 等），结构级调用即抛。
+- 审计 +7 类（`OBSERVABILITY_HEALTH_CHECK` / `ALERT_CANDIDATE_CREATED` / `INCIDENT_CREATED` / `INCIDENT_HUMAN_ACKNOWLEDGED` / `INCIDENT_HUMAN_RESOLVED` / `INCIDENT_HUMAN_CLOSED` / `POSTMORTEM_DRAFT_CREATED`），`actor_kind` 恒 `USER`，总数 88 → 95。
+
+### 14.3 人工动作入口
+
+- 只读看板：`GET /governance/observability/health|metrics|slo|incidents`（合成全 `UNKNOWN` + `simulation_only=true`，前端 `/governance-observability`）。
+- 人工动作（须 `governance:incident:action`，仅 admin；须填 incident_id + 理由）：`POST /governance/observability/incidents/{id}/acknowledge|assign-commander|resolve|close`，返回 `auto_state_transition: false`，落审计。
+- 真实故障指挥、关单、回滚、恢复执行只能源于主理人 / SRE / incident-commander 在人类终端的线下决策。
+
+### 14.4 收口状态
+
+本层状态 **BUILT_NO_GO**：可观测性 / SRE / 事故响应准备体系已建成并通过验证，但**未真接入生产、未发送真实告警、未进入自动修复**。详见 `.ai/reviews/phase3.9.3_production_observability_incident_readiness_report.md` 与 `.ai/roadmap_v8.md` §35.2。
+
+---
+
 ## 附录 A：变更记录
 
 | 版本 | 变更 |
 |---|---|
 | Phase 3.8.29 | 首次发布。HttpOnly Cookie + CSRF 双提交、OIDC/SSO 适配器、环境隔离红线、append-only 安全审计、CI 生产门禁、本部署指南 |
 | Phase 3.9.2 | 新增 §13 生产发布闸门与证据包层：13 项 CHECK_KEYS、SHA-256 证据清单、4 角色人工签署（GO/NO-GO/NEED_MORE_EVIDENCE，仅 `USER`）、4 个 RELEASE_* 审计类（总数 83）、314 项 fail-closed 禁名、只读 API + 签署端点、前端 `/governance-release` 页（无自动上线 / 无 AI 批准按钮） |
+| Phase 3.9.3 | 新增 §14 生产可观测性、SRE 与事故响应准备层：11 组件健康模型（UNKNOWN 不回退 HEALTHY）、SLI/SLO（未验证 PENDING_VERIFICATION）、错误预算只计算、告警去重关联、SEV0–3 事故模型（8 态无 AUTO_*）、append-only 时间线、Runbook 只引用、发布/安全信号关联（auto_rollback=false / threshold_verified=false）、337 项 fail-closed 禁名、只读 API + 人工 ACK/RESOLVE/CLOSE 端点（auto_state_transition=false）、前端 `/governance-observability` 页（无 Auto Fix/Rollback/Resolve/Close/AI Approve）、7 个 OBSERVABILITY_* 审计类（总数 90） |
