@@ -227,7 +227,9 @@ class AuditActionCategory(str, Enum):
     # CONTROLLED_ACTIVATION_GATE_EVALUATED / HUMAN_ACTIVATION_APPROVAL_RECORDED /
     # RC_FREEZE_GENERATED / RC_FREEZE_CHECK_PASSED / RC_FREEZE_VERIFIED）属 3.9.2 受控激活
     # / RC 冻结闸门层扩展，随 3.9.3 提交 8c7c9c5 一并入库，详见
-    # .ai/progress/phase3.9.4_audit_contract_provenance.md。当前总数 96。
+    # .ai/progress/phase3.9.4_audit_contract_provenance.md。当前总数 100（含 3.9.4
+    # 新增 4 类遥测审计：TELEMETRY_PROVIDER_CHECKED / SYNTHETIC_DRILL_STARTED /
+    # SYNTHETIC_DRILL_COMPLETED / TELEMETRY_EVIDENCE_RECORDED）。
     OBSERVABILITY_HEALTH_CHECK = "observability_health_check"
     ALERT_CANDIDATE_CREATED = "alert_candidate_created"
     INCIDENT_CREATED = "incident_created"
@@ -248,6 +250,16 @@ class AuditActionCategory(str, Enum):
     # 仅如实记录「真实人工完成激活 GO / NO-GO 签署」，承载真实人类责任（红线⑥/⑧）；
     # 不承载 AI 构造 / 代签 / 翻转 engineering_enabled / 宣布 Production GO（红线①~⑦/⑩）。
     HUMAN_ACTIVATION_APPROVAL_RECORDED = "human_activation_approval_recorded"
+    # Phase 3.9.4（T19-T21）：生产遥测接入适配与合成运维验证层（新增 4 类）。
+    # TELEMETRY_PROVIDER_CHECKED / SYNTHETIC_DRILL_STARTED / SYNTHETIC_DRILL_COMPLETED /
+    # TELEMETRY_EVIDENCE_RECORDED。四类均为**只读事实型 / 责任留痕型**动作：仅如实记录
+    # 「真实人工巡检遥测 Provider」「合成事故演练开始 / 完成」「真实人工记录遥测证据」。
+    # 绝不承载自动 ACK / 自动 RESOLVE / 自动 CLOSE / 真实外发告警 / 自动回滚语义（红线①~⑭）。
+    # 当前总数 100。
+    TELEMETRY_PROVIDER_CHECKED = "telemetry_provider_checked"
+    SYNTHETIC_DRILL_STARTED = "synthetic_drill_started"
+    SYNTHETIC_DRILL_COMPLETED = "synthetic_drill_completed"
+    TELEMETRY_EVIDENCE_RECORDED = "telemetry_evidence_recorded"
 
 
 def require_human_actor(actor_kind: Any) -> None:
@@ -3114,6 +3126,103 @@ class AuditService(_RedLineForbiddenMixin):
             actor_kind=AuditActorKind.USER,
             actor_id=actor_id,
             category=AuditActionCategory.POSTMORTEM_DRAFT_CREATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    # ---- Phase 3.9.4：生产遥测接入适配与合成运维验证层审计（任务 4，+4 类）----
+    # 下述四种方法仅如实记录「真实人工巡检遥测 Provider」「合成事故演练开始 / 完成」
+    # 「真实人工记录遥测证据」事件，绝不承载自动 ACK / 自动 RESOLVE / 自动 CLOSE /
+    # 真实外发告警 / 自动回滚语义（红线①~⑭）。actor 必须真实 USER（默认 USER，红线⑩）。
+
+    def record_telemetry_provider_checked(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "check_telemetry_provider",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+        actor_kind: "AuditActorKind | None" = None,
+    ) -> AuditRecord:
+        """记录一次遥测 Provider 巡检（actor 真实；默认 USER，红线⑩）。"""
+        return self._append(
+            record_id=record_id,
+            actor_kind=actor_kind or AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.TELEMETRY_PROVIDER_CHECKED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_synthetic_drill_started(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "start_synthetic_drill",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+        actor_kind: "AuditActorKind | None" = None,
+    ) -> AuditRecord:
+        """记录一次合成事故演练开始（actor 真实；默认 USER，红线⑩）。"""
+        return self._append(
+            record_id=record_id,
+            actor_kind=actor_kind or AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.SYNTHETIC_DRILL_STARTED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_synthetic_drill_completed(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "complete_synthetic_drill",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+        actor_kind: "AuditActorKind | None" = None,
+    ) -> AuditRecord:
+        """记录一次合成事故演练完成（actor 真实；默认 USER，红线⑩）。"""
+        return self._append(
+            record_id=record_id,
+            actor_kind=actor_kind or AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.SYNTHETIC_DRILL_COMPLETED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_telemetry_evidence_recorded(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "record_telemetry_evidence",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+        actor_kind: "AuditActorKind | None" = None,
+    ) -> AuditRecord:
+        """记录一次遥测证据留痕（actor 真实；默认 USER，红线⑩）。"""
+        return self._append(
+            record_id=record_id,
+            actor_kind=actor_kind or AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.TELEMETRY_EVIDENCE_RECORDED,
             action=action,
             target=target,
             detail=detail,

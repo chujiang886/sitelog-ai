@@ -86,13 +86,16 @@ EXPECTED_CATEGORIES = {
     "controlled_activation_gate_evaluated", "activation_evidence_bundle_generated",
     # Phase 3.9.2（受控激活批准契约）：+1
     "human_activation_approval_recorded",
+    # Phase 3.9.4：生产遥测接入适配与合成运维验证层（+4）
+    "telemetry_provider_checked", "synthetic_drill_started",
+    "synthetic_drill_completed", "telemetry_evidence_recorded",
 }
 
 
 def test_audit_action_category_has_knowledge_members() -> None:
     members = {c.value for c in AuditActionCategory}
     assert members == EXPECTED_CATEGORIES
-    assert len(members) == 96
+    assert len(members) == 100
     # 程序化校验：枚举每个成员名均存在（规避手写元组形近污染，3.8.11 教训）。
     for name in AuditActionCategory.__members__:
         assert hasattr(AuditActionCategory, name)
