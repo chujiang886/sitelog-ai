@@ -1,8 +1,8 @@
 {
   "phase": "3.9.2",
   "layer": "Enterprise Production Release Gate & Evidence Package Layer",
-  "generated_at": "2026-08-12T03:51:07.630545+00:00",
-  "commit_a_head": "ea5724532075c40f7d6c568cfbf6036b8bc11bff",
+  "generated_at": "2026-08-12T03:59:50.869654+00:00",
+  "commit_a_head": "09625d2a451cf03d6409dbdd1a1b4e40d9192272",
   "tool": "scripts/generate_production_release_manifest.py",
   "total_count": 16,
   "missing_count": 0,
