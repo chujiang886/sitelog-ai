@@ -27,11 +27,34 @@ from uuid import uuid4
 
 from agents.config_loader import load_engineering_enabled
 from agents.enterprise.audit import AuditActionCategory, AuditService
+from agents.enterprise.production_release.activation_evidence import (
+    ActivationEvidenceBundle,
+    build_activation_evidence_bundle,
+)
+from agents.enterprise.production_release.activation_gate import (
+    ControlledActivationGate,
+    ControlledActivationGateResult,
+)
 from agents.enterprise.production_release.evidence import (
     ProductionReleaseEvidenceService,
 )
 from agents.enterprise.production_release.forbidden import (
     _PRODUCTION_RELEASE_FORBIDDEN,
+)
+from agents.enterprise.production_release.freeze_forbidden import (
+    _FREEZE_ACTIVATION_FORBIDDEN,
+)
+from agents.enterprise.production_release.human_approval import (
+    HumanActivationApproval,
+    HumanActivationApprovalService,
+)
+from agents.enterprise.production_release.freeze_checker import (
+    FreezeCheckResult,
+    ReleaseFreezeChecker,
+)
+from agents.enterprise.production_release.freeze_manifest import (
+    RCFreezeManifest,
+    generate_rc_freeze_manifest,
 )
 from agents.enterprise.production_release.gate import ProductionReleaseGate
 from agents.enterprise.production_release.models import (
@@ -50,6 +73,11 @@ from agents.enterprise.production_release.models import (
     SignoffRole,
 )
 from agents.enterprise.production_release.package import ReleasePackageBuilder
+from agents.enterprise.production_release.release_candidate import (
+    RCFreezeStatus,
+    ReleaseCandidate,
+    create_release_candidate,
+)
 from agents.enterprise.red_line import (
     EnterpriseRedLineViolationError,
     _RedLineForbiddenMixin,
@@ -87,7 +115,7 @@ class ProductionReleaseService(_RedLineForbiddenMixin):
     ``ReleaseSignoff`` 组合（由人工在 API 层构造并落库）。
     """
 
-    _FORBIDDEN = _PRODUCTION_RELEASE_FORBIDDEN
+    _FORBIDDEN = _FREEZE_ACTIVATION_FORBIDDEN
 
     def __init__(
         self,
@@ -106,6 +134,7 @@ class ProductionReleaseService(_RedLineForbiddenMixin):
         self._evidence_svc = ProductionReleaseEvidenceService(root_dir=".")
         self._gate = ProductionReleaseGate()
         self._package_builder = ReleasePackageBuilder(root_dir=".")
+        self._approval_svc = HumanActivationApprovalService(audit=audit)
 
     # ------------------------------------------------------------------ #
     # 内部工具
@@ -413,4 +442,211 @@ class ProductionReleaseService(_RedLineForbiddenMixin):
             target=release_id,
             detail=detail,
             ts=_now(),
+        )
+
+    # ------------------------------------------------------------------ #
+    # T11 RC 冻结 / 受控激活增量（纯冻结 / 只读闸门，fail-closed）
+    # ------------------------------------------------------------------ #
+    def freeze_release_candidate(
+        self,
+        *,
+        rc_id: str,
+        version: str,
+        commit_sha: str,
+        branch: str,
+        component_specs: Dict[str, str],
+        actor_id: str,
+        root_dir: str = ".",
+    ) -> ReleaseCandidate:
+        """真实人工发起 RC 冻结：即时计算组件 SHA-256，生成冻结候选并如实审计留痕。
+
+        ``activation_approved`` 恒 False；状态默认 ``RELEASE_CANDIDATE_FROZEN_AWAITING_HUMAN``；
+        AI 不激活、不批准、不翻转 engineering_enabled。
+        """
+
+        self._require_user(actor_id)
+        rc = create_release_candidate(
+            rc_id=rc_id,
+            version=version,
+            commit_sha=commit_sha,
+            branch=branch,
+            component_specs=component_specs,
+            root_dir=root_dir,
+        )
+        self._audit.record_rc_freeze_generated(
+            record_id=f"rcf-{uuid4().hex[:12]}",
+            actor_id=actor_id,
+            action="generate_rc_freeze",
+            target=rc.rc_id,
+            detail=f"version={version};commit={commit_sha};components={len(rc.components)}",
+            ts=_now(),
+        )
+        return rc
+
+    def verify_release_candidate_freeze(
+        self,
+        *,
+        rc: ReleaseCandidate,
+        actor_id: str,
+        detail: str = "",
+    ) -> ReleaseCandidate:
+        """记录一次真实人工核验 RC 冻结（红线⑧）。
+
+        仅如实留痕；AI **不**把 ``status`` 自动翻转为 ``VERIFIED_BY_HUMAN``（那一步须由
+        真实人工在受控激活闸门 / 证据包签署路径显式完成），返回原 ``rc`` 不变。
+        """
+
+        self._require_user(actor_id)
+        self._audit.record_rc_freeze_verified(
+            record_id=f"rcv-{uuid4().hex[:12]}",
+            actor_id=actor_id,
+            action="verify_rc_freeze",
+            target=rc.rc_id,
+            detail=detail or f"status={rc.status.value}",
+            ts=_now(),
+        )
+        return rc
+
+    def run_rc_freeze_check(
+        self,
+        *,
+        rc: ReleaseCandidate,
+        manifest: RCFreezeManifest,
+        actor_id: str,
+        root_dir: str = ".",
+        check_git: bool = True,
+        check_governance: bool = True,
+    ) -> FreezeCheckResult:
+        """执行 RC 冻结检查（fail-closed）。
+
+        仅在结果 ``FROZEN`` 时如实审计留痕（record_rc_freeze_check_passed）；
+        出现 DRIFTED 不记录"通过"，只返回漂移事实供人工处置。
+        """
+
+        self._require_user(actor_id)
+        checker = ReleaseFreezeChecker(
+            root_dir=root_dir,
+            check_git=check_git,
+            check_governance=check_governance,
+        )
+        result = checker.check(rc, manifest)
+        if result.frozen:
+            self._audit.record_rc_freeze_check_passed(
+                record_id=f"rcc-{uuid4().hex[:12]}",
+                actor_id=actor_id,
+                action="check_rc_freeze_passed",
+                target=rc.rc_id,
+                detail=f"manifest_sha256={manifest.manifest_sha256[:16]}",
+                ts=_now(),
+            )
+        return result
+
+    # ------------------------------------------------------------------ #
+    # T11 受控激活证据包 / 闸门 / 人工批准（纯汇总 / 只读判定 / 责任留痕）
+    # ------------------------------------------------------------------ #
+    def build_activation_evidence_bundle(
+        self,
+        *,
+        rc_id: str,
+        version: str,
+        required_evidence_types: List[str],
+        provided_evidence_types: List[str],
+        # 真实人工签署角色须来自外部（API / 线下），AI 不得编造（红线⑥/⑧）。
+        human_signoff_roles: List[str],
+        actor_id: str,
+        freeze_manifest_sha256: Optional[str] = None,
+        governance_integrity_passed: bool = False,
+        rollback_reference_present: bool = False,
+        recovery_validation_present: bool = False,
+        integrity_status: EvidenceVerificationStatus = EvidenceVerificationStatus.PENDING_VERIFICATION,
+    ) -> ActivationEvidenceBundle:
+        """汇总激活前证据包（只读；缺真实人工签署则 incomplete）。
+
+        仅如实留痕；AI 不构造真实人工签署、不翻转 engineering_enabled。
+        """
+
+        self._require_user(actor_id)
+        bundle = build_activation_evidence_bundle(
+            bundle_id=f"aeb-{rc_id}",
+            rc_id=rc_id,
+            version=version,
+            required_evidence_types=required_evidence_types,
+            provided_evidence_types=provided_evidence_types,
+            human_signoff_roles=human_signoff_roles,
+            freeze_manifest_sha256=freeze_manifest_sha256,
+            governance_integrity_passed=governance_integrity_passed,
+            rollback_reference_present=rollback_reference_present,
+            recovery_validation_present=recovery_validation_present,
+            integrity_status=integrity_status,
+        )
+        self._audit.record_activation_evidence_bundle_generated(
+            record_id=f"aeb-{uuid4().hex[:12]}",
+            actor_id=actor_id,
+            action="generate_activation_evidence_bundle",
+            target=rc_id,
+            detail=f"complete={bundle.is_complete}",
+            ts=_now(),
+        )
+        return bundle
+
+    def evaluate_controlled_activation_gate(
+        self,
+        *,
+        rc: ReleaseCandidate,
+        manifest: RCFreezeManifest,
+        freeze_result: FreezeCheckResult,
+        evidence_bundle: ActivationEvidenceBundle,
+        actor_id: str,
+        root_dir: str = ".",
+        check_governance: bool = True,
+    ) -> ControlledActivationGateResult:
+        """评估受控激活闸门（fail-closed，永不 AI 自决放行）。
+
+        仅如实审计留痕；AI 不把 ``status`` 翻转为 ACTIVATED_BY_HUMAN（那一步须由
+        真实人工在 HumanActivationApprovalService 路径显式完成）。
+        """
+
+        self._require_user(actor_id)
+        gate = ControlledActivationGate(check_governance=check_governance)
+        result = gate.evaluate(
+            rc=rc,
+            manifest=manifest,
+            freeze_result=freeze_result,
+            evidence_bundle=evidence_bundle,
+            root_dir=root_dir,
+        )
+        self._audit.record_controlled_activation_gate_evaluated(
+            record_id=f"cag-{uuid4().hex[:12]}",
+            actor_id=actor_id,
+            action="evaluate_controlled_activation_gate",
+            target=rc.rc_id,
+            detail=f"status={result.status.value};missing={len(result.missing)}",
+            ts=_now(),
+        )
+        return result
+
+    def record_activation_approval_recorded(
+        self,
+        *,
+        actor_id: str,
+        approval_id: str,
+        rc_id: str,
+        decision: str,
+        roles: List[str],
+        detail: str = "",
+    ) -> Any:
+        """把一次已发生的真实人工激活批准如实审计留痕（actor_kind 恒 USER）。
+
+        本方法**不**构造 ``HumanActivationApproval``（那是真实人工在外部完成的）；
+        这里仅记录"已发生"的责任事件（红线⑥/⑧）。不翻转 engineering_enabled。
+        """
+
+        self._require_user(actor_id)
+        return self._approval_svc.record_activation_approval_recorded(
+            actor_id=actor_id,
+            approval_id=approval_id,
+            rc_id=rc_id,
+            decision=decision,
+            roles=roles,
+            detail=detail,
         )

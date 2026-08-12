@@ -1,0 +1,74 @@
+name: Release Candidate Freeze & Controlled Activation Gate
+
+# Phase 3.9.2 发布闸门层 CI 门禁（只读，fail-closed）。
+#
+# 与通用 CI（ci.yml）及身份/生产安全门禁（identity-governance.yml）互补：本流水线
+# 只盯"发布候选是否已冻结、受控激活闸门是否未 BLOCKED"。它**不部署、不激活、
+# 不宣布 GO** —— 即便全绿，也只代表候选处于 RELEASE_CANDIDATE_FROZEN_AWAITING_HUMAN，
+# 等待真实人工（production-owner / release-manager / security-owner / auditor）线下裁决。
+#
+#   release-gate-integrity   治理仓库完整性 9/9（只读基线核对）；
+#   rc-freeze-gate           RC 冻结检查 + 受控激活闸门（只读）；
+#   release-gate-tests       发布闸门层单元 / 集成测试。
+#
+# 任一 job 失败即整条流水线失败（fail-closed）。
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "feat/phase3.9.2-production-release-gate"
+      - "main"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: boip-release-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-gate-integrity:
+    name: Governance repository integrity (9/9)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # 纯标准库实现，无需安装依赖。
+      - name: Run governance repository integrity checker
+        run: python scripts/check_governance_repository_integrity.py --root .
+
+  rc-freeze-gate:
+    name: RC freeze & controlled activation gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run RC freeze / controlled activation gate (read-only)
+        run: python scripts/ci_release_gate.py --rc-spec .ai/release-gate/rc-spec.3.9.2.json --root .
+
+  release-gate-tests:
+    name: Production release gate tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --requirement backend/requirements.txt
+      - name: Run production release / RC freeze / activation gate suites
+        run: >-
+          python -m pytest
+          tests/agents/test_enterprise_production_release.py
+          tests/agents/test_enterprise_rc_freeze_activation_gate.py
+          -q
