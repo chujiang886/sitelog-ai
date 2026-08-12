@@ -80,6 +80,54 @@ interface IncidentListView {
   note: string;
 }
 
+// --- Phase 3.9.4 T20：生产遥测接入与合成运维验证视图 ---
+interface TelemetryProviderItem {
+  provider_id: string;
+  kind: string;
+  status: string;
+  simulation_only: boolean;
+  capabilities: string[];
+  detail: string;
+}
+
+interface TelemetryHealthSummary {
+  overall: string;
+  total: number;
+  configured: number;
+  not_configured: number;
+  providers: TelemetryProviderItem[];
+  is_operational: boolean;
+}
+
+interface TelemetryView {
+  organization_id: string;
+  providers: string[];
+  health_summary: TelemetryHealthSummary;
+  engineering_enabled: boolean;
+  note: string;
+}
+
+interface DrillIncidentView {
+  incident_id: string;
+  status: string;
+  overall_health: string;
+  delivery_status: string | null;
+  human_steps: Record<string, unknown>;
+}
+
+interface DrillResultView {
+  drill_id: string;
+  scenario: string;
+  simulation_only: boolean;
+  anomalous: boolean;
+  overall_health: string;
+  alert_delivery: { delivery_status: string } | null;
+  incident: DrillIncidentView;
+  auto_resolved: boolean;
+  auto_closed: boolean;
+  auto_rollback: boolean;
+}
+
 function healthTone(status: string): string {
   switch (status) {
     case "healthy":
@@ -106,11 +154,34 @@ function healthLabel(status: string): string {
   }
 }
 
+// 红线⑪：仅当 Provider 已配置且非合成时才是「真实生产源」；否则一律 SYNTHETIC 徽章。
+function isProductionProvider(p: TelemetryProviderItem): boolean {
+  return p.kind !== "synthetic" && p.status === "configured" && p.simulation_only === false;
+}
+
+function sourceBadgeClasses(p: TelemetryProviderItem): string {
+  return isProductionProvider(p)
+    ? "bg-blue-100 text-blue-700"
+    : "bg-slate-100 text-slate-500";
+}
+
+function sourceBadgeLabel(p: TelemetryProviderItem): string {
+  return isProductionProvider(p) ? "PRODUCTION" : "SYNTHETIC";
+}
+
 export default function GovernanceObservabilityPage(): JSX.Element {
   const [health, setHealth] = useState<HealthView | null>(null);
   const [slo, setSlo] = useState<SLOView | null>(null);
   const [metrics, setMetrics] = useState<MetricsView | null>(null);
   const [incidents, setIncidents] = useState<IncidentListView | null>(null);
+
+  // Phase 3.9.4 T20：遥测 Provider 状态 + 合成演练
+  const [telemetry, setTelemetry] = useState<TelemetryView | null>(null);
+  const [scenarios, setScenarios] = useState<string[]>([]);
+  const [selectedScenario, setSelectedScenario] = useState<string>("");
+  const [drillResult, setDrillResult] = useState<DrillResultView | null>(null);
+  const [drillBusy, setDrillBusy] = useState<boolean>(false);
+  const [drillError, setDrillError] = useState<string>("");
 
   const [error, setError] = useState<string>("");
   const [identity, setIdentity] = useState<GovernanceIdentity | null>(null);
@@ -130,21 +201,28 @@ export default function GovernanceObservabilityPage(): JSX.Element {
       setIdentity(me);
 
       const headers = await provider.getAuthHeaders();
-      const [hRes, sRes, mRes, iRes] = await Promise.all([
+      const [hRes, sRes, mRes, iRes, tRes, scRes] = await Promise.all([
         fetch(`${API_BASE}/governance/observability/health`, { headers }),
         fetch(`${API_BASE}/governance/observability/slo`, { headers }),
         fetch(`${API_BASE}/governance/observability/metrics`, { headers }),
         fetch(`${API_BASE}/governance/incidents`, { headers }),
+        fetch(`${API_BASE}/governance/telemetry/providers`, { headers }),
+        fetch(`${API_BASE}/governance/telemetry/synthetic/scenarios`, { headers }),
       ]);
       if (!hRes.ok) throw new Error(`加载健康视图失败（${hRes.status}）`);
       if (!sRes.ok) throw new Error(`加载 SLO 失败（${sRes.status}）`);
       if (!mRes.ok) throw new Error(`加载指标失败（${mRes.status}）`);
       if (!iRes.ok) throw new Error(`加载事故列表失败（${iRes.status}）`);
+      if (!tRes.ok) throw new Error(`加载遥测 Provider 失败（${tRes.status}）`);
+      if (!scRes.ok) throw new Error(`加载合成场景失败（${scRes.status}）`);
 
       setHealth((await hRes.json()) as HealthView);
       setSlo((await sRes.json()) as SLOView);
       setMetrics((await mRes.json()) as MetricsView);
       setIncidents((await iRes.json()) as IncidentListView);
+      setTelemetry((await tRes.json()) as TelemetryView);
+      const sc = (await scRes.json()) as { scenarios: string[] };
+      setScenarios(sc.scenarios ?? []);
     } catch (e) {
       setIdentity(null);
       setError(e instanceof Error ? e.message : "加载失败");
@@ -200,6 +278,43 @@ export default function GovernanceObservabilityPage(): JSX.Element {
 
   const canAct =
     identity !== null && hasPermission(identity, "governance:incident:action");
+
+  // Phase 3.9.4 T20：合成演练触发（仅真实责任人 + governance:incident:action）。
+  const canRunDrill =
+    identity !== null && hasPermission(identity, "governance:incident:action");
+
+  const runSyntheticDrill = async (): Promise<void> => {
+    setDrillBusy(true);
+    setDrillError("");
+    setDrillResult(null);
+    try {
+      const provider = getIdentityProvider();
+      const me = await provider.getIdentity();
+      // 红线⑨/⑩：只有真人且持有 INCIDENT_ACTION 才能触发（生产环境后端会 403）。
+      requirePermission(me, "governance:incident:action");
+      const headers = await provider.getAuthHeaders();
+      const scenario = selectedScenario;
+      if (!scenario) {
+        throw new Error("请选择一个合成故障场景");
+      }
+      const res = await fetch(`${API_BASE}/governance/telemetry/synthetic/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ scenario, component: "api" }),
+      });
+      if (!res.ok) {
+        const detail = await res.text().catch(() => "");
+        throw new Error(`合成演练失败（${res.status}）${detail ? `：${detail}` : ""}`);
+      }
+      const body = (await res.json()) as DrillResultView;
+      // 红线⑪/⑫/⑬/⑭：结果仅为模拟，无真实外发 / 自动回滚 / 自动关闭。
+      setDrillResult(body);
+    } catch (e) {
+      setDrillError(e instanceof Error ? e.message : "演练失败");
+    } finally {
+      setDrillBusy(false);
+    }
+  };
 
   return (
     <section className="mx-auto max-w-5xl px-6 py-10">
@@ -358,6 +473,145 @@ export default function GovernanceObservabilityPage(): JSX.Element {
       ) : (
         <p className="mt-3 text-sm text-slate-400">加载中…</p>
       )}
+
+      {/* Phase 3.9.4 T20：生产遥测接入与合成运维验证（SYNTHETIC vs PRODUCTION 徽章） */}
+      <h2 className="mt-10 text-xl font-semibold text-slate-800">
+        生产遥测接入与合成运维验证
+      </h2>
+      <p className="mt-2 text-sm text-slate-500">
+        区分 <span className="font-medium text-slate-700">SYNTHETIC</span>（合成只读源，
+        simulation_only）与 <span className="font-medium text-blue-700">PRODUCTION</span>
+        （已配置真实源）。当前准备层仅有 SYNTHETIC 源，未配置真实生产遥测（fail-closed，绝不降级伪装）。
+      </p>
+
+      {telemetry ? (
+        <div className="mt-3 rounded-lg border border-slate-200 bg-white p-4">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="text-slate-600">
+              聚合状态：
+              <span className="ml-1 font-medium text-slate-800">
+                {telemetry.health_summary.overall}
+              </span>
+            </span>
+            <span className="text-slate-400">
+              · Provider 总数 {telemetry.health_summary.total}
+            </span>
+            {telemetry.engineering_enabled ? (
+              <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
+                engineering_enabled=true（异常）
+              </span>
+            ) : (
+              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
+                engineering_enabled=false（正常）
+              </span>
+            )}
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {telemetry.health_summary.providers.map((p) => (
+              <div
+                key={p.provider_id}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-sm text-slate-700">{p.provider_id}</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${sourceBadgeClasses(
+                      p
+                    )}`}
+                  >
+                    {sourceBadgeLabel(p)}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  状态 {p.status} · kind {p.kind}
+                  {p.simulation_only ? " · simulation_only" : ""}
+                </p>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  能力：{p.capabilities.join("、") || "—"}
+                </p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-slate-400">{telemetry.note}</p>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-slate-400">加载中…</p>
+      )}
+
+      {/* 合成故障演练（仅真实责任人 + governance:incident:action；无 Auto/AI/真实外发） */}
+      <h3 className="mt-8 text-lg font-semibold text-slate-800">合成故障演练（E2E Drill）</h3>
+      <p className="mt-2 text-sm text-slate-500">
+        由真实责任人手动触发一次合成事故演练，验证「故障注入 → 遥测归一化 → 健康聚合 → 告警路由（仅模拟）
+        → 事故草稿」链路。本操作<span className="font-medium text-slate-700">不真实外发告警、
+        不自动回滚、不自动关闭 Incident</span>；无人工动作时事故状态恒为 open。
+      </p>
+      <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-5">
+        <label className="block text-xs font-medium text-slate-600">
+          选择合成故障场景
+          <select
+            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm font-mono"
+            value={selectedScenario}
+            onChange={(e) => setSelectedScenario(e.target.value)}
+          >
+            <option value="">— 请选择 —</option>
+            {scenarios.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          disabled={drillBusy || !canRunDrill || !selectedScenario}
+          title={
+            canRunDrill
+              ? undefined
+              : "当前责任人无「事故动作」权限（governance:incident:action，仅 governance-admin 持有）"
+          }
+          onClick={() => void runSyntheticDrill()}
+          className="mt-3 rounded-md bg-boip-primary-main px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {drillBusy ? "演练中…" : "运行合成演练"}
+        </button>
+
+        {drillError ? (
+          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {drillError}
+          </p>
+        ) : null}
+
+        {drillResult ? (
+          <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">
+                {drillResult.simulation_only ? "simulation_only=true" : "simulation_only=false"}
+              </span>
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
+                异常：{drillResult.anomalous ? "是" : "否"}
+              </span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">
+                聚合健康：{drillResult.overall_health}
+              </span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500">
+                告警投递：{drillResult.alert_delivery?.delivery_status ?? "未触发"}
+              </span>
+            </div>
+            <p className="mt-2 text-slate-600">
+              事故状态：
+              <span className="ml-1 font-medium text-slate-800">
+                {drillResult.incident.status}
+              </span>
+              （{drillResult.incident.incident_id}）
+            </p>
+            <p className="mt-2 text-xs text-slate-400">
+              fail-closed 声明：auto_resolved={String(drillResult.auto_resolved)} ·
+              auto_closed={String(drillResult.auto_closed)} ·
+              auto_rollback={String(drillResult.auto_rollback)}（均为 false）
+            </p>
+          </div>
+        ) : null}
+      </div>
 
       {/* 真实人工事故动作（唯一写入动作；无 Auto Fix/Auto Rollback/Auto Resolve/Auto Close/AI Approve） */}
       <h2 className="mt-10 text-xl font-semibold text-slate-800">真实人工事故动作</h2>
