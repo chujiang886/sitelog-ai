@@ -1,0 +1,140 @@
+{
+  "rc_id": "boip-rc-3.9.2",
+  "version": "3.9.2-rc1",
+  "commit_sha": "49c8c639738c8d0ca1d20044da3d53059de8c8f1",
+  "branch": "feat/phase3.9.5-release-line-reconciliation",
+  "status": "release_candidate_frozen_awaiting_human",
+  "activation_approved": false,
+  "manifest_sha256": "2cfbb5c736df123ff38b1c14168890afaa26dd41fda29c61cdc8cf0ee851445e",
+  "component_count": 18,
+  "components": [
+    {
+      "name": "production_release_pkg_init",
+      "repo_path": "agents/enterprise/production_release/__init__.py",
+      "sha256": "0313fcd27a9671699a66b08bc0900f124d23e68d9dbafec764967d37d593bfaf",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "production_release_service",
+      "repo_path": "agents/enterprise/production_release/service.py",
+      "sha256": "b3eb22b5cbc3592ef3af3767eefda02cab7c7cbdcc64d52bc957a04f3717ce33",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "release_candidate",
+      "repo_path": "agents/enterprise/production_release/release_candidate.py",
+      "sha256": "fe5701e519dc07470d672d29c197c4d6eeb3b9b4034f7c79f1640777454e9f44",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "freeze_manifest",
+      "repo_path": "agents/enterprise/production_release/freeze_manifest.py",
+      "sha256": "bb9847cd7db596c88f42c102be670cbc937af2279b003ea19a531528811528cd",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "freeze_checker",
+      "repo_path": "agents/enterprise/production_release/freeze_checker.py",
+      "sha256": "2a659d9cc585c28cb7348cce3ab7326e75345b20830cc7768daf83496c26a6fa",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "activation_gate",
+      "repo_path": "agents/enterprise/production_release/activation_gate.py",
+      "sha256": "b3755356fd7b24577d08aee7cb4d5e8de4796e1e9c880b2a557e9c8549c9f034",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "activation_evidence",
+      "repo_path": "agents/enterprise/production_release/activation_evidence.py",
+      "sha256": "ffb1d39976087c18d78deb3cb66f0aa237d92686de778dfc37d705671c57cf5d",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "human_approval",
+      "repo_path": "agents/enterprise/production_release/human_approval.py",
+      "sha256": "728697e1a647f7038eb76e4eda85c6b76d2e1c0981c3f94227a102e7d8df7dfa",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "freeze_forbidden",
+      "repo_path": "agents/enterprise/production_release/freeze_forbidden.py",
+      "sha256": "c9bf86ec297876a58fd989df40d3755e11c3f2b0629e3e4fa5f7fced5b2ae60b",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "production_release_forbidden",
+      "repo_path": "agents/enterprise/production_release/forbidden.py",
+      "sha256": "77491bfdbf17c290f88a0c20ae80f99a3baafc7bcc4d7bca9d3b32e63b4185d1",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "production_release_models",
+      "repo_path": "agents/enterprise/production_release/models.py",
+      "sha256": "38c16eaee4dd15861aa9e7b2c71fd8050416145a734100115d8a40b0c8eb48d5",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "production_release_evidence",
+      "repo_path": "agents/enterprise/production_release/evidence.py",
+      "sha256": "7d2b1480f5ca404846731027c6492242a1e2d1e64cd84e85e8e9e94f93caf083",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "production_release_gate",
+      "repo_path": "agents/enterprise/production_release/gate.py",
+      "sha256": "f4ae0ad04f813323bf36a57e4d071118281bb6fb1071857aef84a78b182c5e2f",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "production_release_package",
+      "repo_path": "agents/enterprise/production_release/package.py",
+      "sha256": "46f6948477f0fd095627be1ca0f0876b1a870e71e01ee9236f67753eb91066e1",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "audit",
+      "repo_path": "agents/enterprise/audit.py",
+      "sha256": "73041a0852d5a7ca34faad0a3a5c9f44dce0918f9bb2cb24c4d13e905f4d1be4",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "config_yaml",
+      "repo_path": "agents/config.yaml",
+      "sha256": "9aa005aa598dedf75969d12a17f155aa6e27d86dec33cb1c173a7d5b6a0ff2cc",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "governance_integrity",
+      "repo_path": "scripts/check_governance_repository_integrity.py",
+      "sha256": "0a90e333eca20f161485207b3bfc012d9de9eac568dfe9b207bb3875d2273e46",
+      "present": true,
+      "note": ""
+    },
+    {
+      "name": "deploy_guide",
+      "repo_path": "docs/PRODUCTION_DEPLOYMENT_GUIDE.md",
+      "sha256": "6254a96bdae0f6b86697befdf2c27b6e7c04407c1dee3bf372d4aa3a937318a6",
+      "present": true,
+      "note": ""
+    }
+  ],
+  "freeze_status": "RELEASE_CANDIDATE_FROZEN_AWAITING_HUMAN",
+  "generated_by": "Phase 3.9.5 release-line reconciliation (controlled, no history rewrite)"
+}

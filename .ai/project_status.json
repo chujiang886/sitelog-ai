@@ -3104,6 +3104,7 @@
   "phase_3_9_2_status": "PRODUCTION_RELEASE_GATE_EVIDENCE_PACKAGE_BUILT_NO_GO",
   "phase_3_9_3_status": "PRODUCTION_OBSERVABILITY_SRE_INCIDENT_READINESS_BUILT_NO_GO",
   "phase_3_9_4_status": "TELEMETRY_INTEGRATION_SYNTHETIC_OPERATIONS_BUILT_NO_GO",
+  "phase_3_9_5_status": "RELEASE_LINE_RECONCILED_RC_FROZEN_AWAITING_HUMAN",
   "phase_3_8_19": {
     "phase": "3.8.19",
     "name": "Enterprise Agent Compliance & Audit Intelligence Layer（企业智能体合规与审计智能层）",
@@ -4171,6 +4172,95 @@
       "真实合成演练与事故指挥（仅人类终端 SRE/incident-commander 可执行）",
       "真实 SLO/错误预算与阈值验证（当前 threshold_verified=False，PENDING_VERIFICATION）",
       "engineering_enabled 开启（仅人类终端可执行）"
+    ]
+  },
+  "phase_3_9_5": {
+    "phase": "3.9.5",
+    "name": "Release Line Reconciliation & RC Integration Closure Layer（发布线对账、RC 集成与仓库完整性收口层）",
+    "status": "RELEASE_LINE_RECONCILED_RC_FROZEN_AWAITING_HUMAN",
+    "closed_at": "2026-08-12",
+    "report_dated": "2026-08-12",
+    "identity": "BOIP AI Chief Architect / Release Integration Auditor / Repository Reconciliation Custodian",
+    "branch": "feat/phase3.9.5-release-line-reconciliation（自 a905213 分出，即 3.9.4 收口点；不 rewrite 历史）",
+    "commit": "受控集成 commit A/B/C（e0cae50 / d82cade / 49c8c63）+ 安全测试修复 e7952e9；真实 hash 见 git log",
+    "commit_time": "2026-08-12（收口）",
+    "tasks_total": 14,
+    "tasks_completed": 14,
+    "tasks": [
+      "T1 Reality Scan：建 Phase39ReleaseLineRegistry（3.9.0=a538e1e/31、3.9.1=9a3dee1/33、3.9.2=1f223db/37、3.9.3=8c7c9c5/38、3.9.4=a905213/48、master=543c3c7）",
+      "T2 3.9.4 幽灵报告缺口：已由 3.9.4 commit a905213 闭合（phase3.9.4 报告已存在，integrity 9/9）",
+      "T3 3.9.2 增量归属：RC 冻结 / 受控激活代码经受控 Git 集成入 3.9.5 分支（Commit A/B/C，精确 add，禁 git add -A）",
+      "T4 审计枚举依赖解耦：HUMAN_ACTIVATION_APPROVAL_RECORDED 由 3.9.4 线引入，集成于 3.9.4 锚点即满足，无跨分支隐式依赖（human_approval.py 经 audit.record_human_activation_approval_recorded 间接调用，3.9.4 线已含）",
+      "T5 受控 Git 集成：分支 feat/phase3.9.5-release-line-reconciliation（自 a905213）；Commit A/B/C + e7952e9 安全测试修复；禁 push / force push / rewrite history",
+      "T6 RC Freeze Rebuild：ci_release_gate.py --rc-spec 跑通（frozen and gate_ok），生成 RC freeze manifest（18 组件，activation_approved=false）",
+      "T7 治理完整性 9/9：scripts/check_governance_repository_integrity.py 实测 9/9 PASS",
+      "T8 Activation Gate 重评：ControlledActivationGate.evaluate() 永不返回 ACTIVATED_BY_HUMAN；状态 pending_verification（缺真实人工四角色签署）",
+      "T9 CI Gate 真实运行：ci_release_gate.py 集成 create→freeze→check→evidence→gate，fail-closed",
+      "T10 测试 0 failed：agents 2373 passed / backend 374 passed（全量零失败）",
+      "T11 SSOT 对账 + 加 phase_3_9_5（本条目）；engineering_enabled=false 未改，无 engineering_approved",
+      "T12 Baseline Refresh：审计总数 100、forbidden 327、integrity 9/9 与基线一致",
+      "T13 红线验证：十条红线全未触发；附 JWT 缺失 secret fail-closed 测试修复（双命名空间 patch，真正覆盖）",
+      "T14 27 章收口报告（phase3.9.5_release_line_reconciliation_closure_report.md）后 STOP"
+    ],
+    "core_module": "agents/enterprise/production_release/（RC 冻结 / 受控激活增量）",
+    "core_module_files": [
+      "release_candidate.py",
+      "freeze_manifest.py",
+      "freeze_checker.py",
+      "freeze_forbidden.py",
+      "activation_evidence.py",
+      "activation_gate.py",
+      "human_approval.py",
+      "service.py",
+      "__init__.py"
+    ],
+    "forbidden_count": 327,
+    "freeze_forbidden_count": 327,
+    "audit_total": 100,
+    "rc_spec": ".ai/release-gate/rc-spec.3.9.2.json",
+    "rc_freeze_manifest": ".ai/release-gate/rc-freeze-manifest.3.9.2.json",
+    "ci_gate": "scripts/ci_release_gate.py + .github/workflows/release-gate.yml",
+    "runbook": "docs/PRODUCTION_ACTIVATION_ROLLBACK_RUNBOOK.md",
+    "test_files": [
+      "tests/agents/test_enterprise_rc_freeze_activation_gate.py（15 例）"
+    ],
+    "report": ".ai/reviews/phase3.9.5_release_line_reconciliation_closure_report.md",
+    "roadmap_ref": ".ai/roadmap_v8.md §35.5",
+    "phase_tests": "tests/agents/test_enterprise_rc_freeze_activation_gate.py（15 例）",
+    "integration_commits": {
+      "A": "e0cae50（RC freeze core：release_candidate/freeze_manifest/freeze_checker/freeze_forbidden + rc-spec）",
+      "B": "d82cade（受控激活闸门 + 人工批准契约 + 激活证据包 + 测试）",
+      "security_fix": "e7952e9（JWT 缺失 secret fail-closed 测试修复，双命名空间 patch）",
+      "C": "49c8c63（service 编排集成 + ci_release_gate + release-gate.yml + runbook）"
+    },
+    "repo_integrity": "9/9（审计总数唯一 + 与基线一致 total=100）",
+    "working_tree": "clean（Commit A/B/C + e7952e9 后无未提交改动）",
+    "rc_freeze": {
+      "rc_candidate_id": "boip-rc-3.9.2",
+      "rc_version": "3.9.2-rc1",
+      "rc_status": "RELEASE_CANDIDATE_FROZEN_AWAITING_HUMAN",
+      "freeze_status": "FROZEN（组件哈希一致 / 清单无缺失 / 清单哈希自洽 / engineering_enabled=false / 治理完整性 9/9 / RC 状态冻结待人工）",
+      "git_workspace_clean": "true（CI 门禁 check_git=True 通过条件）",
+      "activation_gate": "PENDING_VERIFICATION（客观检查全过；真实人工四角色签署 PENDING → 永不 ACTIVATED_BY_HUMAN）"
+    },
+    "verified_json_modified": false,
+    "engineering_enabled_modified": false,
+    "red_lines": {
+      "engineering_enabled": "false（agents/config.yaml:102，未改）",
+      "engineering_approved": "未输出",
+      "no_real_deploy": "CI / API 均不部署，仅冻结 + 人工签署",
+      "no_ai_signoff": "HumanActivationApprovalService 契约只读 + 禁名拦截，AI 主体不代签",
+      "no_fabricated_evidence": "缺文件标 <missing>，PENDING 不抬 VERIFIED",
+      "no_history_rewrite": "禁 force push / git add -A / 覆盖历史 commit",
+      "no_production_go": "收口状态 RELEASE_LINE_RECONCILED_RC_FROZEN_AWAITING_HUMAN，不得写 PRODUCTION_GO"
+    },
+    "pending_verification": [
+      "真实生产环境部署与拓扑决策（主理人线下）",
+      "真实密钥线下提供（production_secret 恒 PENDING_VERIFICATION）",
+      "真实权限授予 / 真实回滚 / 真实恢复执行（仅演练）",
+      "engineering_enabled 开启（仅人类终端可执行）",
+      "4 角色真人在人类终端签署 GO/NO-GO/NEED_MORE_EVIDENCE",
+      "RC 仓库级 Freeze 真实核验（主理人线下 + 专家复核）"
     ]
   }
 }

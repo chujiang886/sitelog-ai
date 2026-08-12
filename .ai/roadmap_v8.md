@@ -1956,3 +1956,18 @@ GovernanceWorkflowRepository (require_human_actor + OrgScopeError)  ──snapsh
 
 - **状态：🟢 BUILT_NO_GO（3.9.4 已收口，2026-08-12）**。
 - **STOP：不进入 Phase 3.9.5+ 的「真接入/真外发」阶段**，不真接入生产遥测数据源（Prometheus/OpenTelemetry/Loki 等需主理人线下配置）、不真发送告警、不自动修复/回滚/关单/执行 Runbook、不自动开启 `engineering_enabled`，不输出 `engineering_approved`。3.9.4 产物待主理人审核授权后精路径 commit（telemetry 包 + 测试 + API/前端 + 审计 + SSOT + 部署指南 §15 + 本指南 §35.4 + 21 节治理指南 + 36 节收口报告）。
+
+### 35.6 3.9.5 交付物与门禁（发布线对账、RC 集成与仓库完整性收口层）
+
+- **身份**：BOIP AI Chief Architect / Release Integration Auditor / Repository Reconciliation Custodian（非新业务功能开发）。
+- **受控 Git 集成**：分支 `feat/phase3.9.5-release-line-reconciliation`（自 3.9.4 收口 HEAD `a905213` 分出，不 rewrite 历史）；Commit A=`e0cae50`（RC 冻结核心）/ B=`d82cade`（受控激活闸门 + 人工批准契约 + 激活证据包 + 测试 15 例）/ 安全测试修复=`e7952e9`（JWT 缺失 secret fail-closed 双命名空间 patch）/ C=`49c8c63`（service 编排 + ci_release_gate + release-gate.yml + rollback runbook）；全程 `git add <精确路径>`，禁 `git add -A` / push / force push。
+- **RC 冻结**：`agents/enterprise/production_release/{release_candidate,freeze_manifest,freeze_checker,freeze_forbidden,activation_evidence,activation_gate,human_approval}.py`；`ReleaseCandidate.activation_approved` 恒 `False`；`ReleaseFreezeChecker` 7 维判定 fail-closed；`ControlledActivationGate.evaluate()` 永不返回 `ACTIVATED_BY_HUMAN`。
+- **CI 门禁**：`scripts/ci_release_gate.py`（需 `--rc-spec`，create→freeze→check→evidence→gate，fail-closed）+ `.github/workflows/release-gate.yml`（integrity/freeze-gate/tests 三 job，只读）+ `.ai/release-gate/rc-spec.3.9.2.json` + `.ai/release-gate/rc-freeze-manifest.3.9.2.json`（18 组件，manifest_sha256=`2cfbb5c7…`）。
+- **实测**：`ci_release_gate.py` 退出码 0、`freeze_status=frozen`、受控激活闸门 `pending_verification`（缺真实人工四角色签署）；治理完整性 **9/9**；agents **2373 passed / 0 failed**；backend **374 passed / 0 failed**；frontend jest 117 passed / tsc 0 error；生产安全 7/7；fabrication/hardcoded 0 命中。
+- **SSOT**：`.ai/project_status.json` 已登记 `phase_3_9_5_status`（`RELEASE_LINE_RECONCILED_RC_FROZEN_AWAITING_HUMAN`）+ `phase_3_9_5` 嵌套块；审计总数 100、forbidden 327、integrity 9/9 与基线一致。
+- **红线**：十条最高红线全部未触发；`engineering_enabled=false`（未改）；无 `engineering_approved`。
+
+### 35.7 状态结论与 STOP 纪律（3.9.5）
+
+- **状态：🟢 RELEASE_LINE_RECONCILED_RC_FROZEN_AWAITING_HUMAN（3.9.5 已收口，2026-08-12）**。
+- **STOP：完成全部安全任务后停止**，不进下一 Phase、不开 `engineering_enabled`、不输出 `engineering_approved`、不真实部署、不自行执行四角色生产签署。后续仅由主理人 + 专家线下推进：真实人工四角色（production-owner / release-manager / security-owner / auditor）签署 → 终端显式置 `engineering_enabled=true` → 真实部署。收口报告见 `.ai/reviews/phase3.9.5_release_line_reconciliation_closure_report.md`（27 章）。
