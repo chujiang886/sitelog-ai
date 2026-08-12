@@ -1897,3 +1897,29 @@ GovernanceWorkflowRepository (require_human_actor + OrgScopeError)  ──snapsh
 
 - **状态：🟢 BUILT_NO_GO（已收口）**。
 - **STOP：不进入 Phase 3.8.32**，不自动开启 `engineering_enabled`，不输出 `engineering_approved`，不自动放行发布。本阶段产物**全部未提交**，等待主理人审核授权。
+---
+
+## 35. Phase 3.9.0–3.9.2 生产发布闸门体系（概览）
+
+三阶段构成「生产发布前」的镜像验证与闸门收口链，全部 **BUILT_NO_GO**，等待主理人线下授权：
+
+| 阶段 | 定位 | 包 / 报告 | 审计总数 |
+|------|------|----------|---------|
+| 3.9.0 | 生产就绪准备层（只验证准备体系） | `agents/enterprise/production_readiness/` · `phase3.9.0_production_readiness_preparation_report.md` | 79 |
+| 3.9.1 | 预生产验证与灾难恢复演练层（只验证能否扛住验证/灾难） | `agents/enterprise/staging_validation/` · `phase3.9.1_staging_validation_disaster_recovery_report.md` | 79→83（本链 +4） |
+| 3.9.2 | 企业生产发布闸门与证据包层（只核验是否达到人工签署门槛） | `agents/enterprise/production_release/` · `phase3.9.2_production_release_gate_evidence_package_report.md` | 83 |
+
+### 35.1 3.9.2 交付物与门禁
+
+- **包**：`agents/enterprise/production_release/`（forbidden / models / evidence / gate / package / service / __init__ 七文件）；`PRODUCTION_RELEASE_FORBIDDEN_COUNT = 314`，Gate `CHECK_KEYS = 13`。
+- **后端接线**：`backend/app/api/governance_release.py`（只读 + 签署端点，强制真实 USER 主体，AI 主体 403）。
+- **前端**：`frontend/src/app/governance-release/page.tsx`（只读展示 + 人工签署，无自动上线 / 无 AI 批准按钮）；`frontend/src/lib/identity/{types,guards}.ts` 同步 `governance:release:read` / `governance:release:signoff`。
+- **测试**：`tests/agents/test_production_release_gate_evidence.py`（23 例）、`tests/agents/test_enterprise_production_release.py`（27 例）、`backend/tests/test_governance_release.py`（31 例）全绿；agents 全量套件 2305 passed / 0 failed；backend 323 passed；frontend jest 117 passed；tsc 0 error。
+- **清单（SHA-256）**：由 `ProductionReleaseService.build_manifest` 在运行时生成（T6），缺文件标 `<missing>`，不伪造——非独立脚本；证据完整性链见 `ProductionReleaseEvidenceService.verify_integrity`。
+- **SSOT**：`.ai/project_status.json` 已登记 `phase_3_9_0/1/2_status`（均 `BUILT_NO_GO`）；治理仓库完整性检查器 9/9 通过。
+- **十项最高红线**（绝对不可修改 / 弱化）：①`engineering_enabled=false` ②禁 `engineering_approved` ③禁 AI 自动批准发布 ④禁 AI 自动执行部署 ⑤禁 AI 修改真实企业数据 ⑥禁 AI 写真实生产密钥 ⑦禁 AI 自动授予生产权限 ⑧禁 AI 代签 ⑨禁把 staging/drill 描述成 production verified ⑩禁通过跳测试 / 改安全断言 / 伪造证据让 Gate 变绿——全部 fail-closed，门禁 `ProductionReleaseGate` 永不返回 `APPROVED`/`GO`。
+
+### 35.2 状态结论与 STOP 纪律
+
+- **状态：🟢 BUILT_NO_GO（已收口）**。
+- **STOP：不进入 Phase 3.9.3+**，不自动开启 `engineering_enabled`，不输出 `engineering_approved`，不自动放行发布。本阶段产物待主理人审核授权后双 commit（A=包+测试+runbooks+generator+收口+SSOT+roadmap；B=manifest JSON）。

@@ -74,13 +74,16 @@ EXPECTED_CATEGORIES = {
     # Phase 3.9.1：预生产验证与灾难恢复演练层（+4）
     "staging_validation", "deployment_simulation", "rollback_drill",
     "recovery_validation",
+    # Phase 3.9.2：企业生产发布闸门与证据包层（+4）
+    "release_candidate_created", "release_gate_evaluated",
+    "release_signoff_recorded", "release_manifest_generated",
 }
 
 
 def test_audit_action_category_has_knowledge_members() -> None:
     members = {c.value for c in AuditActionCategory}
     assert members == EXPECTED_CATEGORIES
-    assert len(members) == 79
+    assert len(members) == 83
     # 程序化校验：枚举每个成员名均存在（规避手写元组形近污染，3.8.11 教训）。
     for name in AuditActionCategory.__members__:
         assert hasattr(AuditActionCategory, name)

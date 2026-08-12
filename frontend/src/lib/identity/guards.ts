@@ -53,6 +53,8 @@ export const ROLE_PERMISSIONS: Readonly<
     "governance:workflow:report",
     "governance:execution:submit",
     "governance:workflow:close",
+    "governance:release:read",
+    "governance:release:signoff",
   ],
   "governance-reviewer": [
     "governance:workflow:read",
@@ -63,6 +65,7 @@ export const ROLE_PERMISSIONS: Readonly<
     "governance:workflow:report",
     "governance:execution:submit",
     "governance:workflow:close",
+    "governance:release:read",
   ],
   "governance-auditor": [
     "governance:workflow:read",
@@ -70,11 +73,13 @@ export const ROLE_PERMISSIONS: Readonly<
     "governance:execution:read",
     "governance:audit:read",
     "governance:summary:read",
+    "governance:release:read",
   ],
   "governance-viewer": [
     "governance:workflow:read",
     "governance:review:read",
     "governance:summary:read",
+    "governance:release:read",
   ],
 };
 

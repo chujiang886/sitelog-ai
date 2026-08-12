@@ -268,6 +268,15 @@ from agents.enterprise.production_readiness import (
 from agents.enterprise.staging_validation import (
     StagingValidationDisasterRecoveryService,
 )
+# Phase 3.9.2：企业生产发布闸门与证据包层。在准备层 + 演练层之上提供「纯闸门 /
+# 证据包 / 候选 / 清单 / 回滚引用」能力——把发布候选可否放行、证据是否齐备、清单
+# 是否可哈希、回滚引用是否完整以只读校验结构沉淀。本层复用同一审计实例、身份层；
+# 构造即断言 safety_invariants_ok()（engineering_enabled 必须 False），且通过
+# _RedLineForbiddenMixin 结构拦截真实部署 / 真激活 / 出 approved / 自动批准 RC /
+# 代生产负责人签署 / 宣布生产 GO（红线①~⑦/⑩）。AI 路径永不直接返回生产 GO / APPROVED。
+from agents.enterprise.production_release import (
+    ProductionReleaseService,
+)
 
 
 class EnterpriseOperationLayer:
@@ -661,6 +670,17 @@ class EnterpriseOperationLayer:
         # _RedLineForbiddenMixin 结构拦截开生产 / 出 approved / 真部署 / 改真实数据 /
         # 写真实密钥 / 自动授权 / 代生产负责人（红线①~⑦）。不执行任何真实动作。
         self.agent_staging_validation = StagingValidationDisasterRecoveryService(
+            org_id=org_id,
+            audit=self.audit,
+            identity=self.identity,
+        )
+        # Phase 3.9.2：企业生产发布闸门与证据包层。在准备层 + 演练层之上提供
+        # 「纯闸门 / 证据包 / 候选 / 清单 / 回滚引用」能力；构造即断言
+        # safety_invariants_ok()（engineering_enabled 必须 False），且通过
+        # _RedLineForbiddenMixin 结构拦截真实部署 / 真激活 / 出 approved /
+        # 自动批准 RC / 代生产负责人签署 / 宣布生产 GO（红线①~⑦/⑩）。
+        # AI 路径永不直接返回生产 GO / APPROVED。
+        self.agent_production_release = ProductionReleaseService(
             org_id=org_id,
             audit=self.audit,
             identity=self.identity,

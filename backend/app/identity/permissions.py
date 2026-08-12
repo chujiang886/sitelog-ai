@@ -58,6 +58,9 @@ class GovernancePermission(str, Enum):
     WORKFLOW_REPORT = "governance:workflow:report"
     EXECUTION_SUBMIT = "governance:execution:submit"
     WORKFLOW_CLOSE = "governance:workflow:close"
+    # Phase 3.9.2：发布闸门与证据包（只读查看 / 真实人工签署）。
+    RELEASE_READ = "governance:release:read"
+    RELEASE_SIGNOFF = "governance:release:signoff"
 
 
 ALL_GOVERNANCE_PERMISSIONS: tuple[GovernancePermission, ...] = tuple(
@@ -96,6 +99,8 @@ GOVERNANCE_ROLE_PERMISSIONS: Mapping[str, frozenset[GovernancePermission]] = {
             GovernancePermission.WORKFLOW_REPORT,
             GovernancePermission.EXECUTION_SUBMIT,
             GovernancePermission.WORKFLOW_CLOSE,
+            GovernancePermission.RELEASE_READ,
+            GovernancePermission.RELEASE_SIGNOFF,
         }
     ),
     GOVERNANCE_ROLE_REVIEWER: frozenset(
@@ -108,6 +113,7 @@ GOVERNANCE_ROLE_PERMISSIONS: Mapping[str, frozenset[GovernancePermission]] = {
             GovernancePermission.WORKFLOW_REPORT,
             GovernancePermission.EXECUTION_SUBMIT,
             GovernancePermission.WORKFLOW_CLOSE,
+            GovernancePermission.RELEASE_READ,
         }
     ),
     # 审计员能看见一切，但一个写权限都没有：看得见与说了算是两回事。
@@ -118,6 +124,7 @@ GOVERNANCE_ROLE_PERMISSIONS: Mapping[str, frozenset[GovernancePermission]] = {
             GovernancePermission.EXECUTION_READ,
             GovernancePermission.AUDIT_READ,
             GovernancePermission.SUMMARY_READ,
+            GovernancePermission.RELEASE_READ,
         }
     ),
     GOVERNANCE_ROLE_VIEWER: frozenset(
@@ -125,6 +132,7 @@ GOVERNANCE_ROLE_PERMISSIONS: Mapping[str, frozenset[GovernancePermission]] = {
             GovernancePermission.WORKFLOW_READ,
             GovernancePermission.REVIEW_READ,
             GovernancePermission.SUMMARY_READ,
+            GovernancePermission.RELEASE_READ,
         }
     ),
 }

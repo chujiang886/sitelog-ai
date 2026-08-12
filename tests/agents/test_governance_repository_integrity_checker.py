@@ -104,11 +104,14 @@ def test_report_with_ssot_entry_passes(tmp_path: Path) -> None:
 
 
 def test_phase_key_override_is_honoured(tmp_path: Path) -> None:
-    """3.8.0 的状态键历史上没有编号后缀，靠基线里的 override 声明兼容。"""
+    """3.8.0 的状态键历史上没有编号后缀，靠基线里的 override 声明兼容。
+
+    override 以完整阶段串（``"3.8.0"``）为键，避免 3.9.0 被误判为 3.8.0。
+    """
     _write(tmp_path / ".ai/reviews/phase3.8.0_operation_report.md", "# x")
     ctx = _ctx(
         tmp_path,
-        baseline={"ssot": {"phase_key_overrides": {"0": "phase_3_8_status"}}},
+        baseline={"ssot": {"phase_key_overrides": {"3.8.0": "phase_3_8_status"}}},
         ssot={"phase_3_8_status": "BUILT"},
     )
     assert checker.rule_phase_registration_complete(ctx) == []

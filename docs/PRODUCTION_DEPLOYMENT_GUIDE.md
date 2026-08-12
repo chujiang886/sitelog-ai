@@ -622,8 +622,48 @@ ORDER BY created_at DESC;
 
 ---
 
+## 13. 生产发布闸门与证据包（Phase 3.9.2）
+
+本阶段在「部署前」再加一道**只读闸门 + 人工签署**层。它**不是部署工具**，也**不替你做发布决定**——它只把"是否达到人工签署门槛"这件事，用结构化的证据与 13 项检查固化下来，交给真实责任人去签 GO / NO-GO / NEED_MORE_EVIDENCE。
+
+### 13.1 它做什么、不做什么
+
+- **做**：核验仓库事实（git 完整性 / commit SHA / 全量测试绿 / 安全扫描 / 身份扫描 / 治理质量门 / 预生产验证 / 回滚演练 / 恢复校验 / DB 迁移态 / 配置基线 / 部署文档 / 证据完整度），生成 SHA-256 证据清单（Release Package Manifest）。
+- **不做**：不部署、不激活、不翻转 `engineering_enabled`、不写真实密钥、不授真实权限、不代替任何人签字、不输出 `engineering_approved`、不返回 `APPROVED`/`GO`。
+
+> 闸门结论只有三态：`BLOCKED`（有硬缺失）→ `PENDING_VERIFICATION`（有标记待线下验证项）→ `READY_FOR_HUMAN_REVIEW`（材料齐备，等真人签）。**永不**自动 GO。
+
+### 13.2 13 项检查（CHECK_KEYS）
+
+`git_workspace_integrity` · `commit_sha_exists` · `full_test_results_green` · `production_security_scanner` · `identity_security_scanner` · `governance_quality_gate` · `staging_validation` · `rollback_drill` · `recovery_validation` · `database_migration_status` · `configuration_baseline` · `deployment_documentation` · `evidence_completeness`
+
+任何一项缺失 → `BLOCKED`；有项标 `pending_verification` → `PENDING_VERIFICATION`；全部齐备 → `READY_FOR_HUMAN_REVIEW`。
+
+### 13.3 证据包与清单（SHA-256）
+
+- `ProductionReleaseEvidenceService` 收集证据：客观事实（文件存在、测试通过）标 `VERIFIED`；人工依赖项（human_signoff / production_secret）**恒 `PENDING_VERIFICATION`**——AI 不代填、不把 PENDING 抬成 VERIFIED。
+- `ProductionReleaseService.build_manifest` 对存在的交付物算 SHA-256，缺文件标 `<missing>`（不伪造哈希）。清单是**证据**，不是放行令。
+
+### 13.4 人工签署（唯一合法出口）
+
+- 签署角色：`PRODUCTION_OWNER` / `RELEASE_MANAGER` / `SECURITY_OWNER` / `AUDITOR`。
+- 决策：`GO` / `NO_GO` / `NEED_MORE_EVIDENCE`，**只能由 `USER` 类型真实主体**提交。
+- API：`POST /governance/releases/{id}/signoff`（需 `governance:release:signoff`，仅 `governance-admin` 拥有；AI 主体 403）。前端：`/governance-release` 页，**无自动上线按钮、无 AI 批准按钮**。
+- 每次签署落审计：`RELEASE_SIGNOFF_RECORDED`（actor 强制 `USER`）。另有 `RELEASE_CANDIDATE_CREATED` / `RELEASE_GATE_EVALUATED` / `RELEASE_MANIFEST_GENERATED` 三个审计类，合计使审计枚举总数达 **83**。
+
+### 13.5 红线（fail-closed，AI 不可破）
+
+`agents/enterprise/production_release/forbidden.py` 含 **314** 项禁名（含历史治理禁集并集），由 `_RedLineForbiddenMixin` 在结构级拦截：真部署 / 出 `approved` / 自动批准 / AI 代签 / 写真实密钥 / 授真实权限 / 翻转 `engineering_enabled` 一律调用即抛。全程 `engineering_enabled` 保持 `false`。
+
+### 13.6 收口状态
+
+本层状态 **BUILT_NO_GO**：闸门与证据体系已建成并通过验证，但**未开启生产、未进入自动激活**。最终生产发布（开 `engineering_enabled`、真部署、真签 GO）只能源于主理人在人类终端的线下决策。详见 `.ai/reviews/phase3.9.2_production_release_gate_evidence_package_report.md` 与 `.ai/roadmap_v8.md` §35。
+
+---
+
 ## 附录 A：变更记录
 
 | 版本 | 变更 |
 |---|---|
 | Phase 3.8.29 | 首次发布。HttpOnly Cookie + CSRF 双提交、OIDC/SSO 适配器、环境隔离红线、append-only 安全审计、CI 生产门禁、本部署指南 |
+| Phase 3.9.2 | 新增 §13 生产发布闸门与证据包层：13 项 CHECK_KEYS、SHA-256 证据清单、4 角色人工签署（GO/NO-GO/NEED_MORE_EVIDENCE，仅 `USER`）、4 个 RELEASE_* 审计类（总数 83）、314 项 fail-closed 禁名、只读 API + 签署端点、前端 `/governance-release` 页（无自动上线 / 无 AI 批准按钮） |

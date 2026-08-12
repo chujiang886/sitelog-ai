@@ -208,6 +208,14 @@ class AuditActionCategory(str, Enum):
     DEPLOYMENT_SIMULATION = "deployment_simulation"
     ROLLBACK_DRILL = "rollback_drill"
     RECOVERY_VALIDATION = "recovery_validation"
+    # Phase 3.9.2（T11）：企业生产发布闸门与证据包层（审计动作大类 79 → 83）。四类均为
+    # **只读事实型 / 责任留痕型**动作：仅如实记录「真实人工创建发布候选」「真实人工评估
+    # 发布闸门」「真实人工记录发布签署」「真实人工生成发布清单」。绝不承载批准 / 放行 /
+    # 自动部署 / 自动数据覆盖 / 自动密钥写入 / 代替生产负责人语义（红线①~⑦/⑧/⑩）。
+    RELEASE_CANDIDATE_CREATED = "release_candidate_created"
+    RELEASE_GATE_EVALUATED = "release_gate_evaluated"
+    RELEASE_SIGNOFF_RECORDED = "release_signoff_recorded"
+    RELEASE_MANIFEST_GENERATED = "release_manifest_generated"
 
 
 def require_human_actor(actor_kind: Any) -> None:
@@ -2819,6 +2827,100 @@ class AuditService(_RedLineForbiddenMixin):
             actor_kind=AuditActorKind.USER,
             actor_id=actor_id,
             category=AuditActionCategory.RECOVERY_VALIDATION,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    # ---- Phase 3.9.2（T11）：企业生产发布闸门与证据包层审计 ----
+
+    def record_release_candidate_created(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "create_release_candidate",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工创建发布候选（只读，红线①/③/⑥）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.RELEASE_CANDIDATE_CREATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_release_gate_evaluated(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "evaluate_release_gate",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工评估发布闸门（只读，禁止自动放行，红线②/③/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.RELEASE_GATE_EVALUATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_release_signoff_recorded(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "record_release_signoff",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工发布签署（责任留痕，actor_kind 恒 USER，红线⑥/⑧）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.RELEASE_SIGNOFF_RECORDED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_release_manifest_generated(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "generate_release_manifest",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工生成发布清单（只读，禁止执行部署，红线③/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.RELEASE_MANIFEST_GENERATED,
             action=action,
             target=target,
             detail=detail,

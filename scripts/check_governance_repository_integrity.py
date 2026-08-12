@@ -21,7 +21,7 @@
 因此本检查器守九条不变量。每条都对应上面某个已经真实发生过的失效：
 
 1. **基线清单可解析** —— 清单本身就是本检查器的事实来源，先自证。
-2. **阶段登记完整性** —— 每个有收口报告的 3.8.x 阶段，SSOT 必须有状态登记。
+2. **阶段登记完整性** —— 每个有收口报告的 3.8.x / 3.9.x 阶段，SSOT 必须有状态登记。
 3. **报告路径有效性** —— SSOT 声称的 ``report`` 文件必须真实存在（防幽灵登记）。
 4. **审计总数断言唯一** —— 全仓只允许一处断言枚举总数，且必须在清单指定的权威文件里。
 5. **审计总数与基线一致** —— 实际枚举数必须等于基线声明值（新增须显式改基线）。
@@ -143,7 +143,18 @@ def rule_baseline_parsable(ctx: Context) -> list[Violation]:
 # 规则 2：阶段登记完整性（收口报告 ⇒ SSOT 状态键）                                #
 # --------------------------------------------------------------------------- #
 
-_REPORT_RE = re.compile(r"^phase3\.8\.(\d+)[_.]")
+# Phase 3.9.2：扩展覆盖范围到 3.8.x 与 3.9.x 两系收口报告。
+# 捕获 ``phase3.<minor>.<patch>[_.]``，仅处理 minor ∈ {8, 9}。
+_REPORT_RE = re.compile(r"^phase3\.(?P<minor>\d+)\.(?P<patch>\d+)[_.]")
+
+
+def _ssot_status_key_for(minor: str, patch: str, overrides: dict[str, str], phase: str) -> str:
+    """根据 minor/patch 推导 SSOT 状态键（3.8.x → phase_3_8_*，3.9.x → phase_3_9_*）。
+
+    ``overrides`` 以**完整阶段串**（如 ``"3.8.0"``）为键，避免 3.9.0 被误判为 3.8.0。
+    """
+    default = f"phase_3_{minor}_{patch}_status"
+    return overrides.get(phase, default)
 
 
 def rule_phase_registration_complete(ctx: Context) -> list[Violation]:
@@ -156,21 +167,28 @@ def rule_phase_registration_complete(ctx: Context) -> list[Violation]:
     overrides: dict[str, str] = ctx.baseline.get("ssot", {}).get(
         "phase_key_overrides", {}
     )
-    numbers: dict[int, list[str]] = {}
-    for report in sorted(reviews.glob("phase3.8*")):
+    # phase -> 报告名列表
+    phases: dict[str, list[str]] = {}
+    for report in sorted(reviews.glob("phase3.*")):
         match = _REPORT_RE.match(report.name)
-        if match:
-            numbers.setdefault(int(match.group(1)), []).append(report.name)
+        if not match:
+            continue
+        minor = match.group("minor")
+        if minor not in ("8", "9"):
+            continue
+        phase = f"3.{minor}.{match.group('patch')}"
+        phases.setdefault(phase, []).append(report.name)
 
     violations: list[Violation] = []
-    for number in sorted(numbers):
-        key = overrides.get(str(number), f"phase_3_8_{number}_status")
+    for phase in sorted(phases):
+        _, minor, patch = phase.split(".")
+        key = _ssot_status_key_for(minor, patch, overrides, phase)
         if key not in ctx.ssot:
-            reports = "、".join(numbers[number])
+            reports = "、".join(phases[phase])
             violations.append(
                 Violation(
                     f".ai/project_status.json（缺 {key}）",
-                    f"Phase 3.8.{number} 已有收口报告（{reports}），但 SSOT 无状态登记。",
+                    f"Phase {phase} 已有收口报告（{reports}），但 SSOT 无状态登记。",
                     "在 project_status.json 补登该阶段状态；不得重编号已占用的阶段。",
                 )
             )
@@ -454,7 +472,8 @@ def rule_no_engineering_approved_emission(ctx: Context) -> list[Violation]:
 # 规则 9：阶段编号唯一                                                           #
 # --------------------------------------------------------------------------- #
 
-_STATUS_KEY_RE = re.compile(r"^phase_3_8_(\d+)_status$")
+# Phase 3.9.2：扩展阶段编号唯一检查到 3.8.x 与 3.9.x。
+_STATUS_KEY_RE = re.compile(r"^phase_3_(?P<minor>\d+)_(?P<patch>\d+)_status$")
 
 
 def rule_phase_numbering_unique(ctx: Context) -> list[Violation]:
@@ -470,7 +489,10 @@ def rule_phase_numbering_unique(ctx: Context) -> list[Violation]:
         match = _STATUS_KEY_RE.match(key)
         if not match or not isinstance(value, str):
             continue
-        phase = f"3.8.{match.group(1)}"
+        minor = match.group("minor")
+        if minor not in ("8", "9"):
+            continue
+        phase = f"3.{minor}.{match.group('patch')}"
         entry = registry.get(phase)
         if entry is None:
             continue

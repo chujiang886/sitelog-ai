@@ -3099,6 +3099,9 @@
   "phase_3_8_29_status": "ENTERPRISE_PRODUCTION_SECURITY_HARDENING_BUILT_NO_GO",
   "phase_3_8_30_status": "ENTERPRISE_AGENT_GOVERNANCE_TRACEABILITY_BUILT_NO_GO",
   "phase_3_8_31_status": "GOVERNANCE_REPOSITORY_INTEGRITY_RELEASE_BASELINE_BUILT_NO_GO",
+  "phase_3_9_0_status": "PRODUCTION_READINESS_PREPARATION_BUILT_NO_GO",
+  "phase_3_9_1_status": "STAGING_VALIDATION_DISASTER_RECOVERY_BUILT_NO_GO",
+  "phase_3_9_2_status": "PRODUCTION_RELEASE_GATE_EVIDENCE_PACKAGE_BUILT_NO_GO",
   "phase_3_8_19": {
     "phase": "3.8.19",
     "name": "Enterprise Agent Compliance & Audit Intelligence Layer（企业智能体合规与审计智能层）",
@@ -3809,6 +3812,96 @@
       "verified.json 真实化（本阶段未触碰）",
       "engineering_enabled 开启（仅人类终端可执行）",
       "3.8.30 / 3.8.31 产物的提交边界（已规划、未执行）"
+    ]
+  },
+  "phase_3_9_0": {
+    "phase": "3.9.0",
+    "name": "Enterprise Production Readiness & Controlled Activation Preparation Layer（企业生产就绪与受控激活准备层）",
+    "status": "PRODUCTION_READINESS_PREPARATION_BUILT_NO_GO",
+    "closed_at": "2026-08-11",
+    "report_dated": "2026-08-11",
+    "identity": "BOIP AI Chief Architect + Production Readiness Auditor",
+    "branch": "feat/phase3.9.0-production-readiness-preparation（自 49afca9 分出）",
+    "commit": "a538e1e",
+    "commit_time": "2026-08-11 20:03:24 +0800",
+    "commits_verified_ancestor_of_head": true,
+    "tasks_total": 11,
+    "tasks_completed": 11,
+    "tasks": [
+      "T1 ProductionReadinessChecklist（六域，auto_passed 恒 False，只检查不自动放行）",
+      "T2 ProductionDeploymentManifest（仅密钥键名占位，NO_REAL_SECRET_WRITTEN）",
+      "T3 EnvironmentValidationReport（只读取事实，all_ok 仅聚合不用于放行）",
+      "T4 PermissionInitializationPlan（NO_REAL_GRANT，grant_required 仅标记绝不执行）",
+      "T5 RollbackPlan（version_from/to + db/config/recovery 步骤，可逆优先）",
+      "T6 ActivationReviewPackage（approved 恒 False，signature_required=HUMAN_PRODUCTION_OWNER）",
+      "T7 audit.py +3 枚举（PRODUCTION_READINESS_CHECK/DEPLOYMENT_MANIFEST/ROLLBACK_PLAN）与 record 方法",
+      "T8 测试 13 例 fail-closed",
+      "T9–T11 门面接线 / 文档 / SSOT 对齐"
+    ],
+    "core_module": "agents/enterprise/production_readiness/",
+    "audit_delta": "+3 枚举（总数 72 → 75）",
+    "docs": [
+      "docs/PRODUCTION_DEPLOYMENT_GUIDE.md"
+    ],
+    "report": ".ai/reviews/phase3.9.0_production_readiness_preparation_report.md",
+    "roadmap_ref": ".ai/roadmap_v8.md §35",
+    "verified_json_modified": false,
+    "engineering_enabled_modified": false,
+    "red_lines": {
+      "engineering_enabled": "false（未改）",
+      "engineering_approved": "未输出",
+      "no_real_secret_written": "T2 仅占位键名，值一律不出现",
+      "no_real_grant": "T4 仅标记 grant_required，绝不执行真实授权",
+      "no_auto_activation": "T6 approved 恒 False，待人类生产负责人线下签署"
+    },
+    "pending_verification": [
+      "真实生产环境就绪判定（由主理人在人类终端执行）",
+      "真实密钥接入（不写、不出现值）",
+      "真实权限授予（NO_REAL_GRANT，仅计划）",
+      "engineering_enabled 开启（仅人类终端可执行）"
+    ]
+  },
+  "phase_3_9_1": {
+    "phase": "3.9.1",
+    "name": "Enterprise Staging Validation & Disaster Recovery Drill Layer（企业预生产验证与灾难恢复演练层）",
+    "status": "STAGING_VALIDATION_DISASTER_RECOVERY_BUILT_NO_GO",
+    "closed_at": "2026-08-11",
+    "report_dated": "2026-08-11",
+    "identity": "BOIP AI Chief Architect + Production Validation Auditor",
+    "branch": "feat/phase3.9.1-staging-validation-disaster-recovery-drill（自 a538e1e 分出，即 3.9.0 收口点）",
+    "commit": "66f9b57",
+    "commit_time": "2026-08-11 21:33:10 +0800",
+    "commits_verified_ancestor_of_head": true,
+    "tasks_total": 6,
+    "tasks_completed": 6,
+    "tasks": [
+      "T1 StagingValidationChecklist（六域，deployed 恒 False，只验证不自动放行）",
+      "T2 DeploymentSimulationReport（real_deploy_performed 恒 False，仅模拟步骤）",
+      "T3 RollbackDrillReport（executed_for_real 恒 False，owner_role=production-owner）",
+      "T4 RecoveryValidation（real_data_overwritten 恒 False，backup/restore/integrity 校验）",
+      "T5 FailureScenarioCatalog（real_data_touched 恒 False，场景/影响/恢复路径）",
+      "T6 audit.py +4 枚举（STAGING_VALIDATION/DEPLOYMENT_SIMULATION/ROLLBACK_DRILL/RECOVERY_VALIDATION）与 record 方法"
+    ],
+    "core_module": "agents/enterprise/staging_validation/",
+    "audit_delta": "+4 枚举（总数 75 → 79）",
+    "docs": [
+      "docs/PRODUCTION_DEPLOYMENT_GUIDE.md"
+    ],
+    "report": ".ai/reviews/phase3.9.1_staging_validation_disaster_recovery_report.md",
+    "roadmap_ref": ".ai/roadmap_v8.md §36",
+    "verified_json_modified": false,
+    "engineering_enabled_modified": false,
+    "red_lines": {
+      "engineering_enabled": "false（未改）",
+      "engineering_approved": "未输出",
+      "no_real_deploy": "T2 real_deploy_performed 恒 False",
+      "no_real_rollback": "T3 executed_for_real 恒 False，仅演练",
+      "no_real_data_touch": "T4/T5 real_data_overwritten / real_data_touched 恒 False"
+    },
+    "pending_verification": [
+      "真实预生产部署与验证（由主理人在人类终端执行）",
+      "真实回滚 / 恢复执行（仅演练，未触碰真实数据）",
+      "engineering_enabled 开启（仅人类终端可执行）"
     ]
   }
 }

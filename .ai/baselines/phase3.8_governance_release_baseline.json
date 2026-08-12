@@ -18,11 +18,11 @@
     "authorization": "放行决策仅限主理人在人类终端执行；本基线不构成任何放行依据。"
   },
   "audit_category_contract": {
-    "total": 79,
+    "total": 83,
     "authority_file": "tests/agents/test_enterprise_knowledge_governance_audit.py",
-    "authority_assertion": "assert len(members) == 79",
+    "authority_assertion": "assert len(members) == 83",
     "policy": "全仓仅允许权威文件断言枚举总数；其余各层一律改用存在性契约（子集断言），避免『新增一类就要连改十几处旧测试』的脆性。",
-    "history": "3.8.25 起 68 → 3.8.26 +1(VIEW) = 69 → 3.8.30 +3(TRACE/TIMELINE/REPLAY) = 72 → 3.9.0 +3(PRODUCTION_READINESS_CHECK/DEPLOYMENT_MANIFEST/ROLLBACK_PLAN) = 75 → 3.9.1 +4(STAGING_VALIDATION/DEPLOYMENT_SIMULATION/ROLLBACK_DRILL/RECOVERY_VALIDATION) = 79",
+    "history": "3.8.25 起 68 → 3.8.26 +1(VIEW) = 69 → 3.8.30 +3(TRACE/TIMELINE/REPLAY) = 72 → 3.9.0 +3(PRODUCTION_READINESS_CHECK/DEPLOYMENT_MANIFEST/ROLLBACK_PLAN) = 75 → 3.9.1 +4(STAGING_VALIDATION/DEPLOYMENT_SIMULATION/ROLLBACK_DRILL/RECOVERY_VALIDATION) = 79 → 3.9.2 +4(RELEASE_CANDIDATE_CREATED/RELEASE_GATE_EVALUATED/RELEASE_SIGNOFF_RECORDED/RELEASE_MANIFEST_GENERATED) = 83",
     "required_families": {
       "governance_traceability_3_8_30": [
         "GOVERNANCE_TRACE",
@@ -95,7 +95,7 @@
     "file": ".ai/project_status.json",
     "roadmap": ".ai/roadmap_v8.md",
     "phase_key_overrides": {
-      "0": "phase_3_8_status"
+      "3.8.0": "phase_3_8_status"
     },
     "backfilled_in_3_8_31": [
       "3.8.10",
@@ -415,6 +415,38 @@
         ".ai/reviews/phase3.8.31_repository_integrity_release_baseline_closure_report.md"
       ],
       "ssot_detail_key": "phase_3_8_31"
+    },
+    {
+      "phase": "3.9.0",
+      "name": "Enterprise Production Readiness & Controlled Activation Preparation Layer",
+      "status": "PRODUCTION_READINESS_PREPARATION_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_9_0_status",
+      "reports": [
+        ".ai/reviews/phase3.9.0_production_readiness_preparation_report.md"
+      ],
+      "commit": "a538e1e",
+      "ssot_detail_key": "phase_3_9_0"
+    },
+    {
+      "phase": "3.9.1",
+      "name": "Enterprise Staging Validation & Disaster Recovery Drill Layer",
+      "status": "STAGING_VALIDATION_DISASTER_RECOVERY_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_9_1_status",
+      "reports": [
+        ".ai/reviews/phase3.9.1_staging_validation_disaster_recovery_report.md"
+      ],
+      "commit": "66f9b57",
+      "ssot_detail_key": "phase_3_9_1"
+    },
+    {
+      "phase": "3.9.2",
+      "name": "Enterprise Production Release Gate & Evidence Package Layer",
+      "status": "PRODUCTION_RELEASE_GATE_EVIDENCE_PACKAGE_BUILT_NO_GO",
+      "ssot_status_key": "phase_3_9_2_status",
+      "reports": [
+        ".ai/reviews/phase3.9.2_production_release_gate_evidence_package_report.md"
+      ],
+      "ssot_detail_key": "phase_3_9_2"
     }
   ],
   "known_notes": [
@@ -433,7 +465,7 @@
     "Task 11 红线复核实战发现：规则 4（审计总数断言唯一）初版仅识别裸变量 members 与 list(AuditActionCategory)，致 tests/agents/test_enterprise_governance_workflow_orchestration.py 中 `cats = {c.value for c in AuditActionCategory}` + `assert len(cats) == 72` 漏网，且该用例名 test_audit_category_count_still_68 与实际断言 72 自相矛盾。已双修：①该处改存在性契约并更名 test_workflow_audit_categories_registered；②检查器补 _enum_full_set_aliases() 识别枚举全集别名，新增 7 条双向自检（含 4 种别名变体 + 2 条误报守卫）。"
   ],
   "integrity_invariants": [
-    "每个有收口报告的 3.8.x 阶段，SSOT 必须有状态登记",
+    "每个有收口报告的 3.8.x / 3.9.x 阶段，SSOT 必须有状态登记",
     "SSOT 声明的 report 路径必须真实存在",
     "审计枚举总数断言全仓唯一，且位于 authority_file",
     "审计枚举实际总数必须等于本基线 audit_category_contract.total",

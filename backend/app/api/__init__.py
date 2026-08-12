@@ -8,6 +8,7 @@ from app.api.health import router as health_router
 from app.api.governance_dashboard import router as governance_dashboard_router
 from app.api.governance_identity import router as governance_identity_router
 from app.api.governance_operations import router as governance_operations_router
+from app.api.governance_release import router as governance_release_router
 from app.api.knowledge import router as knowledge_router
 from app.api.projects import router as projects_router
 from app.api.rag import router as rag_router
@@ -24,6 +25,7 @@ __all__ = [
     "governance_dashboard_router",
     "governance_identity_router",
     "governance_operations_router",
+    "governance_release_router",
     "knowledge_router",
     "projects_router",
     "rag_router",
