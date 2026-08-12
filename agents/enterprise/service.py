@@ -280,6 +280,7 @@ from agents.enterprise.production_release import (
 from agents.enterprise.production_observability import (
     ProductionObservabilityService,
 )
+from agents.enterprise.telemetry import ProductionTelemetryService
 
 
 class EnterpriseOperationLayer:
@@ -691,6 +692,13 @@ class EnterpriseOperationLayer:
         # Phase 3.9.3：企业生产可观测性、SRE 与事故响应准备层。纯只读 / 事实描述 /
         # 候选 / 草稿；AI 不自动 ACK / RESOLVE / CLOSE / 回滚（红线⑤/⑨/⑩）。
         self.agent_production_observability = ProductionObservabilityService(
+            org_id=org_id,
+            audit=self.audit,
+            identity=self.identity,
+        )
+        # Phase 3.9.4：生产遥测接入适配与合成运维验证层。纯端口 / 归一化 / 合成演练 /
+        # 仅模拟告警路由；AI 不真连接生产源 / 不真外发告警 / 不自动回滚（红线①~⑭）。
+        self.agent_production_telemetry = ProductionTelemetryService(
             org_id=org_id,
             audit=self.audit,
             identity=self.identity,
