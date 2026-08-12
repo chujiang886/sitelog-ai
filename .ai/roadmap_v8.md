@@ -1908,7 +1908,7 @@ GovernanceWorkflowRepository (require_human_actor + OrgScopeError)  ──snapsh
 | 3.9.0 | 生产就绪准备层（只验证准备体系） | `agents/enterprise/production_readiness/` · `phase3.9.0_production_readiness_preparation_report.md` | 79 |
 | 3.9.1 | 预生产验证与灾难恢复演练层（只验证能否扛住验证/灾难） | `agents/enterprise/staging_validation/` · `phase3.9.1_staging_validation_disaster_recovery_report.md` | 79→83（本链 +4） |
 | 3.9.2 | 企业生产发布闸门与证据包层（只核验是否达到人工签署门槛） | `agents/enterprise/production_release/` · `phase3.9.2_production_release_gate_evidence_package_report.md` | 83 |
-| 3.9.3 | 企业生产可观测性、SRE 与事故响应准备层（只建准备层，不真接入/不真告警/不自动修复） | `agents/enterprise/production_observability/` · `phase3.9.3_production_observability_incident_readiness_report.md` | 88→95（本链 +7） |
+| 3.9.3 | 企业生产可观测性、SRE 与事故响应准备层（只建准备层，不真接入/不真告警/不自动修复） | `agents/enterprise/production_observability/` · `phase3.9.3_production_observability_incident_readiness_report.md` | 89→96（本链 +7；含 3.9.2 受控激活/RC冻结层遗留 +6） |
 
 ### 35.1 3.9.2 交付物与门禁
 
@@ -1926,8 +1926,8 @@ GovernanceWorkflowRepository (require_human_actor + OrgScopeError)  ──snapsh
 - **后端接线**：`backend/app/api/governance_observability.py`（只读 + 人工 ACK/RESOLVE/CLOSE 端点，强制真实 `USER` 主体、AI 主体 403、`auto_state_transition=false`）；`backend/app/identity/permissions.py` 新增 `governance:observability:read` / `governance:incident:action`（职责分离：incident 动作仅 admin）。
 - **前端**：`frontend/src/app/governance-observability/page.tsx`（只读展示 Overall/Component(11)/SLO/Metrics/Active Incidents + 真实人工 ACK/RESOLVE/CLOSE，无 Auto Fix / Auto Rollback / Auto Resolve / Auto Close / AI Approve 按钮）；`frontend/src/lib/identity/{types,guards}.ts` 同步两权限词表。
 - **测试**：`tests/agents/test_enterprise_production_observability.py`（24 例）、`backend/tests/test_governance_observability.py`（23 例）全绿；agents 全量套件 **2329 passed / 0 failed**；backend 346 passed；frontend jest 117 passed；tsc 0 error；治理仓库完整性检查器 9/9 通过；生产安全 / 身份头 / 硬编码扫描通过（防编造扫描 20 处命中均为 3.9.3 之前历史 `.ai/` 文档与 `wind_pressure` 接口测试夹具，无一处位于本阶段交付物）。
-- **审计**：`agents/enterprise/audit.py` +7 枚举（`OBSERVABILITY_HEALTH_CHECK` / `ALERT_CANDIDATE_CREATED` / `INCIDENT_CREATED` / `INCIDENT_HUMAN_ACKNOWLEDGED` / `INCIDENT_HUMAN_RESOLVED` / `INCIDENT_HUMAN_CLOSED` / `POSTMORTEM_DRAFT_CREATED`），`actor_kind` 恒 `USER`，总数 88 → 95。
-- **SSOT**：`.ai/project_status.json` 已登记 `phase_3_9_3_status`（`BUILT_NO_GO`）；基线 `audit_category_contract.total = 95`、权威测试 `== 95` 同步。
+- **审计**：`agents/enterprise/audit.py` +7 枚举（`OBSERVABILITY_HEALTH_CHECK` / `ALERT_CANDIDATE_CREATED` / `INCIDENT_CREATED` / `INCIDENT_HUMAN_ACKNOWLEDGED` / `INCIDENT_HUMAN_RESOLVED` / `INCIDENT_HUMAN_CLOSED` / `POSTMORTEM_DRAFT_CREATED`），`actor_kind` 恒 `USER`，当前总数 96（本链 89 → 96，含 3.9.2 受控激活/RC冻结层遗留 +6）。
+- **SSOT**：`.ai/project_status.json` 已登记 `phase_3_9_3_status`（`BUILT_NO_GO`）；基线 `audit_category_contract.total = 96`、权威测试 `== 96` 同步（另含 3.9.2 受控激活/RC冻结层遗留 +6，详见 `.ai/progress/phase3.9.4_audit_contract_provenance.md`）。
 - **十二项最高红线**（绝对不可修改 / 弱化）：①`engineering_enabled=false` ②禁 `engineering_approved` ③禁 AI 自动批准发布 ④禁 AI 自动执行部署 ⑤禁 AI 修改真实企业数据 ⑥禁 AI 写真实生产密钥 ⑦禁 AI 自动授予生产权限 ⑧禁 AI 自动关闭 Incident ⑨禁 AI 代 SRE/production-owner/security-owner/incident-commander 责任签署 ⑩禁 AI 代替人工责任 ⑪禁把模拟监控数据描述成真实 production observation ⑫禁通过删安全断言 / 跳失败测试 / 降权 / 伪造监控证据让观测门禁变绿——全部 fail-closed。
 
 ### 35.3 状态结论与 STOP 纪律

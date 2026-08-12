@@ -4010,7 +4010,7 @@
       "T18 Observability Dashboard（governance-observability 前端页：只读展示 + 真实人工动作，无 Auto Fix/Rollback/Resolve/Close/AI Approve）",
       "T19 Release Correlation（correlate_release：只注入 rollback_reference，auto_rollback=False 显式声明）",
       "T20 Security Correlation（correlate_security_signals：threshold_verified=False，不自动关 Incident）",
-      "T21 Audit Integration（audit.py +7 枚举，actor_kind 恒 USER，总数 88 → 95）",
+      "T21 Audit Integration（audit.py +7 枚举，actor_kind 恒 USER，当前总数 96；本阶段 89 → 96，含 3.9.2 受控激活/RC冻结层遗留 +6）",
       "T22 Tests（agent 24 例 + backend 23 例，fail-closed；禁硬编码 == N）"
     ],
     "core_module": "agents/enterprise/production_observability/",
@@ -4027,7 +4027,7 @@
       "__init__.py"
     ],
     "forbidden_count": 337,
-    "audit_delta": "+7 枚举（起点 88 → 95；权威测试与基线同步 = 95；注：3.9.2 提交基线为 83，本分支起点工作树已含 +5 治理审计类，详见收口报告 §22）",
+    "audit_delta": "+7 枚举（起点 89 → 96；权威测试与基线同步 = 96；注：3.9.2 提交基线为 83，本分支起点工作树已含 +6 治理审计类，属 3.9.2 受控激活/RC冻结闸门层扩展，已于 3.9.4 Task 0 正式归属，详见 .ai/progress/phase3.9.4_audit_contract_provenance.md）",
     "api_router": "backend/app/api/governance_observability.py",
     "frontend_page": "frontend/src/app/governance-observability/page.tsx",
     "test_files": [

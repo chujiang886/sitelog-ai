@@ -118,11 +118,11 @@ ProductionObservabilityService            （_RedLineForbiddenMixin，构造断�
 
 ## 10. 审计集成（Audit Integration）
 
-`agents/enterprise/audit.py` 新增 **7** 个审计类（总数 88 → 95），所有 `record_*` 方法 `_append(actor_kind=AuditActorKind.USER)`：
+`agents/enterprise/audit.py` 新增 **7** 个审计类（当前总数 96，含前序 3.9.2 受控激活/RC冻结层遗留 +6；本阶段 89 → 96），所有 `record_*` 方法 `_append(actor_kind=AuditActorKind.USER)`：
 
 `OBSERVABILITY_HEALTH_CHECK` / `ALERT_CANDIDATE_CREATED` / `INCIDENT_CREATED` / `INCIDENT_HUMAN_ACKNOWLEDGED` / `INCIDENT_HUMAN_RESOLVED` / `INCIDENT_HUMAN_CLOSED` / `POSTMORTEM_DRAFT_CREATED`。
 
-权威断言仅保留在 `tests/agents/test_enterprise_knowledge_governance_audit.py`（`len(members) == 95` + `EXPECTED_CATEGORIES` 集合），其余测试一律改用存在性契约，避免重复硬编码破坏全仓唯一性。
+权威断言仅保留在 `tests/agents/test_enterprise_knowledge_governance_audit.py`（`len(members) == 96` + `EXPECTED_CATEGORIES` 集合），其余测试一律改用存在性契约，避免重复硬编码破坏全仓唯一性。
 
 ---
 

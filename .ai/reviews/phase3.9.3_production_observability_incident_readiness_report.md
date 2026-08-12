@@ -79,9 +79,9 @@
 
 `ProductionObservabilityService.correlate_release`：只注入 `rollback_reference`，显式 `auto_rollback=False`。`correlate_security_signals`：`threshold_verified=False`，绝不自动关 Incident。两条关联均保持「人工唯一决策」。
 
-## 16. T21 审计集成（+7 枚举，总数 88→95）
+## 16. T21 审计集成（+7 枚举，当前总数 96；3.9.3 自身 89→96，含 3.9.2 受控激活/RC冻结层遗留 +6）
 
-`agents/enterprise/audit.py` 新增 `OBSERVABILITY_HEALTH_CHECK`/`ALERT_CANDIDATE_CREATED`/`INCIDENT_CREATED`/`INCIDENT_HUMAN_ACKNOWLEDGED`/`INCIDENT_HUMAN_RESOLVED`/`INCIDENT_HUMAN_CLOSED`/`POSTMORTEM_DRAFT_CREATED`；7 个 `record_*` 方法均 `_append(actor_kind=USER)`。三处联动：①审计枚举 + record 方法；②权威测试 `EXPECTED_CATEGORIES` 集合 + `assert len(members) == 95`；③基线 `audit_category_contract.total = 95`。总数 **88 → 95**（本阶段起点工作树已含 88，+7 = 95；注意 3.9.2 提交基线为 83，存在 +5 工作树漂移，见 §22）。
+`agents/enterprise/audit.py` 新增 `OBSERVABILITY_HEALTH_CHECK`/`ALERT_CANDIDATE_CREATED`/`INCIDENT_CREATED`/`INCIDENT_HUMAN_ACKNOWLEDGED`/`INCIDENT_HUMAN_RESOLVED`/`INCIDENT_HUMAN_CLOSED`/`POSTMORTEM_DRAFT_CREATED`；7 个 `record_*` 方法均 `_append(actor_kind=USER)`。三处联动：①审计枚举 + record 方法；②权威测试 `EXPECTED_CATEGORIES` 集合 + `assert len(members) == 96`；③基线 `audit_category_contract.total = 96`。当前总数 **96**（本阶段起点工作树已含 89 = 83 基线 + 6 前序遗留；本阶段 +7 → 96；其中 +6 为 3.9.2 受控激活/RC冻结闸门层遗留审计类，详见 `.ai/progress/phase3.9.4_audit_contract_provenance.md`，见 §22）。
 
 ## 17. T22 测试（agent 24 + backend 23，fail-closed）
 
@@ -119,12 +119,12 @@
 
 ## 22. 验证证据汇总
 
-- 审计总数：88 → 95（三处联动一致：实际枚举 = 95、基线 `audit_category_contract.total = 95`、权威测试 `assert len(members) == 95`；完整性检查器 9/9）
+- 审计总数：89 → 96（三处联动一致：实际枚举 = 96、基线 `audit_category_contract.total = 96`、权威测试 `assert len(members) == 96`；完整性检查器 9/9；其中 +6 为 3.9.2 受控激活/RC冻结层遗留，见 §22 末段与 `.ai/progress/phase3.9.4_audit_contract_provenance.md`）
 - 测试：agent 24 + backend 23 + 全量 2329/0 + backend 346 + jest 117 + tsc 0
 - 扫描：生产安全 7/7、身份头通过、硬编码通过、完整性 9/9
 - 权限词表：`governance:observability:read`(全治理角色) / `governance:incident:action`(仅 admin)，前后端三处对齐、测试钉死
 - `engineering_enabled` 保持 `false`（`agents/config.yaml:102` 未改）
-- **审计基线工作树漂移（待主理人提交时核对）**：3.9.2 提交基线（`1f223db`）审计总数为 83，但本分支起点工作树已为 88（即 +5 个未归于 3.9.2 的治理审计类，来源不在本阶段交付物内，疑似此前中断会话的未收口增量）。本阶段 +7 后实际 = 95，完整性检查器 9/9 确认 actual == baseline(95) == 权威测试(95)。提交时建议主理人确认这 +5 类的归属；本阶段未改动它们、未编造数字。
+- **审计基线工作树漂移（已于 Phase 3.9.4 Task 0 正式收口）**：3.9.2 提交基线（`1f223db`）审计总数为 83；本分支起点工作树为 89（**+6** 个前序遗留治理审计类：`ACTIVATION_EVIDENCE_BUNDLE_GENERATED` / `CONTROLLED_ACTIVATION_GATE_EVALUATED` / `HUMAN_ACTIVATION_APPROVAL_RECORDED` / `RC_FREEZE_GENERATED` / `RC_FREEZE_CHECK_PASSED` / `RC_FREEZE_VERIFIED`）。经溯源确认，这 +6 类属于 **Phase 3.9.2 受控激活 / RC 冻结闸门层**扩展（代码位于未提交的 `agents/enterprise/production_release/activation_*.py` / `freeze_*.py` / `human_approval.py` / `release_candidate.py` + `tests/agents/test_enterprise_rc_freeze_activation_gate.py`），在前序中断会话中已实现但未随 `1f223db` 提交，其 audit 枚举改动随 3.9.3 的 `git add agents/enterprise/audit.py` 入库于 `8c7c9c5`。**决定保留并正式归属 3.9.2**，消费代码仍为工作树未提交产物（建议 3.9.2 收口或单独 `fix(production-release-activation)` 提交入库）。详见 `.ai/progress/phase3.9.4_audit_contract_provenance.md`。本阶段 +7 后实际 = 96，完整性检查器 9/9 确认 actual == baseline(96) == 权威测试(96)。
 
 ## 23. 未决项与 pending_verification
 

@@ -216,11 +216,18 @@ class AuditActionCategory(str, Enum):
     RELEASE_GATE_EVALUATED = "release_gate_evaluated"
     RELEASE_SIGNOFF_RECORDED = "release_signoff_recorded"
     RELEASE_MANIFEST_GENERATED = "release_manifest_generated"
-    # Phase 3.9.3（T22）：企业生产可观测性、SRE 与事故响应准备层（审计动作大类 83 → 90）。
-    # 七类均为**只读事实型 / 责任留痕型**动作：仅如实记录「健康检查」「告警候选生成」
-    # 「事故创建」「真实人工 ACK 事故」「真实人工 RESOLVE 事故」「真实人工 CLOSE 事故」
-    # 「复盘草稿创建」。绝不承载自动 ACK / 自动 RESOLVE / 自动 CLOSE / AI 代指挥 / 自动
-    # 回滚 / 自动部署语义（红线①~⑫）。
+    # Phase 3.9.3（T22）：企业生产可观测性、SRE 与事故响应准备层（新增 7 类：
+    # OBSERVABILITY_HEALTH_CHECK / ALERT_CANDIDATE_CREATED / INCIDENT_CREATED /
+    # INCIDENT_HUMAN_ACKNOWLEDGED / INCIDENT_HUMAN_RESOLVED / INCIDENT_HUMAN_CLOSED /
+    # POSTMORTEM_DRAFT_CREATED）。七类均为**只读事实型 / 责任留痕型**动作：仅如实记录
+    # 「健康检查」「告警候选生成」「事故创建」「真实人工 ACK 事故」「真实人工 RESOLVE 事故」
+    # 「真实人工 CLOSE 事故」「复盘草稿创建」。绝不承载自动 ACK / 自动 RESOLVE / 自动 CLOSE
+    # / AI 代指挥 / 自动回滚 / 自动部署语义（红线①~⑫）。
+    # 注：另有 6 类受控激活 / RC 冻结审计（ACTIVATION_EVIDENCE_BUNDLE_GENERATED /
+    # CONTROLLED_ACTIVATION_GATE_EVALUATED / HUMAN_ACTIVATION_APPROVAL_RECORDED /
+    # RC_FREEZE_GENERATED / RC_FREEZE_CHECK_PASSED / RC_FREEZE_VERIFIED）属 3.9.2 受控激活
+    # / RC 冻结闸门层扩展，随 3.9.3 提交 8c7c9c5 一并入库，详见
+    # .ai/progress/phase3.9.4_audit_contract_provenance.md。当前总数 96。
     OBSERVABILITY_HEALTH_CHECK = "observability_health_check"
     ALERT_CANDIDATE_CREATED = "alert_candidate_created"
     INCIDENT_CREATED = "incident_created"

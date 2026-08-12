@@ -674,7 +674,7 @@ ORDER BY created_at DESC;
 - 告警/事故所有 `RESOLVE` / `CLOSE` / `ACKNOWLEDGE` 仅接受 `actor_kind == "user"`，AI 主体一律 403 或抛 `EnterpriseRedLineViolationError`。
 - `correlate_release` 只注入 `rollback_reference`，显式 `auto_rollback=False`；`correlate_security_signals` 中 `threshold_verified=False`，绝不自动关 Incident。
 - `forbidden.py` 含 **337** 项禁名（`auto_rollback_incident` / `auto_resolve_incident` / `auto_close_incident` / `assign_self_as_commander` / `act_as_incident_commander` / `silence_alert` / `fabricate_observability_evidence` 等），结构级调用即抛。
-- 审计 +7 类（`OBSERVABILITY_HEALTH_CHECK` / `ALERT_CANDIDATE_CREATED` / `INCIDENT_CREATED` / `INCIDENT_HUMAN_ACKNOWLEDGED` / `INCIDENT_HUMAN_RESOLVED` / `INCIDENT_HUMAN_CLOSED` / `POSTMORTEM_DRAFT_CREATED`），`actor_kind` 恒 `USER`，总数 88 → 95。
+- 审计 +7 类（`OBSERVABILITY_HEALTH_CHECK` / `ALERT_CANDIDATE_CREATED` / `INCIDENT_CREATED` / `INCIDENT_HUMAN_ACKNOWLEDGED` / `INCIDENT_HUMAN_RESOLVED` / `INCIDENT_HUMAN_CLOSED` / `POSTMORTEM_DRAFT_CREATED`），`actor_kind` 恒 `USER`，当前总数 96（本阶段 89 → 96，含前序 3.9.2 受控激活/RC冻结层遗留 +6）。
 
 ### 14.3 人工动作入口
 
