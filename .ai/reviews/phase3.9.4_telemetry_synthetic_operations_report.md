@@ -99,7 +99,7 @@ CI：`.github/workflows/telemetry-quality-gate.yml`（4 job，fail-closed）
 | T25 | CI 门禁 | ✅ | `6a438fd` |
 | T26 | SSOT 同步 | ✅ | `121de8d`（含工作树修正） |
 | T27–T28 | 文档（部署指南 §15 + 专用指南 21 节） | ✅ | `8de1e39` |
-| T29 | 逻辑提交（拆分 commit，排除 3.9.2 遗留） | ✅ | 8 commit |
+| T29 | 逻辑提交（拆分 commit，排除 3.9.2 遗留） | ✅ | 10 commit（9201a7d→a905213，含 T0 与 T30） |
 | T30 | 收口报告（36 节）后 STOP | ✅ | 本报告 |
 
 **总计 31 项任务全完成**（T0 + T1–T30 拆分口径），收口 STOP。
@@ -272,6 +272,7 @@ trigger 含 `feat/phase3.9.4-telemetry-synthetic-operations` 与 `main`。
 | `6a438fd` | ci(telemetry) | telemetry-quality-gate 4 job（T25） |
 | `8de1e39` | docs(telemetry) | 部署指南 §15 + 专用指南（T27–T28） |
 | `121de8d` | chore(ssot) | project_status.json + roadmap_v8 §35.4（T26） |
+| `a905213` | docs(telemetry) | T30 收口报告 36 节 + 消除 SSOT 幽灵登记（integrity 9/9） |
 
 **排除项**：3.9.2 `production_release/*` 遗留未跟踪/未提交文件（含 `tests/agents/test_enterprise_rc_freeze_activation_gate.py`、`.ai/release-gate/`、`docs/PRODUCTION_ACTIVATION_ROLLBACK_RUNBOOK.md` 等）刻意不混入本阶段提交，由 3.9.2 负责人另行处理。
 
@@ -392,7 +393,7 @@ trigger 含 `feat/phase3.9.4-telemetry-synthetic-operations` 与 `main`。
 
 ## 36. 收口声明与 STOP
 
-Phase 3.9.4「生产遥测接入适配与合成运维验证层」**已 BUILT_NO_GO 收口**：31 项任务全完成，8 个逻辑提交真实落地，测试计数 agents 2373 / backend 374 / frontend jest 117 / tsc 0，治理完整性 9/9，生产安全 7/7，硬编码 0 命中，fabrication 仅历史文档命中（零本阶段），14 条红线全遵守，368 项 fail-closed 禁名，4 类审计集成（总数 100）。
+Phase 3.9.4「生产遥测接入适配与合成运维验证层」**已 BUILT_NO_GO 收口**：31 项任务全完成，10 个逻辑提交真实落地（Git 实据 `git rev-list --count 9201a7d^..a905213` = 10，详见 §24 完整 10 行 hash 清单），测试计数 agents 2373（阶段新增）/ backend 全量 2748（阶段新增 374，含 6 项 3.9.2 RC-freeze 资产于 3.9.5 线收口后转绿）/ frontend jest 117 / tsc 0，治理完整性 9/9，生产安全 7/7，硬编码 0 命中，fabrication 仅历史文档命中（零本阶段），14 条红线全遵守，368 项 fail-closed 禁名，4 类审计集成（总数 100，与基线 `audit_category_contract.total=100` 一致）。
 
 **STOP**：不进入真实激活态、不真接入生产、不真发告警、不自动回滚/ACK/RESOLVE/CLOSE、不自动开启 `engineering_enabled`、不输出 `engineering_approved`。待主理人线下审核授权后，按 §31 路径推进真实接入与激活。
 

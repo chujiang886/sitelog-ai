@@ -3978,7 +3978,7 @@
       "runbook": "docs/PRODUCTION_ACTIVATION_ROLLBACK_RUNBOOK.md",
       "phase_tests": "tests/agents/test_enterprise_rc_freeze_activation_gate.py（42 例）",
       "forbidden_count": 327,
-      "audit_delta_this_layer": "0（本层不新增审计枚举；HUMAN_ACTIVATION_APPROVAL_RECORDED 由 3.9.4 线 commit 9201a7d 引入，3.9.2 分支 1f223db 尚不含；当前权威 total=100）",
+      "audit_delta_this_layer": "4（本层新增 RELEASE_CANDIDATE_CREATED / RELEASE_GATE_EVALUATED / RELEASE_MANIFEST_GENERATED / RELEASE_SIGNOFF_RECORDED，由 3.9.2 线 commit ea57245 引入，累计 79→83）；注意 HUMAN_ACTIVATION_APPROVAL_RECORDED 实际由 3.9.3 commit 8c7c9c5 引入（3.9.3 +13 之一），非 3.9.4 T0（9201a7d 仅做审计溯源契约归属修正，不新增枚举）；权威总数 total=100，详见 .ai/AUDIT_ACTION_CATEGORY_LEDGER.md §2",
       "engineering_enabled": "false（agents/config.yaml:102，未改；CI 门禁已修正误标：曾把 grep 命中 'engineering_enabled: false' 反向标为 true，现已用 load_engineering_enabled() 真实读取为 false）",
       "repo_integrity_caveat": "仓库级治理完整性检查原报告 1 处缺口：phase_3_9_4.report 指向 .ai/reviews/phase3.9.4_telemetry_synthetic_operations_report.md（3.9.4 线既有幽灵登记，其 SSOT 登记 audit=100 与权威基线 total=100 一致，无冲突）。该报告已由 3.9.4 T30（phase3.9.4_telemetry_synthetic_operations_report.md）补齐，幽灵登记消除，仓库级完整性恢复 9/9；3.9.2 冻结检查器 governance_integrity_9_9 子项随之通过。缺口独立于 3.9.2，由 3.9.4 负责人解决。"
     },
