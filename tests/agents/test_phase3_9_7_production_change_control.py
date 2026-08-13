@@ -176,4 +176,4 @@ def test_simulation_is_simulation_only() -> None:
 def test_change_control_invariants_ok() -> None:
     inv = check_change_control_invariants()
     assert inv["ok"] is True
-    assert inv["category_count"] == 121
+    assert inv["category_count"] == 129

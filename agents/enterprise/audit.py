@@ -334,6 +334,29 @@ class AuditActionCategory(str, Enum):
     CHANGE_PACKAGE_GENERATED = "change_package_generated"
     CHANGE_HUMAN_DECISION_RECORDED = "change_human_decision_recorded"
 
+    # Phase 3.9.8（T12）：生产激活干跑与人工决策演练层（审计动作大类 121 → 129）。
+    # PRODUCTION_ACTIVATION_DRY_RUN_STARTED / PRODUCTION_ACTIVATION_DRY_RUN_COMPLETED /
+    # PRODUCTION_ACTIVATION_SIMULATION_DECISION_EVALUATED /
+    # PRODUCTION_ACTIVATION_SIMULATION_EVIDENCE_BUILT /
+    # PRODUCTION_ACTIVATION_SIMULATION_SIGNOFF_BUILT /
+    # PRODUCTION_ACTIVATION_HANDOFF_DRY_RUN /
+    # PRODUCTION_ACTIVATION_ABORT_SIMULATED /
+    # PRODUCTION_ACTIVATION_ROLLBACK_SIMULATED。
+    # 八类均为**纯模拟（simulation_only 恒 True）事实留痕**：记录「一次干跑已开始/结束」
+    # 「一次合成决策已评估」「一份合成证据/合成签署已构造」「一次交接/中止/回滚模拟已运行」。
+    # 任何一类都不表示真实执行、放行或激活；actor_kind 恒 AI（干跑由 AI 驱动、非人工责任节点），
+    # detail 强制携带 engineering_enabled=false;production_activated=false 红线标记。
+    # 八类绝不承载自动批准 / 自动执行 / 翻转 engineering_enabled / 宣布 Production GO
+    # 语义（红线①~⑩）。当前总数 129。
+    PRODUCTION_ACTIVATION_DRY_RUN_STARTED = "production_activation_dry_run_started"
+    PRODUCTION_ACTIVATION_DRY_RUN_COMPLETED = "production_activation_dry_run_completed"
+    PRODUCTION_ACTIVATION_SIMULATION_DECISION_EVALUATED = "production_activation_simulation_decision_evaluated"
+    PRODUCTION_ACTIVATION_SIMULATION_EVIDENCE_BUILT = "production_activation_simulation_evidence_built"
+    PRODUCTION_ACTIVATION_SIMULATION_SIGNOFF_BUILT = "production_activation_simulation_signoff_built"
+    PRODUCTION_ACTIVATION_HANDOFF_DRY_RUN = "production_activation_handoff_dry_run"
+    PRODUCTION_ACTIVATION_ABORT_SIMULATED = "production_activation_abort_simulated"
+    PRODUCTION_ACTIVATION_ROLLBACK_SIMULATED = "production_activation_rollback_simulated"
+
 
 def require_human_actor(actor_kind: Any) -> None:
     """红线⑥ human-gating：强制人工责任节点必须由真实 USER 发起。
@@ -3968,6 +3991,230 @@ class AuditService(_RedLineForbiddenMixin):
             action=action,
             target=target,
             detail=detail,
+            ts=ts,
+        )
+
+    # --------------------------------------------------------------------------- #
+    # Phase 3.9.8（T12）：生产激活干跑与人工决策演练层审计动作（8 类，121 → 129）
+    # --------------------------------------------------------------------------- #
+    @staticmethod
+    def _simulation_detail_marker(detail: str) -> str:
+        """强制在 simulation-only 审计 detail 末尾携带红线标记（红线①/⑤）。"""
+
+        marker = "engineering_enabled=false;production_activated=false"
+        if marker in detail:
+            return detail
+        return f"{detail}; {marker}" if detail else marker
+
+    def record_production_activation_dry_run_started(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "dry_run_started",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次生产激活干跑已开始（纯模拟留痕，红线①/⑤/⑨/⑩）。
+
+        干跑由 AI 驱动、非人工责任节点，故 actor_kind 恒 AI。本类别仅证明「一次
+        隔离模拟已启动」，绝不表示真实部署、放行或激活。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.AI,
+            actor_id=actor_id,
+            category=AuditActionCategory.PRODUCTION_ACTIVATION_DRY_RUN_STARTED,
+            action=action,
+            target=target,
+            detail=self._simulation_detail_marker(detail),
+            ts=ts,
+        )
+
+    def record_production_activation_dry_run_completed(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "dry_run_completed",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次生产激活干跑已结束（纯模拟留痕，红线①/⑤/⑨/⑩）。
+
+        结论恒 SIMULATION_PASS/SIMULATION_BLOCKED，production_activated 恒 False。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.AI,
+            actor_id=actor_id,
+            category=AuditActionCategory.PRODUCTION_ACTIVATION_DRY_RUN_COMPLETED,
+            action=action,
+            target=target,
+            detail=self._simulation_detail_marker(detail),
+            ts=ts,
+        )
+
+    def record_production_activation_simulation_decision_evaluated(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "evaluate_simulation_decision",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次合成决策评估已完成（纯模拟留痕，红线④/⑨/⑩）。
+
+        合成决策**绝不**进入真实 FinalDecisionLedger；本类别只证明「一次合成裁决演练
+        已执行」，不表示真实 GO/NO-GO。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.AI,
+            actor_id=actor_id,
+            category=AuditActionCategory.PRODUCTION_ACTIVATION_SIMULATION_DECISION_EVALUATED,
+            action=action,
+            target=target,
+            detail=self._simulation_detail_marker(detail),
+            ts=ts,
+        )
+
+    def record_production_activation_simulation_evidence_built(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "build_simulation_evidence",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一份合成激活证据已构造（纯模拟留痕，红线③/⑩）。
+
+        合成证据 source_type 恒 SIMULATION、synthetic 恒 True，绝不进真实 Evidence Registry。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.AI,
+            actor_id=actor_id,
+            category=AuditActionCategory.PRODUCTION_ACTIVATION_SIMULATION_EVIDENCE_BUILT,
+            action=action,
+            target=target,
+            detail=self._simulation_detail_marker(detail),
+            ts=ts,
+        )
+
+    def record_production_activation_simulation_signoff_built(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "build_simulation_signoff",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一份合成人工签署场景已构造（纯模拟留痕，红线③/⑩）。
+
+        合成签署 actor_id 恒 "SIMULATION:" 前缀、signature_reference 恒 "sim://" 前缀，
+        绝不进真实 HumanSignoffRegistry。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.AI,
+            actor_id=actor_id,
+            category=AuditActionCategory.PRODUCTION_ACTIVATION_SIMULATION_SIGNOFF_BUILT,
+            action=action,
+            target=target,
+            detail=self._simulation_detail_marker(detail),
+            ts=ts,
+        )
+
+    def record_production_activation_handoff_dry_run(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "handoff_dry_run",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次激活交接干跑已运行（纯模拟留痕，红线⑤/⑩）。
+
+        execution_status 恒 PENDING_HUMAN_TERMINAL_ACTION，结构上无 deploy/activate。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.AI,
+            actor_id=actor_id,
+            category=AuditActionCategory.PRODUCTION_ACTIVATION_HANDOFF_DRY_RUN,
+            action=action,
+            target=target,
+            detail=self._simulation_detail_marker(detail),
+            ts=ts,
+        )
+
+    def record_production_activation_abort_simulated(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "abort_simulation",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次激活中止模拟已运行（纯模拟留痕，红线⑨/⑩）。
+
+        中止模拟逐项命中 3.9.7 中止条件目录，结论 SIMULATION_ABORT_REQUIRED，
+        不自动整改 / 恢复 / 执行真实中止。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.AI,
+            actor_id=actor_id,
+            category=AuditActionCategory.PRODUCTION_ACTIVATION_ABORT_SIMULATED,
+            action=action,
+            target=target,
+            detail=self._simulation_detail_marker(detail),
+            ts=ts,
+        )
+
+    def record_production_activation_rollback_simulated(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "rollback_simulation",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次生产回滚模拟已运行（纯模拟留痕，红线⑤/⑧/⑩）。
+
+        executed_real_rollback 恒 False，绝不触碰真实生产数据 / 配置 / 服务。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.AI,
+            actor_id=actor_id,
+            category=AuditActionCategory.PRODUCTION_ACTIVATION_ROLLBACK_SIMULATED,
+            action=action,
+            target=target,
+            detail=self._simulation_detail_marker(detail),
             ts=ts,
         )
 

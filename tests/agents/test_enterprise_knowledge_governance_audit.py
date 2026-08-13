@@ -111,13 +111,24 @@ EXPECTED_CATEGORIES = {
     "change_evidence_submitted", "change_simulation_performed",
     "change_failure_scenario_evaluated", "change_package_generated",
     "change_human_decision_recorded",
+    # Phase 3.9.8：生产激活干跑与人工决策演练层（+8，纯模拟 simulation_only 留痕）
+    # 八类均对应本阶段 AI 干跑驱动的事实留痕（干跑开始/结束 / 合成决策评估 / 合成证据 /
+    # 合成签署 / 交接模拟 / 中止模拟 / 回滚模拟），actor_kind 恒 AI，detail 强制
+    # engineering_enabled=false;production_activated=false，任何一类都不表示批准、
+    # 执行、部署、回滚或激活（红线①~⑩）。
+    "production_activation_dry_run_started", "production_activation_dry_run_completed",
+    "production_activation_simulation_decision_evaluated",
+    "production_activation_simulation_evidence_built",
+    "production_activation_simulation_signoff_built",
+    "production_activation_handoff_dry_run", "production_activation_abort_simulated",
+    "production_activation_rollback_simulated",
 }
 
 
 def test_audit_action_category_has_knowledge_members() -> None:
     members = {c.value for c in AuditActionCategory}
     assert members == EXPECTED_CATEGORIES
-    assert len(members) == 121
+    assert len(members) == 129
     # 程序化校验：枚举每个成员名均存在（规避手写元组形近污染，3.8.11 教训）。
     for name in AuditActionCategory.__members__:
         assert hasattr(AuditActionCategory, name)
