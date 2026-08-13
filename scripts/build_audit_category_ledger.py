@@ -42,6 +42,7 @@ PHASES = [
     ("3.9.6", "59807ca", False),
     ("3.9.7", "42ad9f2", False),
     ("3.9.7-change", "7ad04ab", False),
+    ("3.9.8", "930e147", False),
 ]
 
 
@@ -277,7 +278,27 @@ def render_markdown(ledger: dict) -> None:
     lines.append("全部 13 类语义上限止于「材料就绪 / 仿真 / 留痕」，任何一类都不表示批准、执行、部署、回滚或激活。")
     lines.append("变更管控平面不提供 /execute /deploy /rollback /apply /migrate /activate 端点（红线①②④⑤⑥⑧）。")
     lines.append("")
-    lines.append("## 9. 红线声明")
+    lines.append("## 9. Phase 3.9.8 增量说明（+8，121 → 129）")
+    lines.append("")
+    lines.append("3.9.8 新增 8 个类目，对应**生产激活干跑与人工决策演练层**（agents/enterprise/production_release/simulation.py）")
+    lines.append("由 AI 驱动的纯模拟事实留痕通道，而非真实生产行为：")
+    lines.append("")
+    lines.append("| 类目 | 触发它的模拟行为 | 不新增会丢失什么 |")
+    lines.append("|------|------------------|------------------|")
+    lines.append("| `PRODUCTION_ACTIVATION_DRY_RUN_STARTED` | AI 启动一次隔离干跑 | 干跑起点不可溯 |")
+    lines.append("| `PRODUCTION_ACTIVATION_DRY_RUN_COMPLETED` | AI 结束一次隔离干跑 | 干跑终点不可溯 |")
+    lines.append("| `PRODUCTION_ACTIVATION_SIMULATION_DECISION_EVALUATED` | AI 评估一次合成 Go/No-Go 决策（绝不进真实 FinalDecisionLedger） | 合成裁决演练不可证 |")
+    lines.append("| `PRODUCTION_ACTIVATION_SIMULATION_EVIDENCE_BUILT` | AI 构造一份合成证据（绝不进真实 Evidence Registry） | 合成证据来源不清 |")
+    lines.append("| `PRODUCTION_ACTIVATION_SIMULATION_SIGNOFF_BUILT` | AI 构造一份合成签署场景（绝不进真实 HumanSignoffRegistry） | 合成签署来源不清 |")
+    lines.append("| `PRODUCTION_ACTIVATION_HANDOFF_DRY_RUN` | AI 跑一次激活交接干跑（execution_status 恒 PENDING_HUMAN_TERMINAL_ACTION） | 交接干跑不可证 |")
+    lines.append("| `PRODUCTION_ACTIVATION_ABORT_SIMULATED` | AI 跑一次激活中止模拟（SIMULATION_ABORT_REQUIRED，不自动整改） | 中止模拟不可证 |")
+    lines.append("| `PRODUCTION_ACTIVATION_ROLLBACK_SIMULATED` | AI 跑一次生产回滚模拟（executed_real_rollback 恒 False） | 回滚模拟不可证 |")
+    lines.append("")
+    lines.append("全部 8 类 actor_kind 恒 AI（非人工责任节点），detail 强制携带 `engineering_enabled=false;production_activated=false`")
+    lines.append("红线标记，任何一类都不表示批准、执行、部署、回滚或激活（红线①~⑩）。干跑层不提供 /activate /deploy /go 端点。")
+    lines.append("")
+
+    lines.append("## 10. 红线声明")
     lines.append("")
     lines.append("本台账仅记录事实，不修改 `engineering_enabled`、不触发任何部署、不生成任何真实凭据、")
     lines.append("不代替任何人肉责任。审计枚举的 fail-closed 与人工主体（USER）强制约束由既有治理代码保证。")

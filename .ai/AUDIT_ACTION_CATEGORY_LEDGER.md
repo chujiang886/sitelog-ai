@@ -7,8 +7,8 @@
 
 ## 0. 权威结论（一句话）
 
-`AuditActionCategory` 当前总数 = **121**，与基线 `.ai/baselines/phase3.8_governance_release_baseline.json` 的 `audit_category_contract.total = 121` **完全一致**。
-这 121 个成员**全部可归因于一个已登记阶段**，无孤儿（unassigned）、无幽灵、无重复计数、无重复归属（duplicate ownership）。
+`AuditActionCategory` 当前总数 = **129**，与基线 `.ai/baselines/phase3.8_governance_release_baseline.json` 的 `audit_category_contract.total = 129` **完全一致**。
+这 129 个成员**全部可归因于一个已登记阶段**，无孤儿（unassigned）、无幽灵、无重复计数、无重复归属（duplicate ownership）。
 
 ## 1. 计数方法（可复现，Git 为唯一事实源）
 
@@ -35,9 +35,10 @@ python scripts/audit_category_ledger_validator.py  # 验证 Git<->JSON<->Enum
 | 3.9.6 | `59807ca` | 104 | +4 | ACTIVATION_EVIDENCE_SUBMITTED, ACTIVATION_EVIDENCE_VALIDATED, ACTIVATION_REVIEW_PACKAGE_GENERATED, HUMAN_SIGNOFF_REGISTERED |
 | 3.9.7 | `42ad9f2` | 108 | +4 | ACTIVATION_HANDOFF_PACKAGE_GENERATED, FINAL_ACTIVATION_READINESS_EVALUATED, FINAL_ACTIVATION_REVIEW_PACKET_GENERATED, HUMAN_FINAL_DECISION_VERIFIED |
 | 3.9.7-change | `7ad04ab` | 121 | +13 | CHANGE_ABORT_POLICY_REGISTERED, CHANGE_CHECKPOINT_RECORDED, CHANGE_EVIDENCE_SUBMITTED, CHANGE_FAILURE_SCENARIO_EVALUATED, CHANGE_HUMAN_DECISION_RECORDED, CHANGE_PACKAGE_GENERATED, CHANGE_PLAN_REGISTERED, CHANGE_POST_VERIFICATION_REGISTERED, CHANGE_PREFLIGHT_CHECKED, CHANGE_REQUEST_CREATED, CHANGE_ROLLBACK_REFERENCE_REGISTERED, CHANGE_SIMULATION_PERFORMED, CHANGE_WINDOW_RESERVED |
-| HEAD（当前 `28102dc`） | — | 121 | 0 | （无新增） |
+| 3.9.8 | `930e147` | 129 | +8 | PRODUCTION_ACTIVATION_ABORT_SIMULATED, PRODUCTION_ACTIVATION_DRY_RUN_COMPLETED, PRODUCTION_ACTIVATION_DRY_RUN_STARTED, PRODUCTION_ACTIVATION_HANDOFF_DRY_RUN, PRODUCTION_ACTIVATION_ROLLBACK_SIMULATED, PRODUCTION_ACTIVATION_SIMULATION_DECISION_EVALUATED, PRODUCTION_ACTIVATION_SIMULATION_EVIDENCE_BUILT, PRODUCTION_ACTIVATION_SIMULATION_SIGNOFF_BUILT |
+| HEAD（当前 `930e147`） | — | 129 | 0 | （无新增） |
 
-**增值合计校验**：baseline(69) + 各阶段增量 = 121 = **121** ✓（与基线权威总数一致）
+**增值合计校验**：baseline(69) + 各阶段增量 = 129 = **129** ✓（与基线权威总数一致）
 
 ## 3. 对历史 "83→88→95→96→100" 叙事的纠正
 
@@ -50,7 +51,7 @@ python scripts/audit_category_ledger_validator.py  # 验证 Git<->JSON<->Enum
 - **不存在 +1（95→96）**：3.9.3 从 83 一步到位 96，中间没有 +1 的孤立跳变。
 - **+4（96→100）成立**：3.9.4（commit `6ddb9a3`）确实 +4（TELEMETRY_* ×4）。
 
-结论：以 3.8.27 基线 **69** 为起点，真实增量链为 **+3 / +3 / +4 / +4 / +13 / +4 / +4 / +4 / +13**，终点 **121**，与基线一致。
+结论：以 3.8.27 基线 **69** 为起点，真实增量链为 **+3 / +3 / +4 / +4 / +13 / +4 / +4 / +4 / +13 / +8**，终点 **129**，与基线一致。
 
 ## 4. 归属判定规则（未来新增成员如何登记）
 
@@ -118,7 +119,26 @@ SSOT 对齐环节更正为 3.9.3。归属修正只改「这个成员算谁的」
 全部 13 类语义上限止于「材料就绪 / 仿真 / 留痕」，任何一类都不表示批准、执行、部署、回滚或激活。
 变更管控平面不提供 /execute /deploy /rollback /apply /migrate /activate 端点（红线①②④⑤⑥⑧）。
 
-## 9. 红线声明
+## 9. Phase 3.9.8 增量说明（+8，121 → 129）
+
+3.9.8 新增 8 个类目，对应**生产激活干跑与人工决策演练层**（agents/enterprise/production_release/simulation.py）
+由 AI 驱动的纯模拟事实留痕通道，而非真实生产行为：
+
+| 类目 | 触发它的模拟行为 | 不新增会丢失什么 |
+|------|------------------|------------------|
+| `PRODUCTION_ACTIVATION_DRY_RUN_STARTED` | AI 启动一次隔离干跑 | 干跑起点不可溯 |
+| `PRODUCTION_ACTIVATION_DRY_RUN_COMPLETED` | AI 结束一次隔离干跑 | 干跑终点不可溯 |
+| `PRODUCTION_ACTIVATION_SIMULATION_DECISION_EVALUATED` | AI 评估一次合成 Go/No-Go 决策（绝不进真实 FinalDecisionLedger） | 合成裁决演练不可证 |
+| `PRODUCTION_ACTIVATION_SIMULATION_EVIDENCE_BUILT` | AI 构造一份合成证据（绝不进真实 Evidence Registry） | 合成证据来源不清 |
+| `PRODUCTION_ACTIVATION_SIMULATION_SIGNOFF_BUILT` | AI 构造一份合成签署场景（绝不进真实 HumanSignoffRegistry） | 合成签署来源不清 |
+| `PRODUCTION_ACTIVATION_HANDOFF_DRY_RUN` | AI 跑一次激活交接干跑（execution_status 恒 PENDING_HUMAN_TERMINAL_ACTION） | 交接干跑不可证 |
+| `PRODUCTION_ACTIVATION_ABORT_SIMULATED` | AI 跑一次激活中止模拟（SIMULATION_ABORT_REQUIRED，不自动整改） | 中止模拟不可证 |
+| `PRODUCTION_ACTIVATION_ROLLBACK_SIMULATED` | AI 跑一次生产回滚模拟（executed_real_rollback 恒 False） | 回滚模拟不可证 |
+
+全部 8 类 actor_kind 恒 AI（非人工责任节点），detail 强制携带 `engineering_enabled=false;production_activated=false`
+红线标记，任何一类都不表示批准、执行、部署、回滚或激活（红线①~⑩）。干跑层不提供 /activate /deploy /go 端点。
+
+## 10. 红线声明
 
 本台账仅记录事实，不修改 `engineering_enabled`、不触发任何部署、不生成任何真实凭据、
 不代替任何人肉责任。审计枚举的 fail-closed 与人工主体（USER）强制约束由既有治理代码保证。

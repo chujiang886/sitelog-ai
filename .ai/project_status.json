@@ -3107,6 +3107,7 @@
   "phase_3_9_5_status": "RELEASE_LINE_RECONCILED_RC_FROZEN_AWAITING_HUMAN",
   "phase_3_9_6_status": "PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO",
   "phase_3_9_7_status": "PRODUCTION_CHANGE_CONTROL_BUILT_NO_GO",
+  "phase_3_9_8_status": "PRODUCTION_ACTIVATION_DRY_RUN_VALIDATED_BUILT_NO_GO",
   "phase_3_8_19": {
     "phase": "3.8.19",
     "name": "Enterprise Agent Compliance & Audit Intelligence Layer（企业智能体合规与审计智能层）",
@@ -4581,5 +4582,101 @@
     "engineering_enabled_modified": false,
     "report": ".ai/reviews/phase3.9.7_production_change_control_report.md",
     "stop": "已 STOP：不进入 3.9.8、不自动激活、不真实执行/部署/回滚/迁移变更、不输出 engineering_approved、不 AI 生成 GO、不代替四角色签署；等主理人 + 四角色线下执行真实变更并签署后，由主理人在人类终端显式置 enabled=true。"
+  },
+  "phase_3_9_8": {
+    "phase": "3.9.8",
+    "official_name": "Production Activation Dry-Run & Human Decision Simulation Layer（生产激活干跑、人工决策演练与不可逆边界验证层）",
+    "status": "PRODUCTION_ACTIVATION_DRY_RUN_VALIDATED_BUILT_NO_GO",
+    "closed_at": "2026-08-13",
+    "report_dated": "2026-08-13",
+    "identity": "BOIP AI Chief Architect + Production Activation Simulation Auditor + Human Decision Safety Verifier（非签署/批准/激活/部署主体）",
+    "branch": "feat/phase3.9.8-production-activation-dry-run",
+    "base_head": "930e147fea670349b9f5b287b07855dd62b6517d（阶段起始 HEAD）",
+    "current_head": "930e147fea670349b9f5b287b07855dd62b6517d（T12-T16 交付物在工作区，待 T20 收尾提交）",
+    "delivered_commits": [
+      "（pending T20）feat(phase3.9.8): simulation plane — governance_activation_simulation router + Simulation UI Panel + CI dry-run gate + agents 模拟测试 + audit ledger/基线 121→129 同步"
+    ],
+    "scope_note": "纯模拟验证层：在隔离 sandbox 中演练完整生产激活流程，验证所有不可逆边界（engineering_enabled / 真实签署 / 真实 GO / 真实部署 / 真实密钥 / 真实权限 / 真实数据 / 绕过门禁 / 命名空间污染）在 SIMULATION_ONLY 约束下均 fail-closed。不触碰任何真实生产证据、不登记真实签署、不写入真实 FinalDecisionLedger、不部署。",
+    "tasks_total": 21,
+    "tasks_completed": 19,
+    "tasks": [
+      "T1-T11 隔离模拟沙盒 simulation.py（run_production_activation_dry_run / build_decision_scenario_matrix 14 / ProductionActivationNegativePathMatrix 12 全 rejected / build_simulation_context / 污染守卫）",
+      "T12 AuditActionCategory 契约 121→129（+8 SIMULATION_ONLY 类目）+ ledger 重建（.ai/baselines/audit_action_category_ledger.json + .ai/AUDIT_ACTION_CATEGORY_LEDGER.md）+ 基线 phase3.8_governance_release_baseline.json total 121→129 显式对齐（T17 修复治理完整性缺口）",
+      "T13 API governance_activation_simulation.py（6 端点 /governance/activation/simulation/*，均 csrf_protect + RELEASE_READ，无 /activate /deploy-production /go）",
+      "T14 前端 Simulation Panel frontend/src/app/governance-simulation/page.tsx（SIMULATION ONLY 横幅 + 三枚 RedLineChip，仅调模拟端点，无真实激活入口）",
+      "T15 CI 干跑门禁 scripts/run_production_activation_dry_run_gate.py（fail-closed）+ .github/workflows/production-activation-simulation-gate.yml（3 job：dry-run / api-tests / frontend-tsc）",
+      "T16 agents 模拟测试 tests/agents/test_phase3_9_8_production_activation_simulation.py（7 例：红线 intact / 污染 clean / 负路径全 rejected / 场景=14 / context 拒非模拟 / 污染守卫 / 审计全 simulation-only）",
+      "T17 权威验证：agents 2470 passed / backend 380 passed / jest 117 passed / tsc 0 error；完整性 9/9 / 安全 7/7 / 账本 PASS(129) / 硬编码 0 / 防编造 0 本阶段交付物命中 / 干跑门禁 PASS",
+      "T18 SSOT / 基线更新：补本 phase_3_9_8 详细块（本条目）",
+      "T19 红线核验：十条最高红线全未触发（见 red_lines）",
+      "T20 Git 收尾（pending）：统一提交 T12-T16 全部未提交交付物，working tree 收敛为 clean，禁 add -A/force push/rewrite",
+      "T21 收口报告 .ai/reviews/phase3.9.8_production_activation_dry_run_simulation_closure_report.md（29 项强制章节，pending）"
+    ],
+    "core_module": "agents/enterprise/production_release/simulation.py（隔离模拟沙盒，dry-run / 场景矩阵 14 / 负路径矩阵 12 / 污染守卫，production_activated 恒 False、real_signoff_count 恒 0、engineering_enabled 恒 False）",
+    "api_module": "backend/app/api/governance_activation_simulation.py（6 端点：GET /、/scenarios、/negative-paths、/report/latest、/report/{id}，POST /run；SIMULATION ONLY，无 /activate /deploy-production /go）",
+    "frontend_module": "frontend/src/app/governance-simulation/page.tsx（Simulation Panel，SIMULATION ONLY 横幅 + RedLineChip，仅调 /governance/activation/simulation/*）",
+    "ci_gate": ".github/workflows/production-activation-simulation-gate.yml（3 job：simulation-dry-run / simulation-api-tests / simulation-frontend-tsc，fail-closed，分支覆盖 3.9.8 载体 + feat/phase3.9.* 通配）",
+    "gate_script": "scripts/run_production_activation_dry_run_gate.py（断言 production_activated is False / real_signoff_count==0 / engineering_enabled is False / status∈{simulation_pass,simulation_blocked} / 负路径全 rejected 且 ≥10 / 场景=14 / contamination.detected is not True）",
+    "test_files": [
+      "tests/agents/test_phase3_9_8_production_activation_simulation.py（7 例：红线/污染/负路径/场景/context/守卫/审计 simulation-only）",
+      "backend/tests/test_governance_activation_simulation.py（API 契约：6 端点 + RELEASE_READ + 无真实激活入口）"
+    ],
+    "simulation_only_categories_added": [
+      "PRODUCTION_ACTIVATION_DRY_RUN_STARTED",
+      "PRODUCTION_ACTIVATION_DRY_RUN_COMPLETED",
+      "PRODUCTION_ACTIVATION_SIMULATION_DECISION_EVALUATED",
+      "PRODUCTION_ACTIVATION_SIMULATION_EVIDENCE_BUILT",
+      "PRODUCTION_ACTIVATION_SIMULATION_SIGNOFF_BUILT",
+      "PRODUCTION_ACTIVATION_HANDOFF_DRY_RUN",
+      "PRODUCTION_ACTIVATION_ABORT_SIMULATED",
+      "PRODUCTION_ACTIVATION_ROLLBACK_SIMULATED"
+    ],
+    "scenarios_total": 14,
+    "negative_paths_total": 12,
+    "audit_total": 129,
+    "test_results": {
+      "agents_full_suite": "2470 passed（零回归，含 T16 模拟测试 7 例）",
+      "backend_full_suite": "380 passed（零回归，含 T13 governance_activation_simulation 测试）",
+      "frontend_jest": "117 passed（零回归，governance-simulation page 已 tsc 0 error）",
+      "frontend_tsc": "0 error",
+      "governance_integrity": "9/9（基线 121→129 已显式对齐）",
+      "production_security_lint": "7/7",
+      "audit_ledger_validator": "PASS（total=129，3.9.8 +8 SIMULATION_ONLY 类目，0 orphan/0 ghost/0 duplicate-ownership，Git provenance verified for all 11 phases）",
+      "hardcoded_scan": "0 命中",
+      "fabrication_scan": "0 本阶段交付物命中（仅历史 wind_pressure 夹具，exit 0）",
+      "dry_run_gate": "PASS（status=simulation_pass，engineering_enabled=False，production_activated=False，real_signoff_count=0，scenarios=14，negative_paths=12）"
+    },
+    "engineering_enabled": false,
+    "engineering_approved_emitted": false,
+    "activation_gate_status": "ControlledActivationGate 未被绕过；dry-run 在隔离 sandbox 运行，production_activated 恒 False、real_signoff_count 恒 0、engineering_enabled 恒 False；GO/NO-GO 由真实四角色 + 主理人在人类终端作出，AI 不代行",
+    "simulation_only_guard": {
+      "sandbox_isolation": "run_production_activation_dry_run 使用 ephemeral AuditService(org_id=\"simulation\")，绝不触碰真实 evidence/signoff/audit production namespace",
+      "contamination_guard": "ProductionActivationNegativePathMatrix._assert_no_real_production_object 静态守卫，_FORBIDDEN_REAL_TYPES=(HumanSignoffRegistry,)，传入真实 HumanSignoffRegistry 实例即抛 SimulationContaminationError",
+      "audit_marker": "所有模拟审计记录 detail 含 \"engineering_enabled=false;production_activated=false\"，category 全在 8 类 SIMULATION_ONLY_CATEGORIES 内，绝不落入真实大类"
+    },
+    "pending_human_actions": [
+      "真实四角色线下提交真实证据（production-owner / release-manager / security-owner / auditor）",
+      "真实四角色在人类终端签署 GO / NO-GO",
+      "主理人在人类终端显式置 engineering_enabled=true（唯一 AI 不代执行之动作）",
+      "真实密钥线下提供（production_secret 恒 PENDING_VERIFICATION，AI 不写真实密钥）"
+    ],
+    "forbidden_endpoints": ["/activate", "/deploy-production", "/go", "engineering_approved 输出"],
+    "verified_json_modified": false,
+    "engineering_enabled_modified": false,
+    "red_lines": {
+      "1_engineering_enabled": "false（agents/config.yaml:102，未改，零翻转；dry-run report __post_init__ 强制断言）",
+      "2_no_engineering_approved": "未输出，列入 forbidden",
+      "3_no_simulated_signoff_as_real": "模拟签署 actor_id 恒 \"SIMULATION:\" 前缀、signature_reference 恒 \"sim://\" 前缀，绝不登记进真实 HumanSignoffRegistry（污染守卫拦截）",
+      "4_no_simulated_go_to_real_ledger": "dry-run 不写入真实 FinalDecisionLedger；status 仅 simulation_pass/simulation_blocked（刻意无 PRODUCTION_GO）",
+      "5_no_real_deploy": "SIMULATION ONLY；6 端点全为模拟查询/演练，绝不部署/激活生产",
+      "6_no_real_secret": "模拟链路不写真实密钥/真实权限/真实生产数据",
+      "7_no_real_permission_grant": "仅复用既有 RELEASE_READ 读权限边界，不授予任何真实写权限",
+      "8_no_real_production_data_modify": "dry-run 只读/合成，不修改任何真实业务数据",
+      "9_no_bypass_gate": "dry-run 不绕过 ControlledActivationGate；在隔离 sandbox 内以 ephemeral AuditService 运行",
+      "10_no_namespace_pollution": "模拟数据绝不进入真实 evidence/signoff/audit production namespace（污染守卫 + 审计 marker 双保险）"
+    },
+    "report": ".ai/reviews/phase3.9.8_production_activation_dry_run_simulation_closure_report.md（pending T21）",
+    "roadmap_ref": ".ai/roadmap_v8.md（Phase 3.9.8 交付物与门禁）",
+    "stop": "已 STOP：不进入 3.9.9、不自动激活、不输出 engineering_approved、不真实部署、不 AI 生成 GO、不代替四角色签署、不登记真实签署；等主理人 + 四角色线下提交真实证据并签署后，由主理人在人类终端显式置 enabled=true。"
   }
 }

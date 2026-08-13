@@ -1,0 +1,92 @@
+name: Production Activation Simulation Gate
+
+# Phase 3.9.8 T15 —— 生产激活干跑与人工决策演练 CI 门禁（SIMULATION ONLY，fail-closed）。
+#
+# 与通用 CI（ci.yml）、激活就绪门禁（activation-readiness-gate.yml）、身份/生产安全门禁
+# （identity-governance.yml）、发布闸门（release-gate.yml）、遥测质量门禁
+# （telemetry-quality-gate.yml）互补。本流水线只盯"隔离沙盒里的生产激活链路是否安全可跑"：
+#
+#   simulation-dry-run          直接驱动隔离沙盒跑一次完整干跑，断言红线（fail-closed）；
+#   simulation-api-tests        运行 Simulation API 契约测试（T13 6/6），断言只模拟不激活；
+#   simulation-frontend-tsc     前端 tsc 零错误（校验 T14 Simulation UI Panel 类型安全）。
+#
+# 任一 job 失败即整条流水线失败（fail-closed）。本门禁**不激活、不部署、不翻转
+# engineering_enabled、不写真实控制平面**——全绿仅代表模拟层安全，真实放行仍需主理人在
+# 人类终端、四角色真实签署后显式执行。
+#
+# ── 分支覆盖策略（与 activation-readiness-gate.yml 对齐）────────────────────────
+# 1) main —— 长期主干（占位保留）；
+# 2) 真实 3.9.8 集成载体（显式）；
+# 3) 后续治理层分支通配（feat/phase3.9.* / feat/phase*-release-* / release/**），
+#    保证下一个阶段新建集成分支时门禁自动生效；
+# 4) 历史发布闸门分支（保留）。
+# pull_request 触发保持"无分支过滤"，覆盖所有目标分支的 PR（最严格）。
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "main"
+      - "feat/phase3.9.8-production-activation-dry-run"
+      - "feat/phase3.9.*"
+      - "feat/phase*-release-*"
+      - "release/**"
+      - "feat/phase3.9.2-production-release-gate"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: boip-simulation-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulation-dry-run:
+    name: Production activation dry-run gate (SIMULATION ONLY)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Ensure pyyaml (audit.py -> config_loader chain requires it)
+        run: python -m pip install --quiet pyyaml
+      - name: Run production activation dry-run gate (fail-closed)
+        run: python scripts/run_production_activation_dry_run_gate.py
+
+  simulation-api-tests:
+    name: Simulation API contract tests (6/6)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --requirement backend/requirements.txt
+      - name: Run Simulation API tests (assert SIMULATION_ONLY, no /activate)
+        run: >-
+          python -m pytest
+          backend/tests/test_governance_activation_simulation.py
+          -q
+
+  simulation-frontend-tsc:
+    name: Frontend type-check (Simulation UI Panel)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.2"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: TypeScript type-check (zero errors)
+        run: npx tsc --noEmit
+        working-directory: frontend

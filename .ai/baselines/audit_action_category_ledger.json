@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "total": 121,
-  "generated_from_head": "28102dc43cac26f10541b786266b4d31930ddd71",
+  "total": 129,
+  "generated_from_head": "930e147fea670349b9f5b287b07855dd62b6517d",
   "audit_path": "agents/enterprise/audit.py",
   "baseline_phase": "3.8.27",
   "phases": {
@@ -204,6 +204,22 @@
         "CHANGE_ROLLBACK_REFERENCE_REGISTERED",
         "CHANGE_SIMULATION_PERFORMED",
         "CHANGE_WINDOW_RESERVED"
+      ]
+    },
+    "3.9.8": {
+      "commit": "930e147",
+      "is_baseline": false,
+      "total_at_commit": 129,
+      "introduced_count": 8,
+      "members": [
+        "PRODUCTION_ACTIVATION_ABORT_SIMULATED",
+        "PRODUCTION_ACTIVATION_DRY_RUN_COMPLETED",
+        "PRODUCTION_ACTIVATION_DRY_RUN_STARTED",
+        "PRODUCTION_ACTIVATION_HANDOFF_DRY_RUN",
+        "PRODUCTION_ACTIVATION_ROLLBACK_SIMULATED",
+        "PRODUCTION_ACTIVATION_SIMULATION_DECISION_EVALUATED",
+        "PRODUCTION_ACTIVATION_SIMULATION_EVIDENCE_BUILT",
+        "PRODUCTION_ACTIVATION_SIMULATION_SIGNOFF_BUILT"
       ]
     }
   }

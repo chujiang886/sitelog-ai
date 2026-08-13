@@ -10,6 +10,9 @@ from app.api.governance_identity import router as governance_identity_router
 from app.api.governance_operations import router as governance_operations_router
 from app.api.governance_release import router as governance_release_router
 from app.api.governance_activation import router as governance_activation_router
+from app.api.governance_activation_simulation import (
+    router as governance_activation_simulation_router,
+)
 from app.api.governance_change import router as governance_change_router
 from app.api.governance_observability import router as governance_observability_router
 from app.api.governance_telemetry import router as governance_telemetry_router
@@ -31,6 +34,7 @@ __all__ = [
     "governance_operations_router",
     "governance_release_router",
     "governance_activation_router",
+    "governance_activation_simulation_router",
     "governance_change_router",
     "governance_observability_router",
     "governance_telemetry_router",
