@@ -94,13 +94,18 @@ EXPECTED_CATEGORIES = {
     # 语义上限止于「材料就绪」，任何一类都不表示批准、放行或激活（红线②④⑤）。
     "activation_evidence_submitted", "activation_evidence_validated",
     "human_signoff_registered", "activation_review_package_generated",
+    # Phase 3.9.7：生产激活最终人工评审与 Go/No-Go 就绪层（+4）
+    # 四类均对应本阶段真实新增的人工行为通道（最终评审包生成 / 就绪度评估 / 真人决策核验 / 交接包生成），
+    # 语义上限止于「材料就绪 / 待真人裁决」，任何一类都不表示批准、放行或激活（红线②④⑤）。
+    "final_activation_review_packet_generated", "final_activation_readiness_evaluated",
+    "human_final_decision_verified", "activation_handoff_package_generated",
 }
 
 
 def test_audit_action_category_has_knowledge_members() -> None:
     members = {c.value for c in AuditActionCategory}
     assert members == EXPECTED_CATEGORIES
-    assert len(members) == 104
+    assert len(members) == 108
     # 程序化校验：枚举每个成员名均存在（规避手写元组形近污染，3.8.11 教训）。
     for name in AuditActionCategory.__members__:
         assert hasattr(AuditActionCategory, name)

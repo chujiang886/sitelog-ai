@@ -279,6 +279,25 @@ class AuditActionCategory(str, Enum):
     ACTIVATION_EVIDENCE_VALIDATED = "activation_evidence_validated"
     HUMAN_SIGNOFF_REGISTERED = "human_signoff_registered"
     ACTIVATION_REVIEW_PACKAGE_GENERATED = "activation_review_package_generated"
+    # Phase 3.9.7（T12）：生产激活最终人工评审与 Go/No-Go 就绪层（审计动作大类 104 → 108）。
+    # FINAL_ACTIVATION_REVIEW_PACKET_GENERATED / FINAL_ACTIVATION_READINESS_EVALUATED /
+    # HUMAN_FINAL_DECISION_VERIFIED / ACTIVATION_HANDOFF_PACKAGE_GENERATED。
+    # 四类均为**只读事实型 / 责任留痕型**动作：仅如实记录「最终评审包已生成」
+    # 「就绪度评估已完成（≠GO 裁决）」「真实人工最终决策已核验」「交接包已生成（待人工终端动作）」。
+    #
+    # 语义红线（务必与 Phase 3.9.7 ①~⑩ 对齐）：
+    # - FINAL_ACTIVATION_READINESS_EVALUATED 只表示「就绪度评分已计算」，绝不等价于 GO，
+    #   不解除任何闸门阻断；就绪度上限为 READY_FOR_HUMAN_GO_NO_GO_REVIEW（仍待真人裁决）；
+    # - HUMAN_FINAL_DECISION_VERIFIED 记录的是「真实人工决策已被核验绑定」这一事实，
+    #   AI 不构造、不代决，actor_kind 恒 USER；VALID 也绝不翻转 engineering_enabled；
+    # - ACTIVATION_HANDOFF_PACKAGE_GENERATED 产出的是「交接给真实人工终端动作的材料包」，
+    #   执行状态恒 PENDING_HUMAN_TERMINAL_ACTION，永不含 engineering_approved / PRODUCTION_GO 结论。
+    # 四类绝不承载自动批准 / 自动激活 / 翻转 engineering_enabled / 宣布 Production GO
+    # 语义（红线①~⑩）。当前总数 108。
+    FINAL_ACTIVATION_REVIEW_PACKET_GENERATED = "final_activation_review_packet_generated"
+    FINAL_ACTIVATION_READINESS_EVALUATED = "final_activation_readiness_evaluated"
+    HUMAN_FINAL_DECISION_VERIFIED = "human_final_decision_verified"
+    ACTIVATION_HANDOFF_PACKAGE_GENERATED = "activation_handoff_package_generated"
 
 
 def require_human_actor(actor_kind: Any) -> None:
@@ -3496,6 +3515,115 @@ class AuditService(_RedLineForbiddenMixin):
             actor_kind=AuditActorKind.USER,
             actor_id=actor_id,
             category=AuditActionCategory.ACTIVATION_REVIEW_PACKAGE_GENERATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_final_activation_review_packet_generated(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "generate_final_activation_review_packet",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次最终人工评审包生成（红线⑤/⑩：材料 ≠ 裁决）。
+
+        评审包只是"供真实人工 Go/No-Go 裁决的材料汇总"，永不含 engineering_approved /
+        PRODUCTION_GO 结论，也不翻转 engineering_enabled。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.FINAL_ACTIVATION_REVIEW_PACKET_GENERATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_final_activation_readiness_evaluated(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "evaluate_final_activation_readiness",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次最终激活就绪度评估完成（红线④：evaluated ≠ GO）。
+
+        本类别语义被严格限定为"就绪度评分已计算，上限 READY_FOR_HUMAN_GO_NO_GO_REVIEW"。
+        它不是 GO 裁决，不产生放行效力；真实 Go/No-Go 由真实人工在终端裁决。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.FINAL_ACTIVATION_READINESS_EVALUATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_human_final_decision_verified(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "verify_human_final_decision",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工最终决策已被核验绑定（责任留痕，红线③/⑨/⑩）。
+
+        本方法**不**构造决策（决策发生在系统之外，凭真实自然人留痕可溯）；
+        这里仅把"真实人工决策已核验"如实留痕，并强制 actor 为真实 USER。
+        VALID 也绝不翻转 engineering_enabled。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.HUMAN_FINAL_DECISION_VERIFIED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_activation_handoff_package_generated(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "generate_activation_handoff_package",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次激活交接包生成（红线⑤/⑩：交接包 ≠ 已激活）。
+
+        交接包只是"交真实人工终端动作的材料包"，执行状态恒 PENDING_HUMAN_TERMINAL_ACTION，
+        永不含 engineering_approved / PRODUCTION_GO 结论，也不翻转 engineering_enabled。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.ACTIVATION_HANDOFF_PACKAGE_GENERATED,
             action=action,
             target=target,
             detail=detail,
