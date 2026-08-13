@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "total": 104,
-  "generated_from_head": "59807ca01069709721d71981d66e35292c484f00",
+  "total": 108,
+  "generated_from_head": "42ad9f2116c96e4c7df0b461ec6a28fcd0a9d056",
   "audit_path": "agents/enterprise/audit.py",
   "baseline_phase": "3.8.27",
   "phases": {
@@ -171,6 +171,18 @@
         "ACTIVATION_EVIDENCE_VALIDATED",
         "ACTIVATION_REVIEW_PACKAGE_GENERATED",
         "HUMAN_SIGNOFF_REGISTERED"
+      ]
+    },
+    "3.9.7": {
+      "commit": "42ad9f2",
+      "is_baseline": false,
+      "total_at_commit": 108,
+      "introduced_count": 4,
+      "members": [
+        "ACTIVATION_HANDOFF_PACKAGE_GENERATED",
+        "FINAL_ACTIVATION_READINESS_EVALUATED",
+        "FINAL_ACTIVATION_REVIEW_PACKET_GENERATED",
+        "HUMAN_FINAL_DECISION_VERIFIED"
       ]
     }
   }

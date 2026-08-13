@@ -7,8 +7,8 @@
 
 ## 0. 权威结论（一句话）
 
-`AuditActionCategory` 当前总数 = **104**，与基线 `.ai/baselines/phase3.8_governance_release_baseline.json` 的 `audit_category_contract.total = 104` **完全一致**。
-这 104 个成员**全部可归因于一个已登记阶段**，无孤儿（unassigned）、无幽灵、无重复计数、无重复归属（duplicate ownership）。
+`AuditActionCategory` 当前总数 = **108**，与基线 `.ai/baselines/phase3.8_governance_release_baseline.json` 的 `audit_category_contract.total = 108` **完全一致**。
+这 108 个成员**全部可归因于一个已登记阶段**，无孤儿（unassigned）、无幽灵、无重复计数、无重复归属（duplicate ownership）。
 
 ## 1. 计数方法（可复现，Git 为唯一事实源）
 
@@ -33,9 +33,10 @@ python scripts/audit_category_ledger_validator.py  # 验证 Git<->JSON<->Enum
 | 3.9.3 | `8c7c9c5` | 96 | +13 | ACTIVATION_EVIDENCE_BUNDLE_GENERATED, ALERT_CANDIDATE_CREATED, CONTROLLED_ACTIVATION_GATE_EVALUATED, HUMAN_ACTIVATION_APPROVAL_RECORDED, INCIDENT_CREATED, INCIDENT_HUMAN_ACKNOWLEDGED, INCIDENT_HUMAN_CLOSED, INCIDENT_HUMAN_RESOLVED, OBSERVABILITY_HEALTH_CHECK, POSTMORTEM_DRAFT_CREATED, RC_FREEZE_CHECK_PASSED, RC_FREEZE_GENERATED, RC_FREEZE_VERIFIED |
 | 3.9.4 | `6ddb9a3` | 100 | +4 | SYNTHETIC_DRILL_COMPLETED, SYNTHETIC_DRILL_STARTED, TELEMETRY_EVIDENCE_RECORDED, TELEMETRY_PROVIDER_CHECKED |
 | 3.9.6 | `59807ca` | 104 | +4 | ACTIVATION_EVIDENCE_SUBMITTED, ACTIVATION_EVIDENCE_VALIDATED, ACTIVATION_REVIEW_PACKAGE_GENERATED, HUMAN_SIGNOFF_REGISTERED |
-| HEAD（当前 `59807ca`） | — | 104 | 0 | （无新增） |
+| 3.9.7 | `42ad9f2` | 108 | +4 | ACTIVATION_HANDOFF_PACKAGE_GENERATED, FINAL_ACTIVATION_READINESS_EVALUATED, FINAL_ACTIVATION_REVIEW_PACKET_GENERATED, HUMAN_FINAL_DECISION_VERIFIED |
+| HEAD（当前 `42ad9f2`） | — | 108 | 0 | （无新增） |
 
-**增值合计校验**：baseline(69) + 各阶段增量 = 104 = **104** ✓（与基线权威总数一致）
+**增值合计校验**：baseline(69) + 各阶段增量 = 108 = **108** ✓（与基线权威总数一致）
 
 ## 3. 对历史 "83→88→95→96→100" 叙事的纠正
 
@@ -48,7 +49,7 @@ python scripts/audit_category_ledger_validator.py  # 验证 Git<->JSON<->Enum
 - **不存在 +1（95→96）**：3.9.3 从 83 一步到位 96，中间没有 +1 的孤立跳变。
 - **+4（96→100）成立**：3.9.4（commit `6ddb9a3`）确实 +4（TELEMETRY_* ×4）。
 
-结论：以 3.8.27 基线 **69** 为起点，真实增量链为 **+3 / +3 / +4 / +4 / +13 / +4 / +4**，终点 **104**，与基线一致。
+结论：以 3.8.27 基线 **69** 为起点，真实增量链为 **+3 / +3 / +4 / +4 / +13 / +4 / +4 / +4**，终点 **108**，与基线一致。
 
 ## 4. 归属判定规则（未来新增成员如何登记）
 
