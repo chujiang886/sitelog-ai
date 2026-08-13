@@ -745,6 +745,36 @@ ORDER BY created_at DESC;
 
 ---
 
+## 17. 生产变更管控层（Phase 3.9.7-change）
+
+> 完整治理纪律见姊妹文档 `PRODUCTION_CHANGE_MANAGEMENT_GUIDE.md` 与人工清单 `PRODUCTION_CHANGE_HUMAN_CHECKLIST.md`。本节只给部署方最关键的结论。
+
+### 17.1 它做什么、不做什么
+
+- **做**：构建生产变更管控平面——变更请求 / 计划 / 窗口 / 预检 / 检查点 / 中止策略 / 回滚引用 / 后验证 / 证据 / 模拟 / 失败场景 / 受控包装配，全部只读装配 + 真实 USER 登记。提供后端 API（27 路由：13 GET 只读 + 13 POST 真实 USER 登记 + `/signoff` + `/decision`）与前端只读看板 `/governance-change`。
+- **不做**：**不执行**变更；**不部署**；**不迁移**；**不回滚**；**不激活** `engineering_enabled`（保持 `false`）；**不宣布 GO / APPROVED**；**不自动**执行（执行模式无 `AI_AUTOMATIC`；状态机无 `AUTO_*` 态）；**不替代**四角色或主理人的人工责任；**不提供**任何 `/execute` / `/deploy` / `/rollback` / `/apply` / `/migrate` / `/activate` 端点（红线①–⑩）。
+
+### 17.2 关键 fail-closed 不变量
+
+- 终端态恒为 `PHASE_3_9_7_PRODUCTION_CHANGE_CONTROL_BUILT_NO_GO`（模块常量，不可被运行时改写）。
+- `ProductionChangeControlService` 继承 `_RedLineForbiddenMixin`，结构级禁名拦截 `execute_change` / `deploy_production` / `rollback_production` / `apply_change` / `migrate_production` / `auto_execute_change` / `declare_change_go` 等（getattr 即抛 `EnterpriseRedLineViolationError`）。
+- `ChangeExecutionMode` 不含 `AI_AUTOMATIC`；`ChangeState` 只可能是 `HUMAN_DRAFTED` / `AWAITING_HUMAN_REVIEW` / `HUMAN_COMPLETED` / `HUMAN_ABORTED`，**永不 `AUTO_*` / `AI_APPROVED`**。
+- `run_controlled_change_simulation()` 仅静态推演，`is_simulation` 恒 True；`ControlledChangePackage.simulated_only` 恒 True——**绝不真实变更**。
+- 审计真实 +13 类（`CHANGE_*`），基线 108 → 121，与 `.ai/baselines/audit_action_category_ledger.json` `total=121` 一致。
+- `PRODUCTION_CHANGE_FORBIDDEN_COUNT = 388`（结构级禁名）。
+
+### 17.3 人工动作入口（唯一合法出口）
+
+- 只读看板：`GET /governance/change/readiness | contract | plan | window | preflight | checkpoint | abort-policy | rollback-reference | post-verification | evidence | simulation | failure-scenarios | package | decision-ledger`。
+- 真实人工登记（须 `governance:release:signoff`，仅 admin；强制 `actor_kind="user"`）：`POST /governance/change/signoff`、`POST /governance/change/decision`。
+- **真变更执行**是用户在**人类终端**手工执行的唯一动作；主理人在人类终端显式置 `engineering_enabled=true`（见 `PRODUCTION_CHANGE_HUMAN_CHECKLIST.md`），AI 不代执行。
+
+### 17.4 收口状态
+
+本层状态 **PRODUCTION_CHANGE_CONTROL_BUILT_NO_GO**：生产变更管控平面已建成并通过红线验证，但**无真实生产变更执行**。详见 `.ai/reviews/phase3.9.7_production_change_control_report.md` 与 `.ai/roadmap_v8.md` §35.12。
+
+---
+
 ## 附录 A：变更记录
 
 | 版本 | 变更 |
@@ -752,4 +782,5 @@ ORDER BY created_at DESC;
 | Phase 3.8.29 | 首次发布。HttpOnly Cookie + CSRF 双提交、OIDC/SSO 适配器、环境隔离红线、append-only 安全审计、CI 生产门禁、本部署指南 |
 | Phase 3.9.2 | 新增 §13 生产发布闸门与证据包层：13 项 CHECK_KEYS、SHA-256 证据清单、4 角色人工签署（GO/NO-GO/NEED_MORE_EVIDENCE，仅 `USER`）、4 个 RELEASE_* 审计类（总数 83）、314 项 fail-closed 禁名、只读 API + 签署端点、前端 `/governance-release` 页（无自动上线 / 无 AI 批准按钮） |
 | Phase 3.9.3 | 新增 §14 生产可观测性、SRE 与事故响应准备层：11 组件健康模型（UNKNOWN 不回退 HEALTHY）、SLI/SLO（未验证 PENDING_VERIFICATION）、错误预算只计算、告警去重关联、SEV0–3 事故模型（8 态无 AUTO_*）、append-only 时间线、Runbook 只引用、发布/安全信号关联（auto_rollback=false / threshold_verified=false）、337 项 fail-closed 禁名、只读 API + 人工 ACK/RESOLVE/CLOSE 端点（auto_state_transition=false）、前端 `/governance-observability` 页（无 Auto Fix/Rollback/Resolve/Close/AI Approve）、7 个 OBSERVABILITY_* 审计类（总数 90） |
+| Phase 3.9.7-change | 新增 §17 生产变更管控层：19 模块只读装配 + 真实 USER 登记（production_change/），执行模式无 AI_AUTOMATIC、状态机无 AUTO_* 态、受控变更包 simulated_only 恒 True、模拟只静态推演；388 项 fail-closed 禁名（_RedLineForbiddenMixin 结构级拦截）；27 路由（13 GET 只读 + 13 POST USER 登记 + /signoff + /decision，无 /execute /deploy /rollback /apply /migrate /activate）；前端 `/governance-change` 只读看板（无 Deploy/Execute/Rollback Now）；13 个 CHANGE_* 审计类（总数 121）；门禁脚本 check_production_change_control_gate.py + 人工清单 PRODUCTION_CHANGE_HUMAN_CHECKLIST.md |
 | Phase 3.9.4 | 新增 §15 生产遥测接入适配与合成运维验证层：`TelemetryProvider` 端口（ABC + 5 抽象方法）+ Synthetic/Prometheus/OTel 适配器（未配置真实源→空/`NOT_CONFIGURED`，绝不降级伪装 Synthetic）、`TelemetryNormalizer` 复用 production_observability 模型、`TelemetryAggregator`（仅合成源→`synthetic_only` 不判 operational）、`TelemetryProviderRegistry`（真实源不 fallback）、`TelemetryAlertRouter`（合成源仅 `SIMULATED_DELIVERY`，禁真实外发）、SyntheticFaultScenario 合成演练（incident 恒 open、`auto_*=false`）、102 项 fail-closed 禁名、只读 API `governance_telemetry.py`（9 路由，生产环境合成演练 403，USER 强制）+ 前端 SYNTHETIC/PRODUCTION 徽章与演练 UI、4 个 TELEMETRY_* 审计类（总数 100）、CI `telemetry-quality-gate.yml`（4 job） |

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "total": 121,
-  "generated_from_head": "7ad04abc46a6012c92b82387bdaf472199d7419f",
+  "generated_from_head": "28102dc43cac26f10541b786266b4d31930ddd71",
   "audit_path": "agents/enterprise/audit.py",
   "baseline_phase": "3.8.27",
   "phases": {

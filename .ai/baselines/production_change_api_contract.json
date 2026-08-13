@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "plane": "production_change_control",
+  "phase": "3.9.7-change",
+  "prefix": "/governance/change",
+  "red_line": "fail-closed; no real execution endpoints; real USER + min-permission only",
+  "present_routes": [
+    {
+      "method": "GET",
+      "path": "/governance/change/readiness",
+      "op": "view_change_readiness",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/change/plan",
+      "op": "record_change_plan",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/change/window",
+      "op": "reserve_change_window",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/change/preflight",
+      "op": "record_change_preflight",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/change/checkpoint",
+      "op": "record_change_checkpoint",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/change/abort-policy",
+      "op": "register_change_abort_policy",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/change/rollback-reference",
+      "op": "register_change_rollback_ref",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/change/post-verification",
+      "op": "record_post_change_verification",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/change/evidence",
+      "op": "submit_change_evidence",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/change/simulation",
+      "op": "perform_change_simulation",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/change/failure-scenarios",
+      "op": "evaluate_failure_scenario",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/change/package",
+      "op": "build_change_package",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/change/decision-ledger",
+      "op": "record_change_decision",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/change/plan",
+      "op": "record_change_plan",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/change/window",
+      "op": "reserve_change_window",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/change/preflight",
+      "op": "record_change_preflight",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/change/checkpoint",
+      "op": "record_change_checkpoint",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/change/abort-policy",
+      "op": "register_change_abort_policy",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/change/rollback-reference",
+      "op": "register_change_rollback_ref",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/change/post-verification",
+      "op": "record_post_change_verification",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/change/evidence",
+      "op": "submit_change_evidence",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/change/simulation",
+      "op": "perform_change_simulation",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/change/failure-scenarios",
+      "op": "evaluate_failure_scenario",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/change/package",
+      "op": "build_change_package",
+      "perm": "governance:release:read"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/change/signoff",
+      "op": "register_change_signoff",
+      "perm": "governance:release:signoff"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/change/decision",
+      "op": "record_change_decision",
+      "perm": "governance:release:signoff"
+    }
+  ],
+  "present_route_count": 26,
+  "absent_routes": [
+    "POST /governance/change/execute",
+    "POST /governance/change/deploy",
+    "POST /governance/change/rollback",
+    "POST /governance/change/apply",
+    "POST /governance/change/migrate",
+    "POST /governance/change/activate",
+    "POST /governance/change/trigger-go",
+    "POST /governance/change/auto-execute"
+  ],
+  "absent_route_count": 8,
+  "note": "本契约为 SSOT；任何 absent_route 若真实存在即违反红线③/⑩，CI 须失败。"
+}
