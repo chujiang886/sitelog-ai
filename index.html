@@ -1737,6 +1737,8 @@
           // 把图片数据同步到报告 DOM
           const container = document.getElementById('images-container');
           if (!container) return;
+          // 封面项目信息（归档人/施工部位/日期）与图片无关，先同步，避免无图时提前 return 不更新
+          this.syncCoverMeta();
           this.captureDomEdits(); // 先回写用户编辑，避免重建丢失
           this.ensureTitles();   // 最终安全网：确保没有空 title/desc 渲染出去
 
@@ -1800,19 +1802,19 @@
         syncCoverMeta() {
           const cover = document.querySelector('#report-content .pdf-cover');
           if (!cover) return;
+          // 按关键字子串匹配，避免 emoji 变体选择符（U+FE0F）导致精确比对失败
           const map = [
-            ['📋 项目名称', this.projectName || '未命名项目'],
-            ['📍 施工部位', this.siteLocation || '—'],
-            ['📅 归档日期', this.archiveDate || new Date().toISOString().slice(0,10)],
-            ['👤 归档人', this.archivePerson || '—'],
+            ['项目名称', this.projectName || '未命名项目'],
+            ['施工部位', this.siteLocation || '—'],
+            ['归档日期', this.archiveDate || new Date().toISOString().slice(0,10)],
+            ['归档人', this.archivePerson || '—'],
           ];
-          const items = cover.querySelectorAll('.pdf-meta-item');
-          items.forEach(item => {
+          cover.querySelectorAll('.pdf-meta-item').forEach(item => {
             const label = item.querySelector('.pdf-meta-label');
             const value = item.querySelector('.pdf-meta-value');
             if (!label || !value) return;
-            const txt = label.textContent.trim();
-            const entry = map.find(m => m[0] === txt);
+            const txt = label.textContent;
+            const entry = map.find(m => txt.includes(m[0]));
             if (entry) { value.textContent = entry[1]; }
           });
         },
