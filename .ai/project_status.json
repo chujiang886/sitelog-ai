@@ -4675,7 +4675,7 @@
       "9_no_bypass_gate": "dry-run 不绕过 ControlledActivationGate；在隔离 sandbox 内以 ephemeral AuditService 运行",
       "10_no_namespace_pollution": "模拟数据绝不进入真实 evidence/signoff/audit production namespace（污染守卫 + 审计 marker 双保险）"
     },
-    "report": ".ai/reviews/phase3.9.8_production_activation_dry_run_simulation_closure_report.md（pending T21）",
+    "report": ".ai/reviews/phase3.9.8_production_activation_dry_run_simulation_closure_report.md",
     "roadmap_ref": ".ai/roadmap_v8.md（Phase 3.9.8 交付物与门禁）",
     "stop": "已 STOP：不进入 3.9.9、不自动激活、不输出 engineering_approved、不真实部署、不 AI 生成 GO、不代替四角色签署、不登记真实签署；等主理人 + 四角色线下提交真实证据并签署后，由主理人在人类终端显式置 enabled=true。"
   }
