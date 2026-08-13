@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "total": 108,
-  "generated_from_head": "42ad9f2116c96e4c7df0b461ec6a28fcd0a9d056",
+  "total": 121,
+  "generated_from_head": "7ad04abc46a6012c92b82387bdaf472199d7419f",
   "audit_path": "agents/enterprise/audit.py",
   "baseline_phase": "3.8.27",
   "phases": {
@@ -183,6 +183,27 @@
         "FINAL_ACTIVATION_READINESS_EVALUATED",
         "FINAL_ACTIVATION_REVIEW_PACKET_GENERATED",
         "HUMAN_FINAL_DECISION_VERIFIED"
+      ]
+    },
+    "3.9.7-change": {
+      "commit": "7ad04ab",
+      "is_baseline": false,
+      "total_at_commit": 121,
+      "introduced_count": 13,
+      "members": [
+        "CHANGE_ABORT_POLICY_REGISTERED",
+        "CHANGE_CHECKPOINT_RECORDED",
+        "CHANGE_EVIDENCE_SUBMITTED",
+        "CHANGE_FAILURE_SCENARIO_EVALUATED",
+        "CHANGE_HUMAN_DECISION_RECORDED",
+        "CHANGE_PACKAGE_GENERATED",
+        "CHANGE_PLAN_REGISTERED",
+        "CHANGE_POST_VERIFICATION_REGISTERED",
+        "CHANGE_PREFLIGHT_CHECKED",
+        "CHANGE_REQUEST_CREATED",
+        "CHANGE_ROLLBACK_REFERENCE_REGISTERED",
+        "CHANGE_SIMULATION_PERFORMED",
+        "CHANGE_WINDOW_RESERVED"
       ]
     }
   }

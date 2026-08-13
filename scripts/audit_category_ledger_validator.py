@@ -82,7 +82,7 @@ def check_markdown_consistency(ledger: dict) -> int:
         )
     # phase/commit rows in the §2 table
     rows = re.findall(
-        r"^\|\s*([0-9.]+)\s*\|\s*`([0-9a-f]+)`\s*\|", text, flags=re.M
+        r"^\|\s*([0-9][0-9A-Za-z.\-]*)\s*\|\s*`([0-9a-f]+)`\s*\|", text, flags=re.M
     )
     md_phases = {phase: commit for phase, commit in rows}
     for phase, info in ledger["phases"].items():

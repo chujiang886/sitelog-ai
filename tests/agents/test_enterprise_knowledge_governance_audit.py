@@ -99,13 +99,25 @@ EXPECTED_CATEGORIES = {
     # 语义上限止于「材料就绪 / 待真人裁决」，任何一类都不表示批准、放行或激活（红线②④⑤）。
     "final_activation_review_packet_generated", "final_activation_readiness_evaluated",
     "human_final_decision_verified", "activation_handoff_package_generated",
+    # Phase 3.9.7-change：生产变更管控平面（+13）
+    # 13 类均对应本阶段真实新增的 USER 行为通道（变更请求 / 计划 / 窗口 / 预检 / 检查点 /
+    # 中止策略 / 回滚引用 / 变更后验证 / 证据 / 仿真 / 失败场景 / 变更包 / 人工裁决登记），
+    # 语义上限止于「材料就绪 / 仿真 / simulation 留痕」，任何一类都不表示批准、执行、部署、
+    # 回滚或激活（红线①②④⑤）。
+    "change_request_created", "change_plan_registered",
+    "change_window_reserved", "change_preflight_checked",
+    "change_checkpoint_recorded", "change_abort_policy_registered",
+    "change_rollback_reference_registered", "change_post_verification_registered",
+    "change_evidence_submitted", "change_simulation_performed",
+    "change_failure_scenario_evaluated", "change_package_generated",
+    "change_human_decision_recorded",
 }
 
 
 def test_audit_action_category_has_knowledge_members() -> None:
     members = {c.value for c in AuditActionCategory}
     assert members == EXPECTED_CATEGORIES
-    assert len(members) == 108
+    assert len(members) == 121
     # 程序化校验：枚举每个成员名均存在（规避手写元组形近污染，3.8.11 教训）。
     for name in AuditActionCategory.__members__:
         assert hasattr(AuditActionCategory, name)

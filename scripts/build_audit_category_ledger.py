@@ -41,6 +41,7 @@ PHASES = [
     ("3.9.4", "6ddb9a3", False),
     ("3.9.6", "59807ca", False),
     ("3.9.7", "42ad9f2", False),
+    ("3.9.7-change", "7ad04ab", False),
 ]
 
 
@@ -252,7 +253,31 @@ def render_markdown(ledger: dict) -> None:
     lines.append("")
     lines.append("四者语义上限均止于**材料/事实留痕**，任何一个都不表示批准、放行或激活。")
     lines.append("")
-    lines.append("## 8. 红线声明")
+    lines.append("## 8. Phase 3.9.7-change 增量说明（+13，108 → 121）")
+    lines.append("")
+    lines.append("3.9.7-change 新增 13 个类目，对应生产变更管控平面（agents/enterprise/production_change/）")
+    lines.append("真实新增的 USER 行为通道，而非为阶段编号凑数：")
+    lines.append("")
+    lines.append("| 类目 | 触发它的真实行为 | 不新增会丢失什么 |")
+    lines.append("|------|------------------|------------------|")
+    lines.append("| `CHANGE_REQUEST_CREATED` | 真实 USER 创建一份变更请求草稿 | 谁在何时提了什么变更，无留痕 |")
+    lines.append("| `CHANGE_PLAN_REGISTERED` | 真实 USER 登记变更计划 | 变更步骤不可追责 |")
+    lines.append("| `CHANGE_WINDOW_RESERVED` | 真实 USER 预约受控变更窗口 | 变更窗口归属混乱 |")
+    lines.append("| `CHANGE_PREFLIGHT_CHECKED` | 真实 USER 记录变更前预检 | 预检是否发生过不可证 |")
+    lines.append("| `CHANGE_CHECKPOINT_RECORDED` | 真实 USER 记录变更检查点 | 过程断点无痕 |")
+    lines.append("| `CHANGE_ABORT_POLICY_REGISTERED` | 真实 USER 登记中止策略 | 中止条件无据 |")
+    lines.append("| `CHANGE_ROLLBACK_REFERENCE_REGISTERED` | 真实 USER 登记回滚引用 | 回滚基线缺失 |")
+    lines.append("| `CHANGE_POST_VERIFICATION_REGISTERED` | 真实 USER 登记变更后验证 | 变更结果无人核验 |")
+    lines.append("| `CHANGE_EVIDENCE_SUBMITTED` | 真实 USER 提交变更证据 | 证据链断裂 |")
+    lines.append("| `CHANGE_SIMULATION_PERFORMED` | 真实 USER 记录一次**受控仿真**（is_simulation 恒 True，绝不执行真实变更） | 仿真是否跑过不可证 |")
+    lines.append("| `CHANGE_FAILURE_SCENARIO_EVALUATED` | 真实 USER 记录失败场景评估 | 风险推演无痕 |")
+    lines.append("| `CHANGE_PACKAGE_GENERATED` | 真实 USER 生成**仿真专用**变更包（simulated_only 恒 True） | 材料包来源不清 |")
+    lines.append("| `CHANGE_HUMAN_DECISION_RECORDED` | 真实 USER 记录已发生的人工裁决（仅留痕，不翻转 engineering_enabled） | 谁拍板不可回溯 |")
+    lines.append("")
+    lines.append("全部 13 类语义上限止于「材料就绪 / 仿真 / 留痕」，任何一类都不表示批准、执行、部署、回滚或激活。")
+    lines.append("变更管控平面不提供 /execute /deploy /rollback /apply /migrate /activate 端点（红线①②④⑤⑥⑧）。")
+    lines.append("")
+    lines.append("## 9. 红线声明")
     lines.append("")
     lines.append("本台账仅记录事实，不修改 `engineering_enabled`、不触发任何部署、不生成任何真实凭据、")
     lines.append("不代替任何人肉责任。审计枚举的 fail-closed 与人工主体（USER）强制约束由既有治理代码保证。")
