@@ -13,7 +13,8 @@ name: Production Activation Evidence Readiness Gate
 #   activation-readiness-integrity   治理仓库完整性 9/9（只读基线核对）；
 #   activation-readiness-security    生产安全 lint（7/7）+ 审计账本校验 + 硬编码扫描（0 命中）；
 #   activation-readiness-tests       生产激活就绪层单元 / 契约 / fail-closed 测试
-#                                   （含 3.9.2 发布闸门 / RC 冻结回归，确保未破坏既有契约）。
+#                                   （含 3.9.2 发布闸门 / RC 冻结 / 3.9.7 Layer C 最终评审只读层
+#                                     回归，确保未破坏既有契约、且 9 个 Layer C 端点 fail-closed）。
 #
 # 任一 job 失败即整条流水线失败（fail-closed）。
 #
@@ -36,6 +37,8 @@ on:
       - "main"
       # 2) 真实 3.9.6 集成载体（显式）
       - "feat/phase3.9.6-production-activation-evidence-readiness"
+      # 2b) 真实 3.9.7 最终人工评审只读层集成载体（显式，feat/phase3.9.* 亦已通配覆盖）
+      - "feat/phase3.9.7-production-activation-final-human-review-readiness"
       # 3) 后续 release integration / 治理层分支策略（通配，自动覆盖新建集成分支）
       - "feat/phase3.9.*"
       - "feat/phase*-release-*"
@@ -109,6 +112,7 @@ jobs:
           tests/agents/test_enterprise_production_release.py
           tests/agents/test_enterprise_rc_freeze_activation_gate.py
           tests/agents/test_phase3_9_6_evidence_boundary_contract.py
+          tests/agents/test_phase3_9_7_final_review_api.py
           -q
 
   activation-readiness-evidence-packet:
