@@ -255,6 +255,149 @@ async function authPost(path: string, permission: Perm, body: unknown): Promise<
   return text ? JSON.parse(text) : null;
 }
 
+// =====================================================================
+// Layer C：Phase 3.9.7 最终人工评审只读面板（T15）
+//
+// 9 个 GET 端点，全部 fail-closed：仅真实 USER + RELEASE_READ，后端只读装配，
+// 返回恒含 engineering_enabled:false；本面板不激活、不宣布 GO、不提供 /activate 入口。
+// AI 仅装配事实与人裁决留痕，最终 GO 只能由四角色真人线下签署（红线①②④⑤⑨⑩）。
+// =====================================================================
+
+interface FinalReviewResponse {
+  engineering_enabled: boolean;
+  rc_id: string;
+  [k: string]: unknown;
+}
+
+function FinalReviewSection({
+  title,
+  data,
+  extra,
+}: {
+  title: string;
+  data: FinalReviewResponse | undefined;
+  extra?: unknown;
+}): JSX.Element {
+  const eng = data?.engineering_enabled;
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-slate-800">{title}</p>
+        <span
+          className={`rounded-full px-3 py-0.5 text-xs font-medium ${
+            eng === false ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+          }`}
+        >
+          engineering_enabled={String(eng)}
+        </span>
+      </div>
+      <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-slate-50 p-3 text-xs text-slate-600">
+        {JSON.stringify(data ?? null, null, 2)}
+      </pre>
+      {extra !== undefined ? (
+        <pre className="mt-2 max-h-48 overflow-auto rounded-md bg-slate-50 p-3 text-xs text-slate-500">
+          {JSON.stringify(extra, null, 2)}
+        </pre>
+      ) : null}
+    </div>
+  );
+}
+
+function FinalHumanReviewPanel({
+  identity,
+}: {
+  identity: GovernanceIdentity | null;
+}): JSX.Element {
+  const [bundle, setBundle] = useState<Record<string, FinalReviewResponse> | null>(null);
+  const [err, setErr] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!identity) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setErr("");
+      try {
+        const provider = getIdentityProvider();
+        const headers = await provider.getAuthHeaders();
+        const paths = [
+          "evidence-snapshot",
+          "completeness-matrix",
+          "signoff-matrix",
+          "signoff-conflicts",
+          "evidence-drift",
+          "review-packet",
+          "readiness",
+          "verify-decision",
+          "handoff-package",
+        ] as const;
+        const results = await Promise.all(
+          paths.map(async (p) => {
+            const res = await fetch(
+              `${API_BASE}/governance/activation/final-review/${p}?rc_id=${encodeURIComponent(RC_ID)}`,
+              { headers }
+            );
+            if (!res.ok) throw new Error(`加载失败（${res.status}）/final-review/${p}`);
+            return [p, (await res.json()) as FinalReviewResponse] as const;
+          })
+        );
+        if (!cancelled) {
+          const obj: Record<string, FinalReviewResponse> = {};
+          for (const [p, v] of results) obj[p] = v;
+          setBundle(obj);
+        }
+      } catch (e) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : "加载失败");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [identity]);
+
+  return (
+    <section className="mt-10">
+      <h2 className="text-xl font-semibold text-slate-800">
+        最终人工评审与 Go/No-Go 就绪（Phase 3.9.7 · 只读）
+      </h2>
+      <p className="mt-2 text-sm text-slate-500">
+        以下 9 项最终评审只读材料由后端按 T1–T11 装配，全部为事实与人裁决留痕，
+        <span className="font-medium">不含任何 AI 裁决、不宣布 GO、不激活</span>。
+        真实生产启用须四角色真人线下签署后由主理人在人类终端执行（红线①②④⑤⑨⑩）。
+      </p>
+
+      {!identity ? (
+        <p className="mt-3 text-sm text-slate-400">未取得责任人身份，最终评审只读视图已禁用。</p>
+      ) : loading ? (
+        <p className="mt-3 text-sm text-slate-400">加载最终评审材料…</p>
+      ) : err ? (
+        <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+          {err}
+        </p>
+      ) : bundle ? (
+        <div className="mt-3 space-y-3">
+          <FinalReviewSection title="T1 证据事实快照" data={bundle["evidence-snapshot"]} />
+          <FinalReviewSection title="T2 证据完整性矩阵（8 项）" data={bundle["completeness-matrix"]} />
+          <FinalReviewSection title="T3 四角色签署矩阵" data={bundle["signoff-matrix"]} />
+          <FinalReviewSection title="T4 签署冲突候选" data={bundle["signoff-conflicts"]} />
+          <FinalReviewSection title="T5 证据漂移发现" data={bundle["evidence-drift"]} />
+          <FinalReviewSection title="T6 最终激活评审包" data={bundle["review-packet"]} />
+          <FinalReviewSection
+            title="T7 就绪度评估 + T11 中止条件目录"
+            data={bundle["readiness"]}
+            extra={bundle["readiness"]?.["abort_catalog"]}
+          />
+          <FinalReviewSection title="T9 人工最终裁决校验" data={bundle["verify-decision"]} />
+          <FinalReviewSection title="T10 生产激活交接包" data={bundle["handoff-package"]} />
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export default function GovernanceActivationPage(): JSX.Element {
   const [dossier, setDossier] = useState<Dossier | null>(null);
   const [intake, setIntake] = useState<IntakeSummary | null>(null);
@@ -1206,6 +1349,11 @@ export default function GovernanceActivationPage(): JSX.Element {
           {busy ? "登记中…" : "登记最终裁决"}
         </button>
       </div>
+
+      {/* =====================================================================
+          Layer C：Phase 3.9.7 最终人工评审只读面板（T15）
+          ===================================================================== */}
+      <FinalHumanReviewPanel identity={identity} />
 
       <p className="mt-8 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
         提醒：本页面为「生产激活证据就绪」只读控制台。Phase 3.9.6 不执行真实部署、不开启
