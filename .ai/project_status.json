@@ -4592,13 +4592,13 @@
     "identity": "BOIP AI Chief Architect + Production Activation Simulation Auditor + Human Decision Safety Verifier（非签署/批准/激活/部署主体）",
     "branch": "feat/phase3.9.8-production-activation-dry-run",
     "base_head": "930e147fea670349b9f5b287b07855dd62b6517d（阶段起始 HEAD）",
-    "current_head": "930e147fea670349b9f5b287b07855dd62b6517d（T12-T16 交付物在工作区，待 T20 收尾提交）",
+    "current_head": "0d8414ee2091ecf32be2de8881885782f62ad9cc（T20 收口提交：14 files / +1368 -12）",
     "delivered_commits": [
-      "（pending T20）feat(phase3.9.8): simulation plane — governance_activation_simulation router + Simulation UI Panel + CI dry-run gate + agents 模拟测试 + audit ledger/基线 121→129 同步"
+      "0d8414e feat(phase3.9.8): production activation dry-run & human decision simulation layer（governance_activation_simulation router + Simulation UI Panel + CI dry-run gate + agents/backend 测试 + audit ledger/基线 121→129 同步；14 files / +1368 -12）"
     ],
     "scope_note": "纯模拟验证层：在隔离 sandbox 中演练完整生产激活流程，验证所有不可逆边界（engineering_enabled / 真实签署 / 真实 GO / 真实部署 / 真实密钥 / 真实权限 / 真实数据 / 绕过门禁 / 命名空间污染）在 SIMULATION_ONLY 约束下均 fail-closed。不触碰任何真实生产证据、不登记真实签署、不写入真实 FinalDecisionLedger、不部署。",
     "tasks_total": 21,
-    "tasks_completed": 19,
+    "tasks_completed": 20,
     "tasks": [
       "T1-T11 隔离模拟沙盒 simulation.py（run_production_activation_dry_run / build_decision_scenario_matrix 14 / ProductionActivationNegativePathMatrix 12 全 rejected / build_simulation_context / 污染守卫）",
       "T12 AuditActionCategory 契约 121→129（+8 SIMULATION_ONLY 类目）+ ledger 重建（.ai/baselines/audit_action_category_ledger.json + .ai/AUDIT_ACTION_CATEGORY_LEDGER.md）+ 基线 phase3.8_governance_release_baseline.json total 121→129 显式对齐（T17 修复治理完整性缺口）",
