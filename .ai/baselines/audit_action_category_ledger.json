@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "total": 100,
-  "generated_from_head": "4983e7b1811e03516edd39ed19f152cea73db051",
+  "total": 104,
+  "generated_from_head": "59807ca01069709721d71981d66e35292c484f00",
   "audit_path": "agents/enterprise/audit.py",
   "baseline_phase": "3.8.27",
   "phases": {
@@ -159,6 +159,18 @@
         "SYNTHETIC_DRILL_STARTED",
         "TELEMETRY_EVIDENCE_RECORDED",
         "TELEMETRY_PROVIDER_CHECKED"
+      ]
+    },
+    "3.9.6": {
+      "commit": "59807ca",
+      "is_baseline": false,
+      "total_at_commit": 104,
+      "introduced_count": 4,
+      "members": [
+        "ACTIVATION_EVIDENCE_SUBMITTED",
+        "ACTIVATION_EVIDENCE_VALIDATED",
+        "ACTIVATION_REVIEW_PACKAGE_GENERATED",
+        "HUMAN_SIGNOFF_REGISTERED"
       ]
     }
   }

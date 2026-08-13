@@ -7,8 +7,8 @@
 
 ## 0. 权威结论（一句话）
 
-`AuditActionCategory` 当前总数 = **100**，与基线 `.ai/baselines/phase3.8_governance_release_baseline.json` 的 `audit_category_contract.total = 100` **完全一致**。
-这 100 个成员**全部可归因于一个已登记阶段**，无孤儿（unassigned）、无幽灵、无重复计数、无重复归属（duplicate ownership）。
+`AuditActionCategory` 当前总数 = **104**，与基线 `.ai/baselines/phase3.8_governance_release_baseline.json` 的 `audit_category_contract.total = 104` **完全一致**。
+这 104 个成员**全部可归因于一个已登记阶段**，无孤儿（unassigned）、无幽灵、无重复计数、无重复归属（duplicate ownership）。
 
 ## 1. 计数方法（可复现，Git 为唯一事实源）
 
@@ -32,9 +32,10 @@ python scripts/audit_category_ledger_validator.py  # 验证 Git<->JSON<->Enum
 | 3.9.2 | `ea57245` | 83 | +4 | RELEASE_CANDIDATE_CREATED, RELEASE_GATE_EVALUATED, RELEASE_MANIFEST_GENERATED, RELEASE_SIGNOFF_RECORDED |
 | 3.9.3 | `8c7c9c5` | 96 | +13 | ACTIVATION_EVIDENCE_BUNDLE_GENERATED, ALERT_CANDIDATE_CREATED, CONTROLLED_ACTIVATION_GATE_EVALUATED, HUMAN_ACTIVATION_APPROVAL_RECORDED, INCIDENT_CREATED, INCIDENT_HUMAN_ACKNOWLEDGED, INCIDENT_HUMAN_CLOSED, INCIDENT_HUMAN_RESOLVED, OBSERVABILITY_HEALTH_CHECK, POSTMORTEM_DRAFT_CREATED, RC_FREEZE_CHECK_PASSED, RC_FREEZE_GENERATED, RC_FREEZE_VERIFIED |
 | 3.9.4 | `6ddb9a3` | 100 | +4 | SYNTHETIC_DRILL_COMPLETED, SYNTHETIC_DRILL_STARTED, TELEMETRY_EVIDENCE_RECORDED, TELEMETRY_PROVIDER_CHECKED |
-| HEAD（当前 `4983e7b`） | — | 100 | 0 | （无新增） |
+| 3.9.6 | `59807ca` | 104 | +4 | ACTIVATION_EVIDENCE_SUBMITTED, ACTIVATION_EVIDENCE_VALIDATED, ACTIVATION_REVIEW_PACKAGE_GENERATED, HUMAN_SIGNOFF_REGISTERED |
+| HEAD（当前 `59807ca`） | — | 104 | 0 | （无新增） |
 
-**增值合计校验**：baseline(69) + 各阶段增量 = 100 = **100** ✓（与基线权威总数一致）
+**增值合计校验**：baseline(69) + 各阶段增量 = 104 = **104** ✓（与基线权威总数一致）
 
 ## 3. 对历史 "83→88→95→96→100" 叙事的纠正
 
@@ -47,7 +48,7 @@ python scripts/audit_category_ledger_validator.py  # 验证 Git<->JSON<->Enum
 - **不存在 +1（95→96）**：3.9.3 从 83 一步到位 96，中间没有 +1 的孤立跳变。
 - **+4（96→100）成立**：3.9.4（commit `6ddb9a3`）确实 +4（TELEMETRY_* ×4）。
 
-结论：真实增量链为 **+3 / +3 / +4 / +4 / +13 / +4**，终点 **100**，与基线一致。
+结论：以 3.8.27 基线 **69** 为起点，真实增量链为 **+3 / +3 / +4 / +4 / +13 / +4 / +4**，终点 **104**，与基线一致。
 
 ## 4. 归属判定规则（未来新增成员如何登记）
 
@@ -75,9 +76,23 @@ python scripts/audit_category_ledger_validator.py  # 验证 Git<->JSON<->Enum
 "HUMAN_ACTIVATION_APPROVAL_RECORDED 由 3.9.4 线 commit 9201a7d 引入"。
 Git 事实：该成员由 **3.9.3**（commit `8c7c9c5`，+13 之一）引入；`9201a7d` 是 3.9.4 T0 的
 **溯源契约归属修正**（+6 归属），不新增枚举成员。该文本误归属已于 3.9.4-R1 在
-SSOT 对齐环节更正为 3.9.3，不影响总数（仍为 100）。
+SSOT 对齐环节更正为 3.9.3。归属修正只改「这个成员算谁的」，从不改变总数——
+当时总数为 100，修正前后一致。
 
-## 7. 红线声明
+## 7. Phase 3.9.6 增量说明（+4，100 → 104）
+
+3.9.6 新增 4 个类目，每一个都对应本阶段**真实新增的人工行为通道**，而非为阶段编号凑数：
+
+| 类目 | 触发它的真实行为 | 不新增会丢失什么 |
+|------|------------------|------------------|
+| `ACTIVATION_EVIDENCE_SUBMITTED` | 真实 USER 提交一份激活证据 | 谁在何时交了什么，无留痕 |
+| `ACTIVATION_EVIDENCE_VALIDATED` | 对已提交证据做结构/哈希/溯源校验 | 校验是否发生过不可证 |
+| `HUMAN_SIGNOFF_REGISTERED` | 真实 USER 以某角色登记签署 | 四角色签署无法追责 |
+| `ACTIVATION_REVIEW_PACKAGE_GENERATED` | 生成供人裁决的材料包 | 人「看着哪一版材料」拍板不可回溯 |
+
+四者语义上限均止于**材料/事实留痕**，任何一个都不表示批准、放行或激活。
+
+## 8. 红线声明
 
 本台账仅记录事实，不修改 `engineering_enabled`、不触发任何部署、不生成任何真实凭据、
 不代替任何人肉责任。审计枚举的 fail-closed 与人工主体（USER）强制约束由既有治理代码保证。

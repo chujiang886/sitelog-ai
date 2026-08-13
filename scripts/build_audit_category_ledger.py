@@ -39,6 +39,7 @@ PHASES = [
     ("3.9.2", "ea57245", False),
     ("3.9.3", "8c7c9c5", False),
     ("3.9.4", "6ddb9a3", False),
+    ("3.9.6", "59807ca", False),
 ]
 
 
@@ -196,7 +197,17 @@ def render_markdown(ledger: dict) -> None:
     lines.append("- **不存在 +1（95→96）**：3.9.3 从 83 一步到位 96，中间没有 +1 的孤立跳变。")
     lines.append("- **+4（96→100）成立**：3.9.4（commit `6ddb9a3`）确实 +4（TELEMETRY_* ×4）。")
     lines.append("")
-    lines.append("结论：真实增量链为 **+3 / +3 / +4 / +4 / +13 / +4**，终点 **100**，与基线一致。")
+    # 增量链与终点一律从 JSON Ledger 现算，禁止手写数字（手写就是下一次不一致的源头）。
+    non_baseline = [
+        (p, info) for p, info in phases.items() if not info["is_baseline"]
+    ]
+    chain = " / ".join(f"+{info['introduced_count']}" for _, info in non_baseline)
+    baseline_phase = ledger["baseline_phase"]
+    baseline_count = phases[baseline_phase]["introduced_count"]
+    lines.append(
+        f"结论：以 {baseline_phase} 基线 **{baseline_count}** 为起点，真实增量链为 "
+        f"**{chain}**，终点 **{total}**，与基线一致。"
+    )
     lines.append("")
     lines.append("## 4. 归属判定规则（未来新增成员如何登记）")
     lines.append("")
@@ -224,9 +235,23 @@ def render_markdown(ledger: dict) -> None:
     lines.append("\"HUMAN_ACTIVATION_APPROVAL_RECORDED 由 3.9.4 线 commit 9201a7d 引入\"。")
     lines.append("Git 事实：该成员由 **3.9.3**（commit `8c7c9c5`，+13 之一）引入；`9201a7d` 是 3.9.4 T0 的")
     lines.append("**溯源契约归属修正**（+6 归属），不新增枚举成员。该文本误归属已于 3.9.4-R1 在")
-    lines.append("SSOT 对齐环节更正为 3.9.3，不影响总数（仍为 100）。")
+    lines.append("SSOT 对齐环节更正为 3.9.3。归属修正只改「这个成员算谁的」，从不改变总数——")
+    lines.append("当时总数为 100，修正前后一致。")
     lines.append("")
-    lines.append("## 7. 红线声明")
+    lines.append("## 7. Phase 3.9.6 增量说明（+4，100 → 104）")
+    lines.append("")
+    lines.append("3.9.6 新增 4 个类目，每一个都对应本阶段**真实新增的人工行为通道**，而非为阶段编号凑数：")
+    lines.append("")
+    lines.append("| 类目 | 触发它的真实行为 | 不新增会丢失什么 |")
+    lines.append("|------|------------------|------------------|")
+    lines.append("| `ACTIVATION_EVIDENCE_SUBMITTED` | 真实 USER 提交一份激活证据 | 谁在何时交了什么，无留痕 |")
+    lines.append("| `ACTIVATION_EVIDENCE_VALIDATED` | 对已提交证据做结构/哈希/溯源校验 | 校验是否发生过不可证 |")
+    lines.append("| `HUMAN_SIGNOFF_REGISTERED` | 真实 USER 以某角色登记签署 | 四角色签署无法追责 |")
+    lines.append("| `ACTIVATION_REVIEW_PACKAGE_GENERATED` | 生成供人裁决的材料包 | 人「看着哪一版材料」拍板不可回溯 |")
+    lines.append("")
+    lines.append("四者语义上限均止于**材料/事实留痕**，任何一个都不表示批准、放行或激活。")
+    lines.append("")
+    lines.append("## 8. 红线声明")
     lines.append("")
     lines.append("本台账仅记录事实，不修改 `engineering_enabled`、不触发任何部署、不生成任何真实凭据、")
     lines.append("不代替任何人肉责任。审计枚举的 fail-closed 与人工主体（USER）强制约束由既有治理代码保证。")
