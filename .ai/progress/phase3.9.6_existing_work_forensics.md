@@ -98,3 +98,17 @@ AuditActionCategory 仍为 100。** 该"+4"属未落实的占位/臆测，违背
 `agents/enterprise/production_release/__init__.py` 模块 docstring 中：Layer A 回答"仓库客观
 就绪前置态"，Layer B 回答"人到底交了/签了/拍了什么"。两层都不得产出放行结论，且不得互相
 顶替（Layer A 不能"视为已签署"，Layer B 不能覆盖仓库客观事实）。
+
+## 7. 最终权威结论（2026-08-13 收口复核，覆盖 §3 与 §6.1）
+
+- **§3 的"+4 属臆测/未落实"在**写下该节的那一刻**成立（当时 audit.py 确未被触碰，基线仍为 100）；
+  但随着 T5–T10 真实施工，4 类审计事件已真实落地，该结论已被推翻。请勿孤立引用 §3。**
+- **权威事实（经枚举定义 + `AuditService` 方法 + 调用点三重核验）**：
+  - `AuditActionCategory` 成员数 = **104**（基线 100 + 3.9.6 真实 +4 = 104）；
+  - 4 类 = `ACTIVATION_EVIDENCE_SUBMITTED` / `ACTIVATION_EVIDENCE_VALIDATED` /
+    `HUMAN_SIGNOFF_REGISTERED` / `ACTIVATION_REVIEW_PACKAGE_GENERATED`，定义在 `audit.py:278-281`；
+  - 对应 `AuditService` 记录方法 4 个（`audit.py:3397/3424/3451/3478`）；
+  - 真实调用点 **7 处**：`intake_service.py` ×6 + `backend/app/api/governance_activation.py` ×1。
+- **JSON Ledger SSOT** `.ai/baselines/audit_action_category_ledger.json` `total=104`，与枚举一致。
+- **结论**：3.9.6 的"审计 +4（100→104）"为**真实、可溯源、非凑数**，`PHASE_BOUNDARY_LEDGER.md`
+  3.9.6 行与 `roadmap_v8.md` §35.10 已据此登记。本阶段无审计类目造假。

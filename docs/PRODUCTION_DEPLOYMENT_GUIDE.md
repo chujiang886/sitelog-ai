@@ -716,6 +716,35 @@ ORDER BY created_at DESC;
 
 ---
 
+## 16. 生产激活证据准备层（Phase 3.9.6）
+
+> 完整治理纪律见姊妹文档 `PRODUCTION_ACTIVATION_GOVERNANCE_GUIDE.md`。本节只给部署方最关键的结论。
+
+### 16.1 它做什么、不做什么
+
+- **做**：把前序各阶段能力收拢为「生产激活就绪 dossier」——软件证据包 v2、四角色签署要求、SoD 校验、就绪闸门（8 检查）、阻断器 B1–B6、pending 登记 PV1–PV6、机器可读复核包、工程激活契约、后端 API（8 路由，无 `/activate`）、前端看板、CI 门禁。
+- **不做**：**不激活** `engineering_enabled`（保持 `false`）；**不部署**；**不宣布 GO / APPROVED**；**不自动**生成真实工程参数 / 报价 / 评级；**不替代**四角色或主理人的人工责任；**不提供**任何 `/activate` 或 `/deploy-production` 端点（红线①–⑧）。
+
+### 16.2 关键 fail-closed 不变量
+
+- 终端态恒为 `PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO`（模块常量，不可被运行时改写）。
+- `ProductionActivationReadinessGate` 状态只可能是 `BLOCKED` / `PENDING_VERIFICATION` / `READY_FOR_HUMAN_SIGNOFF`，**永不 `APPROVED`**；`set_engineering_enabled(...)` 触发 `EnterpriseRedLineViolationError`。
+- 当前态：闸门 `blocked`（证据包未齐 / B1–B6 未解 / PV1–PV6 未清 / 四角色未签），`contract.activation_allowed_for_human == False`。
+- 审计真实 +4 类（`ACTIVATION_EVIDENCE_SUBMITTED` / `ACTIVATION_EVIDENCE_VALIDATED` / `HUMAN_SIGNOFF_REGISTERED` / `ACTIVATION_REVIEW_PACKAGE_GENERATED`），基线 100 → 104，与 `.ai/baselines/audit_action_category_ledger.json` `total=104` 一致。
+- `ACTIVATION_READINESS_FORBIDDEN_COUNT = 340`（结构级禁名，`forbidden.py` 调用即抛）。
+
+### 16.3 人工动作入口（唯一合法出口）
+
+- 只读看板：`GET /governance/activation/readiness|evidence|blockers|pending-verifications|signoff-requirements|contract|review-packet`。
+- 真实人工签署（须 `governance:release:signoff`，仅 admin；强制 `actor_kind="user"` + 非空 `signature_reference`）：`POST /governance/activation/signoff`。
+- **真激活**是主理人在**人类终端**显式置 `engineering_enabled=true` 这一唯一动作（见 `.ai/runbooks/production_activation/HUMAN_ACTIVATION_CHECKLIST.md`），AI 不代执行。
+
+### 16.4 收口状态
+
+本层状态 **PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO**：全部软件证据 / 人工责任结构 / 检查清单包 / 回滚包 / 签署模板 / Go-No-Go 输入已就位，但**无真实生产激活**。详见 `.ai/reviews/phase3.9.6_production_activation_evidence_readiness_report.md` 与 `.ai/roadmap_v8.md` §35.10 / §35.11。
+
+---
+
 ## 附录 A：变更记录
 
 | 版本 | 变更 |

@@ -1989,3 +1989,31 @@ GovernanceWorkflowRepository (require_human_actor + OrgScopeError)  ──snapsh
 - **Audit Ledger Gate**：运行 `scripts/build_audit_category_ledger.py` 重建 JSON + `scripts/audit_category_ledger_validator.py`，必须 PASS（total=100，0 orphan/ghost/dup）。
 - **Phase Boundary Gate**：运行 `scripts/check_phase_boundary.py`，核对 `project_status.json` / `roadmap_v8.md` / `PHASE_BOUNDARY_LEDGER.md` / 收口报告路径一致，且 3.9.5 等未审核阶段不得标 `APPROVED`/`GO`/`PRODUCTION_READY`。
 - **Repository Cleanliness / Ownership Gate**：运行 `scripts/check_repository_clean.py`，`git status --porcelain` 必须为空（无未提交源码/测试/SSOT/报告/来源不明文件），运行时缓存须正确 gitignore。
+
+### 35.10 Phase 3.9.6 交付物与门禁（现有阶段对账与生产激活证据准备层）
+
+- **分支**：`feat/phase3.9.6-production-activation-evidence-readiness`（自 R2 冻结点 `f7a2aba` 切出，保留真实 ancestry，不重写历史）。
+- **收口 HEAD**：`0dfd253`（含 `59807ca` production activation evidence intake & human signoff governance T1–T11 核心 + `0dfd253` 审计账本登记 3.9.6）。
+- **终端态**：🟠 `PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO`（全部软件证据 / 人工责任结构 / 检查清单包 / 回滚包 / 签署模板 / Go-No-Go 输入已就位，但**无真实生产激活**）。
+- **核心交付**（Layer A 已提交 `agents/enterprise/production_release/activation_readiness.py` ~1064 行）：
+  - `assemble_activation_readiness_dossier`：从仓库事实合成只读 dossier（engineering_enabled=false / 治理完整性 9/9 / 证据包完整 / 四角色签署要求 / SoD / 阻断器 B1–B6 / pending PV1–PV6 / 就绪闸门 / 工程激活契约 / 终端态常量）。
+  - `ProductionActivationReadinessGate`（`_RedLineForbiddenMixin`，`CHECK_KEYS=8`，`set_engineering_enabled` 触发 `EnterpriseRedLineViolationError` 红线）：状态只可能为 `BLOCKED` / `PENDING_VERIFICATION` / `READY_FOR_HUMAN_SIGNOFF`，**永不 `APPROVED`**。
+  - `HumanSignoffRegistry` + `build_human_signoff_record`（强制 `actor_kind=="user"`、非空 `actor_id`、非空 `signature_reference`）。
+  - `ProductionHumanReviewPacket`（机器可读复核包，`schema_version="1.0.0"`、`contains_real_secret=False`）。
+  - `EngineeringActivationContract`（`activation_allowed_for_human` 仅当闸门 READY）。
+  - `ACTIVATION_READINESS_FORBIDDEN_COUNT=340`。
+- **后端 API**（已提交 `backend/app/api/governance_activation.py`，8 路由；注册入 `__init__.py` + `main.py`）：只读 `/readiness` `/evidence` `/blockers` `/pending-verifications` `/signoff-requirements` `/contract` `/review-packet` + 真实人工 `POST /signoff`（仅 `actor_kind=user` 可落，无 `/activate` / `/deploy-production` 端点）。
+- **前端看板**（已提交 `frontend/src/app/governance-activation/page.tsx`）：只读展示 + 真实人工四角色签署表单（需 reason + signature_reference 双填），BUILT_NO_GO 琥珀色横幅，无自动 GO/激活/部署按钮。
+- **审计增量**：3.9.6 真实新增 4 类审计事件 —— `ACTIVATION_EVIDENCE_SUBMITTED` / `ACTIVATION_EVIDENCE_VALIDATED` / `HUMAN_SIGNOFF_REGISTERED` / `ACTIVATION_REVIEW_PACKAGE_GENERATED`（均由本阶段真实新增的接收/签署/复核能力之 `AuditService` 方法记录，非为凑数；基线 100 → 104）。
+- **审计账本**：`.ai/baselines/audit_action_category_ledger.json` `total=104`，与 `audit.py` 枚举 104 成员一致（R2 重建的 JSON Ledger SSOT）。
+
+### 35.11 3.9.6 CI 门禁（生产激活就绪闸门，fail-closed）
+
+- **新增** `.github/workflows/activation-readiness-gate.yml`，与 `release-gate.yml` 互补：只盯"生产激活就绪证据是否齐备、受控激活闸门是否未 BLOCKED、四角色人工签署结构是否就位"。
+- **三道 job（任一失败即整条流水线失败，fail-closed）**：
+  1. `activation-readiness-integrity`：治理仓库完整性 9/9（只读基线核对）。
+  2. `activation-readiness-security`：生产安全 lint（7/7）+ 审计账本一致性校验 + 硬编码扫描（0 命中）。
+  3. `activation-readiness-tests`：3.9.6 生产激活就绪层契约 + 3.9.2 发布闸门 / RC 冻结回归（不得破坏既有契约）。
+- **语义边界（红线）**：即便全绿，也只代表 `PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO` / `READY_FOR_HUMAN_REVIEW` / `READY_FOR_HUMAN_SIGNOFF`，**绝不 APPROVED / GO / 自动激活**。
+- **分支覆盖**：`main`（占位）+ `feat/phase3.9.6-production-activation-evidence-readiness`（显式）+ 通配 `feat/phase3.9.*` / `feat/phase*-release-*` / `release/**` + 历史 `feat/phase3.9.2-production-release-gate`（保留）。`pull_request` 保持无分支过滤（最严格）。
+
