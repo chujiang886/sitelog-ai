@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "total": 100,
+  "generated_from_head": "4983e7b1811e03516edd39ed19f152cea73db051",
+  "audit_path": "agents/enterprise/audit.py",
+  "baseline_phase": "3.8.27",
+  "phases": {
+    "3.8.27": {
+      "commit": "4aa23fb",
+      "is_baseline": true,
+      "total_at_commit": 69,
+      "introduced_count": 69,
+      "members": [
+        "AGENT_COMPLIANCE_CHECK",
+        "AGENT_COMPLIANCE_RISK",
+        "AGENT_COMPLIANCE_RULE",
+        "AGENT_COST",
+        "AGENT_COST_REPORT",
+        "AGENT_EVALUATION",
+        "AGENT_EXECUTION",
+        "AGENT_FEEDBACK",
+        "AGENT_GOVERNANCE_ACTION",
+        "AGENT_GOVERNANCE_ASSISTANCE",
+        "AGENT_GOVERNANCE_ASSISTANT_CONTEXT",
+        "AGENT_GOVERNANCE_ASSISTANT_DRAFT",
+        "AGENT_GOVERNANCE_ASSISTANT_QUERY",
+        "AGENT_GOVERNANCE_CASE",
+        "AGENT_GOVERNANCE_CLOSURE",
+        "AGENT_GOVERNANCE_DASHBOARD",
+        "AGENT_GOVERNANCE_IMPROVEMENT",
+        "AGENT_GOVERNANCE_INSIGHT",
+        "AGENT_GOVERNANCE_KNOWLEDGE",
+        "AGENT_GOVERNANCE_KNOWLEDGE_QUERY",
+        "AGENT_GOVERNANCE_KNOWLEDGE_RETRIEVAL",
+        "AGENT_GOVERNANCE_REPORT",
+        "AGENT_GOVERNANCE_TASK",
+        "AGENT_GOVERNANCE_WORKFLOW_CREATE",
+        "AGENT_GOVERNANCE_WORKFLOW_EXECUTION",
+        "AGENT_GOVERNANCE_WORKFLOW_REVIEW",
+        "AGENT_GOVERNANCE_WORKFLOW_VIEW",
+        "AGENT_HEALTH",
+        "AGENT_METRIC",
+        "AGENT_POLICY",
+        "AGENT_QUALITY",
+        "AGENT_REGISTER",
+        "AGENT_RESOURCE",
+        "AGENT_RISK",
+        "AGENT_RISK_REVIEW",
+        "AGENT_RUNTIME_CHECK",
+        "AGENT_SECURITY_EVENT",
+        "AGENT_TOOL_ACCESS",
+        "AGENT_TRACE",
+        "AGENT_VERSION",
+        "AI_ACTION",
+        "ANOMALY_DETECTION",
+        "COLLABORATION",
+        "DASHBOARD",
+        "DATA_INSIGHT",
+        "FEEDBACK",
+        "KNOWLEDGE_AGENT_DRAFT",
+        "KNOWLEDGE_AGENT_QUERY",
+        "KNOWLEDGE_AGENT_RETRIEVE",
+        "KNOWLEDGE_AGENT_VALIDATE",
+        "KNOWLEDGE_AGENT_WORKFLOW",
+        "KNOWLEDGE_CANDIDATE",
+        "KNOWLEDGE_CONFLICT",
+        "KNOWLEDGE_CONVERSATION",
+        "KNOWLEDGE_MEMORY",
+        "KNOWLEDGE_MESSAGE",
+        "KNOWLEDGE_QUERY",
+        "KNOWLEDGE_RETRIEVAL",
+        "KNOWLEDGE_REVIEW",
+        "KNOWLEDGE_SEARCH",
+        "KNOWLEDGE_SUBTASK",
+        "KNOWLEDGE_TASK",
+        "KNOWLEDGE_VERSION",
+        "PERMISSION",
+        "REPORT_GENERATION",
+        "TREND_ANALYSIS",
+        "USER_ACTION",
+        "VALIDATION",
+        "WORKFLOW_EVENT"
+      ]
+    },
+    "3.8.30": {
+      "commit": "382afd4",
+      "is_baseline": false,
+      "total_at_commit": 72,
+      "introduced_count": 3,
+      "members": [
+        "GOVERNANCE_REPLAY",
+        "GOVERNANCE_TIMELINE",
+        "GOVERNANCE_TRACE"
+      ]
+    },
+    "3.9.0": {
+      "commit": "a538e1e",
+      "is_baseline": false,
+      "total_at_commit": 75,
+      "introduced_count": 3,
+      "members": [
+        "DEPLOYMENT_MANIFEST",
+        "PRODUCTION_READINESS_CHECK",
+        "ROLLBACK_PLAN"
+      ]
+    },
+    "3.9.1": {
+      "commit": "66f9b57",
+      "is_baseline": false,
+      "total_at_commit": 79,
+      "introduced_count": 4,
+      "members": [
+        "DEPLOYMENT_SIMULATION",
+        "RECOVERY_VALIDATION",
+        "ROLLBACK_DRILL",
+        "STAGING_VALIDATION"
+      ]
+    },
+    "3.9.2": {
+      "commit": "ea57245",
+      "is_baseline": false,
+      "total_at_commit": 83,
+      "introduced_count": 4,
+      "members": [
+        "RELEASE_CANDIDATE_CREATED",
+        "RELEASE_GATE_EVALUATED",
+        "RELEASE_MANIFEST_GENERATED",
+        "RELEASE_SIGNOFF_RECORDED"
+      ]
+    },
+    "3.9.3": {
+      "commit": "8c7c9c5",
+      "is_baseline": false,
+      "total_at_commit": 96,
+      "introduced_count": 13,
+      "members": [
+        "ACTIVATION_EVIDENCE_BUNDLE_GENERATED",
+        "ALERT_CANDIDATE_CREATED",
+        "CONTROLLED_ACTIVATION_GATE_EVALUATED",
+        "HUMAN_ACTIVATION_APPROVAL_RECORDED",
+        "INCIDENT_CREATED",
+        "INCIDENT_HUMAN_ACKNOWLEDGED",
+        "INCIDENT_HUMAN_CLOSED",
+        "INCIDENT_HUMAN_RESOLVED",
+        "OBSERVABILITY_HEALTH_CHECK",
+        "POSTMORTEM_DRAFT_CREATED",
+        "RC_FREEZE_CHECK_PASSED",
+        "RC_FREEZE_GENERATED",
+        "RC_FREEZE_VERIFIED"
+      ]
+    },
+    "3.9.4": {
+      "commit": "6ddb9a3",
+      "is_baseline": false,
+      "total_at_commit": 100,
+      "introduced_count": 4,
+      "members": [
+        "SYNTHETIC_DRILL_COMPLETED",
+        "SYNTHETIC_DRILL_STARTED",
+        "TELEMETRY_EVIDENCE_RECORDED",
+        "TELEMETRY_PROVIDER_CHECKED"
+      ]
+    }
+  }
+}
