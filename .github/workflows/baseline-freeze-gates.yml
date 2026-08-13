@@ -1,0 +1,74 @@
+name: Baseline Freeze Gates (Audit Ledger / Phase Boundary / Repo Clean)
+
+# Phase 3.9.4-R2 权威基线冻结 CI 门禁（只读，fail-closed）。
+#
+# 与 release-gate.yml（RC 冻结 / 受控激活闸门）互补，本流水线盯"基线是否已冻结、
+# Audit 事实是否唯一、阶段边界是否一致、工作树是否清洁"。它**不部署、不激活、
+# 不宣布 GO** —— 即便全绿，也只代表基线处于 FROZEN_BUILT_NO_GO / AWAITING_HUMAN。
+#
+#   audit-ledger-gate       Git <-> JSON Ledger <-> 当前枚举 一致性（total/union/orphan/ghost/dup/commit/provenance）；
+#   phase-boundary-gate     project_status / roadmap / PHASE_BOUNDARY_LEDGER / 收口报告 / audit ledger 一致；
+#   repository-clean-gate   工作树清洁，无未提交 / 来源不明源码。
+#
+# 任一 job 失败即整条流水线失败（fail-closed，无 continue-on-error）。
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "feat/phase3.9.4-r2-definitive-baseline-freeze"
+      - "main"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: boip-baseline-freeze-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit-ledger-gate:
+    name: Audit Ledger Gate (Git <-> JSON <-> Enum)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # validator re-extracts members from historical commits
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --requirement backend/requirements.txt
+      - name: Rebuild Audit ledger from Git + validate
+        run: |
+          python scripts/build_audit_category_ledger.py
+          python scripts/audit_category_ledger_validator.py
+
+  phase-boundary-gate:
+    name: Phase Boundary Gate (SSOT consistency)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify phase-boundary SSOT consistency
+        run: python scripts/check_phase_boundary.py
+
+  repository-clean-gate:
+    name: Repository Cleanliness / Ownership Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify working tree is clean
+        run: python scripts/check_repository_clean.py

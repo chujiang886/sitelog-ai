@@ -1917,12 +1917,12 @@ GovernanceWorkflowRepository (require_human_actor + OrgScopeError)  ──snapsh
 - **RC 冻结 / 受控激活增量（本 turn）**：`release_candidate.py`（RC 模型，activation_approved 恒 False）/ `freeze_manifest.py`（SHA-256 自洽）/ `freeze_checker.py`（7 维只读判定 FROZEN↔DRIFTED）/ `activation_evidence.py`（is_complete 缺真实签署恒 False）/ `activation_gate.py`（ControlledActivationGate，三态 + 永不 ACTIVATED_BY_HUMAN）/ `human_approval.py`（契约只读 + 禁名拦截，不翻转 engineering_enabled）。
 - **后端接线**：`backend/app/api/governance_release.py`（只读 + 签署端点，强制真实 USER 主体，AI 主体 403）。
 - **前端**：`frontend/src/app/governance-release/page.tsx`（只读展示 + 人工签署，无自动上线 / 无 AI 批准按钮）；`frontend/src/lib/identity/{types,guards}.ts` 同步 `governance:release:read` / `governance:release:signoff`。
-- **测试**：`tests/agents/test_production_release_gate_evidence.py`（23 例）、`tests/agents/test_enterprise_production_release.py`（27 例）、`backend/tests/test_governance_release.py`（31 例）、`tests/agents/test_enterprise_rc_freeze_activation_gate.py`（42 例）全绿；agents 全量套件 **2372 passed / 1 failed**（真实复跑；1 失败为 `test_main_on_real_repository_exits_zero`，因仓库级 `phase_3_9_4.report` 幽灵缺口触发，属 3.9.4 线缺陷，非本层）；backend **374 passed**；frontend jest 117 passed；tsc 0 error。
+- **测试**：`tests/agents/test_production_release_gate_evidence.py`（23 例）、`tests/agents/test_enterprise_production_release.py`（27 例）、`backend/tests/test_governance_release.py`（31 例）、`tests/agents/test_enterprise_rc_freeze_activation_gate.py`（42 例）全绿；agents 全量套件 **2373 passed / 0 failed**（JWT 缺失 secret fail-closed 修复 `e7952e9` 已并入，仓库级 `phase_3_9_4.report` 幽灵缺口随 3.9.5 对账消解）；backend **374 passed**；frontend jest 117 passed；tsc 0 error。
 - **CI 门禁**：`scripts/ci_release_gate.py`（只读 fail-closed）+ `.github/workflows/release-gate.yml`（三 job）+ `.ai/release-gate/rc-spec.3.9.2.json`；已修正 `engineering_enabled` 摘要误标（曾把 grep 命中 'engineering_enabled: false' 反向标为 true，现用 `load_engineering_enabled()` 真实读取为 false）。
 - **清单（SHA-256）**：由 `ProductionReleaseService.build_manifest` 在运行时生成（T6），缺文件标 `<missing>`，不伪造——非独立脚本；证据完整性链见 `ProductionReleaseEvidenceService.verify_integrity`。
 - **运行手册**：`docs/PRODUCTION_ACTIVATION_ROLLBACK_RUNBOOK.md`（fail-closed 放行前置 / 标准放行 / 回滚 / 红线）。
 - **SSOT**：`.ai/project_status.json` 已登记 `phase_3_9_0/1/2_status`（均 `BUILT_NO_GO`），`phase_3_9_2` 详情对象补 RC 候选 id `boip-rc-3.9.2`、闸门状态、冻结状态、报告路径（见本文件）。
-- **仓库级完整性外部缺口（透明披露）**：当下治理完整性检查报告 1 处缺口（实测 **8/9**）——`phase_3_9_4.report` 指向 `.ai/reviews/phase3.9.4_telemetry_synthetic_operations_report.md`（不存在，3.9.4 线既有幽灵登记）。其 SSOT 登记 `audit=100`，与权威基线 `total=100` **一致，无冲突**（3.9.4 telemetry +4 已随 9201a7d / 6ddb9a3 提交）。此缺口独立于 3.9.2，须由 3.9.4 负责人线下补齐报告或修正 SSOT 路径；补齐后仓库级完整性恢复 9/9，3.9.2 冻结检查器 `governance_integrity_9_9` 子项随之通过。注意：roadmap §35.1 的 3.9.4 段仍记"2373 passed/0 failed、完整性 9/9"，该记录写于幽灵登记之前，已与实时检查器（2372 passed/1 failed、8/9）不一致，属 3.9.4 段口径滞后，非本层问题。3.9.2 自身的组件哈希 / 清单自洽 / engineering_enabled=false / RC 状态等冻结维度独立判定均通过。
+- **仓库级完整性**：治理完整性检查器 **9/9**（`phase_3_9_4.report` 幽灵缺口已随 3.9.5 对账消解并补齐报告路径）。SSOT 登记 `audit=100` 与权威基线 `total=100` **一致**。3.9.2 自身的组件哈希 / 清单自洽 / engineering_enabled=false / RC 状态等冻结维度独立判定均通过。
 - **十项最高红线**（绝对不可修改 / 弱化）：①`engineering_enabled=false` ②禁 `engineering_approved` ③禁 AI 自动批准发布 ④禁 AI 自动执行部署 ⑤禁 AI 修改真实企业数据 ⑥禁 AI 写真实生产密钥 ⑦禁 AI 自动授予生产权限 ⑧禁 AI 代签 ⑨禁把 staging/drill 描述成 production verified ⑩禁通过跳测试 / 改安全断言 / 伪造证据让 Gate 变绿——全部 fail-closed，门禁 `ProductionReleaseGate` / `ControlledActivationGate` 永不返回 `APPROVED`/`GO`/`ACTIVATED_BY_HUMAN`。
 
 ### 35.2 3.9.3 交付物与门禁（企业生产可观测性、SRE 与事故响应准备层）
@@ -1971,3 +1971,21 @@ GovernanceWorkflowRepository (require_human_actor + OrgScopeError)  ──snapsh
 
 - **状态：🟢 RELEASE_LINE_RECONCILED_RC_FROZEN_AWAITING_HUMAN（3.9.5 已收口，2026-08-12）**。
 - **STOP：完成全部安全任务后停止**，不进下一 Phase、不开 `engineering_enabled`、不输出 `engineering_approved`、不真实部署、不自行执行四角色生产签署。后续仅由主理人 + 专家线下推进：真实人工四角色（production-owner / release-manager / security-owner / auditor）签署 → 终端显式置 `engineering_enabled=true` → 真实部署。收口报告见 `.ai/reviews/phase3.9.5_release_line_reconciliation_closure_report.md`（27 章）。
+
+### 35.8 3.9.4-R2 权威基线冻结与阶段边界收敛（Definitive Baseline Freeze & Phase Boundary Reconciliation）
+
+- **分支**：`feat/phase3.9.4-r2-definitive-baseline-freeze`（自 3.9.5 收口 HEAD `4983e7b` 分出）。
+- **目标**：把当前仓库收敛为 Git 事实唯一 / 测试事实唯一 / Audit 事实唯一 / SSOT 唯一 / 工作树清洁 / 阶段边界明确 / 无未提交关键修复 / 无未来 Phase 污染 / 无报告与代码矛盾的正式基线，再冻结为 `PHASE_3_9_4_DEFINITIVE_BASELINE_FROZEN_BUILT_NO_GO`。
+- **交付**：
+  - Audit `AuditActionCategory` 机器可读 SSOT = `.ai/baselines/audit_action_category_ledger.json`（100 成员逐项登记，baseline 3.8.27 69 也逐项），由 `scripts/build_audit_category_ledger.py` 从真实阶段边界 commit（`4aa23fb`/`382afd4`/`a538e1e`/`66f9b57`/`ea57245`/`8c7c9c5`/`6ddb9a3`）经 `git show` 重建；人类可读镜像 = `.ai/AUDIT_ACTION_CATEGORY_LEDGER.md`（由 JSON 渲染）。
+  - 校验器 `scripts/audit_category_ledger_validator.py`：读 JSON，验证 total==enum / union==enum / 0 orphan / 0 ghost / 0 duplicate-ownership / 每阶段 commit 存在 / 从 commit 实际提取 introduced==ledger。
+  - 阶段边界台账 `.ai/PHASE_BOUNDARY_LEDGER.md`：登记 3.8.27–3.9.5 每阶段 branch/start/end/closure/status/能力/审核态，杜绝"代码跑到下一阶段但报告停上一阶段"。
+  - CI 三道新门禁（见 §35.9）：Audit Ledger Gate、Phase Boundary Gate、Repository Cleanliness/Ownership Gate。
+  - 多 CWD 测试稳定：`production_release` 两测试文件从仓库根与 `backend/` 两种 CWD 均 50 passed；`service.py` 透传 `root_dir`。
+- **状态：🟢 FROZEN_BUILT_NO_GO / AWAITING_HUMAN（2026-08-13）**。等待主理人 + 专家线下四角色真实签署后方可推进激活。收口报告见 `.ai/reviews/phase3.9.4_r2_definitive_baseline_freeze_report.md`。
+
+### 35.9 3.9.4-R2 CI 门禁（新增三道，无 continue-on-error）
+
+- **Audit Ledger Gate**：运行 `scripts/build_audit_category_ledger.py` 重建 JSON + `scripts/audit_category_ledger_validator.py`，必须 PASS（total=100，0 orphan/ghost/dup）。
+- **Phase Boundary Gate**：运行 `scripts/check_phase_boundary.py`，核对 `project_status.json` / `roadmap_v8.md` / `PHASE_BOUNDARY_LEDGER.md` / 收口报告路径一致，且 3.9.5 等未审核阶段不得标 `APPROVED`/`GO`/`PRODUCTION_READY`。
+- **Repository Cleanliness / Ownership Gate**：运行 `scripts/check_repository_clean.py`，`git status --porcelain` 必须为空（无未提交源码/测试/SSOT/报告/来源不明文件），运行时缓存须正确 gitignore。
