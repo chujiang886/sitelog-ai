@@ -187,9 +187,7 @@ R2 分支 `feat/phase3.9.4-r2-definitive-baseline-freeze` 自 `4983e7b` 起的�
 | `3043eb4` | fix(release): make production release evidence resolution cwd-independent |
 | `e709176` | feat(audit): Git-derived AuditActionCategory ledger (JSON SSOT + build + validator) |
 | `ab1f7cd` | docs(ssot): reconcile project_status.json + 3.9.4 telemetry report with Git evidence (R1) |
-| （C4） | docs(boundary): add Phase Boundary Ledger + CI three gates + roadmap §35.8/§35.9 + revise R1 report（本批提交，含本报告） |
-
-> C4 的具体短 hash 以 `git rev-parse --short HEAD` 为准（提交后由 `check_repository_clean.py` / `check_phase_boundary.py` 复验）。
+| `8d7ccaa` | docs(boundary): add Phase Boundary Ledger + CI three gates + roadmap §35.8/§35.9 + revise R1 report + R2 closure report (R2) |
 
 ## 15. 完整测试矩阵
 
