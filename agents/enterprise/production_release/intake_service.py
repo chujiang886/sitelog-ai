@@ -25,8 +25,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import os
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -44,6 +42,9 @@ from agents.enterprise.production_release.activation_intake import (
     EvidenceProvenance,
     REQUIRED_ACTIVATION_EVIDENCE_TYPES,
     build_activation_evidence_submission,
+)
+from agents.enterprise.production_release.evidence_storage_safety import (
+    compute_evidence_sha256,
 )
 from agents.enterprise.production_release.human_signoff import (
     HumanSignoffRecord,
@@ -64,8 +65,7 @@ from agents.enterprise.red_line import (
     safety_invariants_ok,
 )
 
-#: 计算哈希时的分块大小（流式读取，绝不整块驻留内存 / 绝不保存内容）。
-_HASH_CHUNK_BYTES = 1024 * 1024
+#: 流式哈希的权威实现位于 evidence_storage_safety（T13），本服务复用之、不复制第二套。
 
 
 def _now() -> str:
@@ -183,29 +183,11 @@ class ActivationEvidenceIntakeService(_RedLineForbiddenMixin):
         return tuple(dict(d) for d in self._decision_log)
 
     def _compute_sha256(self, content_reference: str) -> Optional[str]:
-        """对**本地可读**的证据引用流式计算 SHA-256；内容读完即弃（红线⑦）。
+        """对本地可读的证据引用流式计算 SHA-256（委托 T13 权威实现，红线⑦）。
 
-        ``content_reference`` 若不是本地存在的文件（如工单号 / 外部 URL / 线下件编号），
-        返回 ``None`` —— 服务不会为了"凑一个哈希"去抓取外部内容，也不会伪造。
+        内容读完即弃，服务不保存任何证据正文；引用非本地文件时返回 None。
         """
-        ref = (content_reference or "").strip()
-        if not ref:
-            return None
-        path = ref if os.path.isabs(ref) else os.path.join(self._root_dir, ref)
-        if not os.path.isfile(path):
-            return None
-        digest = hashlib.sha256()
-        try:
-            with open(path, "rb") as fh:
-                while True:
-                    chunk = fh.read(_HASH_CHUNK_BYTES)
-                    if not chunk:
-                        break
-                    digest.update(chunk)
-        except OSError:
-            return None
-        # 注意：chunk 为局部变量，函数返回后即释放；服务不保存任何证据正文。
-        return digest.hexdigest()
+        return compute_evidence_sha256(content_reference, self._root_dir)
 
     # ------------------------------------------------------------------ #
     # 1) 真实人工提交证据（AI 不得代提交）

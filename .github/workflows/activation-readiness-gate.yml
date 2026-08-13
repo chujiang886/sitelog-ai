@@ -60,7 +60,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      # 纯标准库实现，无需安装依赖。
+      - name: Ensure pyyaml (audit.py enum import transitively requires it)
+        run: python -m pip install --quiet pyyaml
+      # 校验器需导入仓库内 agents/enterprise/audit.py 的 AuditActionCategory，
+      # 而 audit.py 依赖 yaml，故 CI 需先安装 pyyaml（非纯标准库）。
       - name: Run governance repository integrity checker
         run: python scripts/check_governance_repository_integrity.py --root .
 
@@ -73,6 +76,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Ensure pyyaml (audit ledger validator imports audit.py -> yaml)
+        run: python -m pip install --quiet pyyaml
       # 生产安全七红线静态扫描（fail-closed）。
       - name: Production security lint (7/7)
         run: python scripts/lint/check_production_security.py
@@ -104,3 +109,31 @@ jobs:
           tests/agents/test_enterprise_production_release.py
           tests/agents/test_enterprise_rc_freeze_activation_gate.py
           -q
+
+  activation-readiness-evidence-packet:
+    name: Evidence packet & API contract (generate → validate → diff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # 包生成器依赖 agents 企业包（audit.py → yaml）。
+      - name: Ensure pyyaml
+        run: python -m pip install --quiet pyyaml
+      # 1) 重新生成机器可读复核包（schema 2.0.0，含 Layer A+B，确定性 source_commit）。
+      - name: Generate production activation review packet
+        run: python scripts/generate_production_activation_review_packet.py
+      # 2) 校验包（schema / 终端态 / 红线 / 篡改哈希 / Layer B / B1-B6·PV1-PV6 1:1）。
+      - name: Validate production activation review packet
+        run: python scripts/validate_production_activation_review_packet.py
+      # 3) 包必须与已提交副本一致——代码变更必须先重新生成并提交（新鲜度 + 一致性）。
+      - name: Packet must match committed copy
+        run: git diff --exit-code .ai/release-gate/production_activation_review_packet.json
+      # 4) 重新生成 API 契约快照（15 路由，Layer A+B，确定性）。
+      - name: Generate production activation API contract snapshot
+        run: python scripts/generate_production_activation_api_contract.py
+      # 5) 契约必须与已提交副本一致——路由增删/方法/权限变更必须显式对账（漂移检测）。
+      - name: API contract must match committed copy
+        run: git diff --exit-code .ai/baselines/production_activation_api_contract.json

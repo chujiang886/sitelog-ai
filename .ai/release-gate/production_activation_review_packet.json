@@ -1,9 +1,9 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "2.0.0",
   "artifact": "production_activation_review_packet",
   "phase": "3.9.6",
   "rc_id": "RC-3.9.6",
-  "generated_at": "2026-08-13T02:59:37.627677+00:00",
+  "source_commit": "863a038e0a1424538369cfcdeb3f7fb8de20f3dc",
   "contains_real_secret": false,
   "terminal_status": "PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO",
   "engineering_enabled": false,
@@ -312,11 +312,91 @@
     "ok": false,
     "note": "SOD_ONLY: 校验四角色齐备且均为真实 USER；是否要求'不同自然人'在无权威策略时标 pending_policy_verification，不擅自断言"
   },
+  "layer_b": {
+    "boundary": {
+      "rc_id": "RC-3.9.6",
+      "required_actor_kind": "user",
+      "permission_reference": "reuse GovernancePermission (governance:release:read / governance:release:signoff)",
+      "policy": "deny-by-default whitelist; AI/SYSTEM always denied",
+      "operations": [
+        {
+          "operation": "view_readiness",
+          "required_permission": "governance:release:read",
+          "required_actor_kind": "user",
+          "is_write": false
+        },
+        {
+          "operation": "submit_evidence",
+          "required_permission": "governance:release:read",
+          "required_actor_kind": "user",
+          "is_write": true
+        },
+        {
+          "operation": "validate_evidence",
+          "required_permission": "governance:release:read",
+          "required_actor_kind": "user",
+          "is_write": true
+        },
+        {
+          "operation": "record_evidence_decision",
+          "required_permission": "governance:release:signoff",
+          "required_actor_kind": "user",
+          "is_write": true
+        },
+        {
+          "operation": "register_signoff",
+          "required_permission": "governance:release:signoff",
+          "required_actor_kind": "user",
+          "is_write": true
+        },
+        {
+          "operation": "build_review_package",
+          "required_permission": "governance:release:read",
+          "required_actor_kind": "user",
+          "is_write": true
+        },
+        {
+          "operation": "record_final_decision",
+          "required_permission": "governance:release:signoff",
+          "required_actor_kind": "user",
+          "is_write": true
+        }
+      ],
+      "note": "本边界只回答'谁能执行哪个治理动作'；不回答'能否放行生产'（红线②⑤⑩）"
+    },
+    "evidence_storage_policy": {
+      "store_by_reference_only": true,
+      "rejects_inline_content": true,
+      "rejects_secret_like_reference": true,
+      "never_holds_evidence_plaintext": true,
+      "rules": [
+        "ensure_no_inline_content: 拒收任何 inline 证据正文，只收引用",
+        "ensure_reference_not_secret: 拒把裸密钥/令牌当引用存（sk-/ghp_/PRIVATE KEY/...）",
+        "issue_receipt: 仅签发含引用+哈希的回执，不持有任何原文"
+      ],
+      "note": "T13 存储安全：只存引用与哈希，永存原文，防止生产密钥/数据进入仓库或审计流"
+    },
+    "intake_operations": [
+      "submit_evidence（真实 USER + RELEASE_READ + T13 存储安全）",
+      "record_evidence_decision（真实 USER + RELEASE_SIGNOFF + 人工裁决）",
+      "register_signoff（真实 USER + RELEASE_SIGNOFF，四角色签署）",
+      "build_review_package（真实 USER + RELEASE_READ，材料≠裁决）",
+      "record_final_decision（真实 USER + RELEASE_SIGNOFF，登记人裁决，永不激活）"
+    ],
+    "note": "Layer B 只登记事实与人工裁决，绝不翻转 engineering_enabled / 不宣布 GO / 不激活；HUMAN_GO_RECORDED ≠ PRODUCTION_ACTIVATED（红线②⑤⑩）"
+  },
   "human_review_required": true,
   "automated_approval_prohibited": true,
+  "forbidden_endpoints": [
+    "/activate",
+    "/deploy-production",
+    "/go",
+    "engineering_approved 输出"
+  ],
   "next_human_actions": [
     "主理人 + 四角色线下提交真实生产激活证据（RC 冻结基线 / 回滚 runbook / 真实凭证占位）",
     "四角色（production-owner / release-manager / security-owner / auditor）线下完成各自签署",
-    "主理人显式置 engineering_enabled=true（唯一人类终端动作，AI 不代执行）"
-  ]
+    "主理人在人类终端显式置 engineering_enabled=true（唯一人类终端动作，AI 不代执行）"
+  ],
+  "packet_sha256": "e342314ae7c8272f9eff675009b02d682be7c8f9da4d47a30e601fd4e5fa1d89"
 }

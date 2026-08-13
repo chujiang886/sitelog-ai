@@ -1,0 +1,186 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "production_activation_api_contract",
+  "rc_id": "RC-3.9.6",
+  "generated_from": "backend/app/api/governance_activation.py",
+  "route_count": 15,
+  "layers": {
+    "A": [
+      "/governance/activation/blockers",
+      "/governance/activation/contract",
+      "/governance/activation/pending-verifications",
+      "/governance/activation/readiness",
+      "/governance/activation/review-packet",
+      "/governance/activation/signoff",
+      "/governance/activation/signoff-requirements"
+    ],
+    "B": [
+      "/governance/activation/decision-ledger",
+      "/governance/activation/evidence",
+      "/governance/activation/evidence-decision",
+      "/governance/activation/evidence-list",
+      "/governance/activation/final-decision",
+      "/governance/activation/intake-summary",
+      "/governance/activation/review-package"
+    ]
+  },
+  "forbidden_endpoints": [
+    "/activate",
+    "/deploy-production",
+    "/go",
+    "engineering_approved 输出"
+  ],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/governance/activation/blockers",
+      "handler": "blockers",
+      "layer": "A",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/contract",
+      "handler": "contract",
+      "layer": "A",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/decision-ledger",
+      "handler": "decision_ledger",
+      "layer": "B",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/evidence",
+      "handler": "evidence",
+      "layer": "B",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/activation/evidence",
+      "handler": "submit_evidence",
+      "layer": "B",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "append-only AuditService"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/activation/evidence-decision",
+      "handler": "record_evidence_decision",
+      "layer": "B",
+      "actor_kind": "user",
+      "permission": "RELEASE_SIGNOFF",
+      "csrf_protected": true,
+      "audit": "append-only AuditService"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/evidence-list",
+      "handler": "evidence_list",
+      "layer": "B",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/activation/final-decision",
+      "handler": "record_final_decision",
+      "layer": "B",
+      "actor_kind": "user",
+      "permission": "RELEASE_SIGNOFF",
+      "csrf_protected": true,
+      "audit": "append-only AuditService"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/intake-summary",
+      "handler": "intake_summary",
+      "layer": "B",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/pending-verifications",
+      "handler": "pending_verifications",
+      "layer": "A",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/readiness",
+      "handler": "readiness",
+      "layer": "A",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/activation/review-package",
+      "handler": "build_review_package_endpoint",
+      "layer": "B",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "append-only AuditService"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/review-packet",
+      "handler": "review_packet",
+      "layer": "A",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "POST",
+      "path": "/governance/activation/signoff",
+      "handler": "signoff",
+      "layer": "A",
+      "actor_kind": "user",
+      "permission": "RELEASE_SIGNOFF",
+      "csrf_protected": true,
+      "audit": "append-only AuditService"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/signoff-requirements",
+      "handler": "signoff_requirements",
+      "layer": "A",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    }
+  ],
+  "note": "本契约是 Layer A（客观就绪）+ Layer B（人工证据受理与裁决登记）控制面的唯一事实源；任何路由增删/方法/权限变更都必须同步本文件并经 CI 漂移检测"
+}

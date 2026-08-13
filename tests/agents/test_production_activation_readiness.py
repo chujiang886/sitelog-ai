@@ -15,6 +15,11 @@
 - 前端看板契约（无自动 GO / 激活 / 部署）；
 - CI 门禁 yml 引用与 job 数；
 - 机器可读复核包 JSON（contains_real_secret=False）。
+- Layer B 服务层（T5/T8）：ActivationEvidenceIntakeService 提交/裁决/汇总、build_review_package；
+- Layer B fail-closed：AI 不可 approved、GO 需 READY 评审包、human_go_recorded 仅标志不激活；
+- T13 证据存储安全（只存引用与哈希，拒 inline 正文/裸密钥）；
+- T12 权限边界（deny-by-default 白名单，AI/SYSTEM 一律 403）；
+- 后端 API 14 路由且无 /activate / /deploy-production（含新增 GET /evidence-list）。
 """
 from __future__ import annotations
 
@@ -25,15 +30,49 @@ from pathlib import Path
 
 import pytest
 
+from agents.enterprise.audit import AuditActorKind, AuditService
 from agents.enterprise.production_release import activation_readiness as ar
 from agents.enterprise.production_release.activation_evidence import (
     REQUIRED_SIGNOFF_ROLES,
+)
+from agents.enterprise.production_release.activation_intake import (
+    ActivationEvidenceSubmissionStatus,
+    build_chain_of_custody,
+    build_evidence_provenance,
+    REQUIRED_ACTIVATION_EVIDENCE_TYPES,
+)
+from agents.enterprise.production_release.evidence_storage_safety import (
+    EvidenceStoragePolicy,
+    EvidenceStorageSafetyError,
+    compute_evidence_sha256,
+)
+from agents.enterprise.production_release.final_decision import (
+    FinalDecisionOutcome,
+    FinalHumanDecisionError,
+    FinalHumanDecisionLedger,
+    build_final_human_activation_decision,
 )
 from agents.enterprise.production_release.human_signoff import (
     HumanSignoffRegistry,
     build_human_signoff_record,
 )
+from agents.enterprise.production_release.intake_service import (
+    ActivationEvidenceIntakeService,
+    ActivationIntakeServiceError,
+)
 from agents.enterprise.production_release.models import SignoffDecision, SignoffRole
+from agents.enterprise.production_release.permission_boundary import (
+    ActivationOperation,
+    ActivationPermissionBoundary,
+    ActivationPermissionBoundaryError,
+    PERM_RELEASE_READ,
+    PERM_RELEASE_SIGNOFF,
+    require_activation_operation,
+)
+from agents.enterprise.production_release.review_package import (
+    FinalActivationReviewPackage,
+    ReviewPackageReadiness,
+)
 from agents.enterprise.red_line import EnterpriseRedLineViolationError
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -399,23 +438,37 @@ def _activation_router():
 
 
 class TestActivationAPIRoutes:
-    def test_eight_routes_no_forbidden_endpoint(self) -> None:
+    def test_routes_no_forbidden_endpoint(self) -> None:
         router = _activation_router()
         paths = sorted({getattr(r, "path", "") for r in router.routes})
         activation = [p for p in paths if p.startswith("/governance/activation")]
-        assert len(activation) == 8, activation
+        # 8 个 Layer A 端点 + 6 个 Layer B 端点（含 T15 新增的 GET /evidence-list）：
+        #   Layer A: /readiness /signoff
+        #   Layer B: /intake-summary /decision-ledger /evidence(GET+POST 共享路径)
+        #            /evidence-list(GET, T15 新增) /evidence-decision /review-package
+        #            /final-decision
+        assert len(activation) == 14, activation
+        # T15 新增的只读证据列表端点必须存在（供 Layer B 人工裁决下拉选 submission_id）。
+        assert "/governance/activation/evidence-list" in activation
         # 禁设任何 /activate 或 /deploy-production 端点。
         assert not any(p.rstrip("/").endswith("activate") for p in activation)
         assert not any(p.rstrip("/").endswith("deploy-production") for p in activation)
 
-    def test_only_one_post_route_and_it_is_signoff(self) -> None:
+    def test_post_routes_are_layer_b_governed(self) -> None:
         router = _activation_router()
-        posts = [
+        posts = sorted(
             getattr(r, "path", "")
             for r in router.routes
             if "POST" in (getattr(r, "methods", None) or set())
-        ]
-        assert posts == ["/governance/activation/signoff"]
+        )
+        # 全部 POST 均为受治理的 Layer A/B 端点；不存在 /activate 或 /deploy-production。
+        assert posts == [
+            "/governance/activation/evidence",
+            "/governance/activation/evidence-decision",
+            "/governance/activation/final-decision",
+            "/governance/activation/review-package",
+            "/governance/activation/signoff",
+        ], posts
 
 
 # ---------------------------------------------------------------------------
@@ -467,3 +520,378 @@ class TestCIGateYaml:
     def test_covers_3_9_6_branch(self) -> None:
         text = self._text()
         assert "feat/phase3.9.6-production-activation-evidence-readiness" in text
+
+
+# ---------------------------------------------------------------------------
+# 14. Layer B 服务层（T5/T8）：提交 / 人工裁决 / 汇总 / 评审包
+# ---------------------------------------------------------------------------
+def _audit() -> "AuditService":
+    return AuditService(org_id="org-phase3-9-6-test")
+
+
+def _svc() -> "ActivationEvidenceIntakeService":
+    return ActivationEvidenceIntakeService(rc_id=RC_ID, audit=_audit())
+
+
+def _provenance(submitted_by: str = "alice", *, verifiable: bool = True):
+    coc = (
+        build_chain_of_custody(
+            [
+                {
+                    "event_kind": "received",
+                    "actor_id": submitted_by,
+                    "actor_kind": "user",
+                    "detail": "received by human",
+                }
+            ]
+        )
+        if verifiable
+        else ()
+    )
+    return build_evidence_provenance(
+        origin_system="ticket-system",
+        origin_reference="TKT-1",
+        submitted_by=submitted_by,
+        submitted_by_kind="user",
+        declared_sha256=("deadbeef" if verifiable else None),
+        chain_of_custody=coc,
+    )
+
+
+def _submit(svc, evidence_type="rc_freeze_manifest", actor_id="alice", *, verifiable=True):
+    return svc.submit_evidence(
+        actor_kind=AuditActorKind.USER,
+        actor_id=actor_id,
+        evidence_type=evidence_type,
+        title=f"{evidence_type} evidence",
+        content_reference=f"ref-{evidence_type}",  # 非本地文件 → 哈希 None，≠ 失败
+        provenance=_provenance(submitted_by=actor_id, verifiable=verifiable),
+    )
+
+
+def _flatten_non_note(obj, _note_keys=("note", "notes", "disclaimer", "human_action_required")):
+    """递归收集非说明性字段里的字符串（与评审包自身的 _scan_forbidden 跳过规则一致）。"""
+    out: list = []
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k in _note_keys or str(k).endswith("_note"):
+                continue
+            out.extend(_flatten_non_note(v))
+    elif isinstance(obj, (list, tuple)):
+        for item in obj:
+            out.extend(_flatten_non_note(item))
+    elif isinstance(obj, str):
+        out.append(obj)
+    return out
+
+
+class TestLayerBIntakeService:
+    def test_submit_requires_real_human_actor(self) -> None:
+        svc = _svc()
+        with pytest.raises(EnterpriseRedLineViolationError):
+            svc.submit_evidence(
+                actor_kind=AuditActorKind.AI,
+                actor_id="bot",
+                evidence_type="rc_freeze_manifest",
+                title="t",
+                content_reference="r",
+                provenance=_provenance(),
+            )
+
+    def test_submit_actor_id_must_match_provenance(self) -> None:
+        svc = _svc()
+        with pytest.raises(ActivationIntakeServiceError):
+            svc.submit_evidence(
+                actor_kind=AuditActorKind.USER,
+                actor_id="bob",
+                evidence_type="rc_freeze_manifest",
+                title="t",
+                content_reference="r",
+                provenance=_provenance(submitted_by="alice"),
+            )
+
+    def test_submit_reaches_structurally_validated_not_approved(self) -> None:
+        sub = _submit(_svc())
+        # AI 路径最高只能到 STRUCTURALLY_VALIDATED，绝不 APPROVED。
+        assert sub.status is ActivationEvidenceSubmissionStatus.STRUCTURALLY_VALIDATED
+        assert sub.structurally_valid is True
+        assert sub.is_human_approved is False
+        assert sub.is_human_rejected is False
+
+    def test_record_human_decision_approves(self) -> None:
+        svc = _svc()
+        sub = _submit(svc)
+        updated = svc.record_human_evidence_decision(
+            actor_kind=AuditActorKind.USER,
+            actor_id="alice",
+            submission_id=sub.submission_id,
+            approved=True,
+            reason="verified by human",
+        )
+        assert updated.status is ActivationEvidenceSubmissionStatus.APPROVED_BY_HUMAN
+        assert updated.is_human_approved is True
+        assert updated.human_decision_by == "alice"
+
+    def test_record_decision_requires_real_user(self) -> None:
+        svc = _svc()
+        sub = _submit(svc)
+        with pytest.raises(EnterpriseRedLineViolationError):
+            svc.record_human_evidence_decision(
+                actor_kind=AuditActorKind.AI,
+                actor_id="bot",
+                submission_id=sub.submission_id,
+                approved=True,
+                reason="x",
+            )
+
+    def test_cannot_approve_structurally_invalid(self) -> None:
+        svc = _svc()
+        sub = _submit(svc, verifiable=False)
+        assert sub.status is ActivationEvidenceSubmissionStatus.VALIDATION_FAILED
+        assert sub.structurally_valid is False
+        with pytest.raises(ActivationIntakeServiceError):
+            svc.record_human_evidence_decision(
+                actor_kind=AuditActorKind.USER,
+                actor_id="alice",
+                submission_id=sub.submission_id,
+                approved=True,
+                reason="forced",
+            )
+
+    def test_record_decision_requires_nonempty_reason(self) -> None:
+        svc = _svc()
+        sub = _submit(svc)
+        with pytest.raises(ActivationIntakeServiceError):
+            svc.record_human_evidence_decision(
+                actor_kind=AuditActorKind.USER,
+                actor_id="alice",
+                submission_id=sub.submission_id,
+                approved=True,
+                reason="",
+            )
+
+    def test_summarize_intake_incomplete_until_all_approved(self) -> None:
+        svc = _svc()
+        for et in REQUIRED_ACTIVATION_EVIDENCE_TYPES:
+            sub = _submit(svc, evidence_type=et)
+            svc.record_human_evidence_decision(
+                actor_kind=AuditActorKind.USER,
+                actor_id="alice",
+                submission_id=sub.submission_id,
+                approved=True,
+                reason=f"ok {et}",
+            )
+        summary = svc.summarize()
+        assert summary.intake_complete is True
+        assert summary.missing_types == ()
+        assert summary.total_submissions == len(REQUIRED_ACTIVATION_EVIDENCE_TYPES)
+        assert (
+            len(summary.human_approved_ids) == len(REQUIRED_ACTIVATION_EVIDENCE_TYPES)
+        )
+
+        # 反向：仅提交未批准 → 未完成。
+        svc2 = _svc()
+        _submit(svc2)
+        assert svc2.summarize().intake_complete is False
+
+    def test_build_review_package_requires_real_user_and_carries_no_decision(self) -> None:
+        svc = _svc()
+        for et in REQUIRED_ACTIVATION_EVIDENCE_TYPES:
+            sub = _submit(svc, evidence_type=et)
+            svc.record_human_evidence_decision(
+                actor_kind=AuditActorKind.USER,
+                actor_id="alice",
+                submission_id=sub.submission_id,
+                approved=True,
+                reason="ok",
+            )
+        # AI 不得生成评审包（审计不得谎称由人发起）。
+        with pytest.raises(EnterpriseRedLineViolationError):
+            svc.build_review_package(actor_kind=AuditActorKind.AI, actor_id="bot")
+
+        pkg = svc.build_review_package(
+            actor_kind=AuditActorKind.USER, actor_id="alice"
+        )
+        assert isinstance(pkg, FinalActivationReviewPackage)
+        # 就绪度上限不含任何放行终态。
+        assert pkg.readiness.value != "approved"
+        assert pkg.to_dict()["human_final_decision"] is None
+        # 非说明性字段不得含放行类词元（note 字段的"红线说明"本身可提及，故跳过）。
+        serialized = " ".join(_flatten_non_note(pkg.to_dict())).lower()
+        assert "engineering_approved" not in serialized
+        assert "production_go" not in serialized
+
+
+# ---------------------------------------------------------------------------
+# 15. T13 证据存储安全（只存引用与哈希，永不存原文 / 裸密钥）
+# ---------------------------------------------------------------------------
+class TestLayerBEvidenceStorageSafety:
+    def _policy(self) -> "EvidenceStoragePolicy":
+        return EvidenceStoragePolicy(root_dir=str(ROOT))
+
+    def test_rejects_inline_content(self) -> None:
+        with pytest.raises(EvidenceStorageSafetyError):
+            self._policy().ensure_no_inline_content(
+                declared_content="这是一段不该被入库的证据正文"
+            )
+
+    def test_rejects_bare_secret_reference(self) -> None:
+        for bad in (
+            "sk-abcdefgh12345678",
+            "api_key=supersecret",
+            "password=hunter2",
+            "ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+            "-----BEGIN PRIVATE KEY-----",
+        ):
+            with pytest.raises(EvidenceStorageSafetyError):
+                self._policy().ensure_reference_not_secret(bad)
+
+    def test_allows_path_reference(self) -> None:
+        # 普通路径 / 工单号引用不触发拒绝。
+        self._policy().ensure_reference_not_secret("tickets/TKT-123/rc-freeze.json")
+        self._policy().ensure_reference_not_secret("/var/evidence/rc-freeze.json")
+
+    def test_compute_sha256_streams_and_returns_none_for_missing(self) -> None:
+        import os as _os
+        import tempfile
+
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as tf:
+            tf.write("hello evidence")
+            path = tf.name
+        try:
+            h = compute_evidence_sha256(path, ".")
+            assert h and len(h) == 64
+            # 非本地引用返回 None（不伪造哈希）。
+            assert compute_evidence_sha256("TKT-nonexistent-123", str(ROOT)) is None
+        finally:
+            _os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# 16. T12 权限边界（deny-by-default 白名单；AI/SYSTEM 一律拒绝）
+# ---------------------------------------------------------------------------
+class TestLayerBPermissionBoundary:
+    def test_read_permission_allows_read_operations(self) -> None:
+        for op in (
+            ActivationOperation.VIEW_READINESS,
+            ActivationOperation.SUBMIT_EVIDENCE,
+            ActivationOperation.BUILD_REVIEW_PACKAGE,
+        ):
+            require_activation_operation(
+                operation=op,
+                actor_kind="user",
+                granted_permissions=[PERM_RELEASE_READ],
+            )
+
+    def test_signoff_required_for_decision(self) -> None:
+        with pytest.raises(ActivationPermissionBoundaryError):
+            require_activation_operation(
+                operation=ActivationOperation.RECORD_EVIDENCE_DECISION,
+                actor_kind="user",
+                granted_permissions=[PERM_RELEASE_READ],
+            )
+        # 持有 signoff 则放行。
+        require_activation_operation(
+            operation=ActivationOperation.RECORD_EVIDENCE_DECISION,
+            actor_kind="user",
+            granted_permissions=[PERM_RELEASE_SIGNOFF],
+        )
+
+    def test_non_user_actor_denied(self) -> None:
+        for kind in ("ai", "system", "service"):
+            with pytest.raises(ActivationPermissionBoundaryError):
+                require_activation_operation(
+                    operation=ActivationOperation.VIEW_READINESS,
+                    actor_kind=kind,
+                    granted_permissions=[PERM_RELEASE_READ],
+                )
+
+    def test_deny_by_default_whitelist(self) -> None:
+        desc = ActivationPermissionBoundary(rc_id=RC_ID).describe()
+        assert len(desc["operations"]) == 7
+        for op in desc["operations"]:
+            assert op["required_actor_kind"] == "user"
+
+
+# ---------------------------------------------------------------------------
+# 17. Layer B fail-closed：AI 不可 approved / GO 需 READY 包 / human_go 仅标志
+# ---------------------------------------------------------------------------
+class TestLayerBFailClosed:
+    def _ready_package(self, readiness=ReviewPackageReadiness.READY_FOR_HUMAN_FINAL_REVIEW):
+        return FinalActivationReviewPackage(
+            package_id="farp-test",
+            rc_id=RC_ID,
+            readiness=readiness,
+            generated_at="2026-08-12T00:00:00Z",
+            generated_for_actor="alice",
+            evidence_summary={},
+            signoff_snapshot={},
+            redline_assertions={"engineering_enabled_false": True},
+        )
+
+    def test_go_requires_ready_package(self) -> None:
+        pkg = self._ready_package(ReviewPackageReadiness.EVIDENCE_INCOMPLETE)
+        with pytest.raises(FinalHumanDecisionError):
+            build_final_human_activation_decision(
+                decision_id="d1",
+                outcome=FinalDecisionOutcome.GO,
+                decided_by="principal",
+                decided_by_kind="user",
+                signature_reference="SIG-1",
+                reason="want go",
+                package=pkg,
+            )
+
+    def test_no_go_allowed_on_incomplete_package(self) -> None:
+        pkg = self._ready_package(ReviewPackageReadiness.EVIDENCE_INCOMPLETE)
+        dec = build_final_human_activation_decision(
+            decision_id="d2",
+            outcome=FinalDecisionOutcome.NO_GO,
+            decided_by="principal",
+            decided_by_kind="user",
+            signature_reference="SIG-2",
+            reason="blocked",
+            package=pkg,
+        )
+        assert dec.is_blocking is True
+        assert dec.is_go is False
+
+    def test_decision_recorded_go_only_flags_not_activates(self) -> None:
+        pkg = self._ready_package()
+        dec = build_final_human_activation_decision(
+            decision_id="d3",
+            outcome=FinalDecisionOutcome.GO,
+            decided_by="principal",
+            decided_by_kind="user",
+            signature_reference="SIG-3",
+            reason="all good",
+            package=pkg,
+        )
+        ledger = FinalHumanDecisionLedger(rc_id=RC_ID, audit=AuditService(org_id="org-x"))
+        ledger.record(actor_kind=AuditActorKind.USER, decision=dec)
+
+        # human_go_recorded 仅标志真实人工已登记 GO 裁决。
+        assert ledger.human_go_recorded() is True
+        eff = ledger.effective()
+        assert eff is not None and eff.is_go is True
+        # 裁决登记不翻转 engineering_enabled、不表达已激活。
+        assert eff.engineering_enabled_at_decision is False
+        assert eff.activation_execution.value == "pending_human_terminal_action"
+        snap = ledger.snapshot()
+        assert snap.human_go_recorded is True
+        assert snap.total_decisions == 1
+
+    def test_ledger_record_requires_real_user(self) -> None:
+        pkg = self._ready_package()
+        dec = build_final_human_activation_decision(
+            decision_id="d4",
+            outcome=FinalDecisionOutcome.NO_GO,
+            decided_by="principal",
+            decided_by_kind="user",
+            signature_reference="SIG-4",
+            reason="block",
+            package=pkg,
+        )
+        ledger = FinalHumanDecisionLedger(rc_id=RC_ID, audit=AuditService(org_id="org-x"))
+        with pytest.raises(EnterpriseRedLineViolationError):
+            ledger.record(actor_kind=AuditActorKind.AI, decision=dec)

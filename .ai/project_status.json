@@ -4263,5 +4263,126 @@
       "4 角色真人在人类终端签署 GO/NO-GO/NEED_MORE_EVIDENCE",
       "RC 仓库级 Freeze 真实核验（主理人线下 + 专家复核）"
     ]
+  },
+  "phase_3_9_6": {
+    "phase": "3.9.6",
+    "official_name": "Production Activation Evidence Intake & Human Signoff Governance Layer（生产激活证据受理与人工签署治理层）",
+    "status": "PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO",
+    "closed_at": "2026-08-13",
+    "report_dated": "2026-08-13",
+    "identity": "BOIP AI Chief Architect / Production Activation Evidence Auditor / Human Signoff Governance Custodian",
+    "branch": "feat/phase3.9.6-production-activation-evidence-readiness",
+    "base_head": "863a038e0a1424538369cfcdeb3f7fb8de20f3dc",
+    "current_head": "863a038e0a1424538369cfcdeb3f7fb8de20f3dc（HEAD 未变；Phase 内 8 个增量仍为未提交工作树 delta，未被 amend/reset 改写）",
+    "final_delta_files": [
+      {"file": ".ai/project_status.json", "purpose": "T19 SSOT 补齐 phase_3_9_6 详细对象（+93 行；phase_3_9_6_status 标志行已在 863a038 加入）", "task": "T19", "tracked": true, "included_in_863a038": false, "final_action": "commit (follow-up delta)"},
+      {"file": ".github/workflows/activation-readiness-gate.yml", "purpose": "T17 CI 门禁：integrity/security job 补 pyyaml 安装步骤（真实 CI 可跑，修复本地绿而 CI 红）", "task": "T17", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
+      {"file": "agents/enterprise/production_release/intake_service.py", "purpose": "T16 Layer B intake 服务：submit_evidence/record_human_evidence_decision/summarize/build_review_package 强化", "task": "T16", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
+      {"file": "backend/app/api/governance_activation.py", "purpose": "T15 新增 GET /evidence-list 端点（Layer B 受理证据清单，14 路由无 /activate /deploy-production）", "task": "T15", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
+      {"file": "frontend/src/app/governance-activation/page.tsx", "purpose": "T15 人工复核 UI 接线（读取态：evidence-list/signoff/review-package；禁写 no-go 之外结论）", "task": "T15", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
+      {"file": "tests/agents/test_production_activation_readiness.py", "purpose": "T16 Layer B 测试：4 新测试类（intake/存储安全/权限边界/fail-closed），路由计数 13→14（含 /evidence-list）", "task": "T16", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
+      {"file": "agents/enterprise/production_release/evidence_storage_safety.py", "purpose": "T13/T16 证据存储安全：拒 inline 正文、拒裸密钥引用（sk-/ghp_/PRIVATE KEY/...）、流式 sha256", "task": "T13/T16", "tracked": false, "included_in_863a038": false, "final_action": "commit (add)"},
+      {"file": "agents/enterprise/production_release/permission_boundary.py", "purpose": "T12/T16 权限边界：deny-by-default 白名单；require_activation_operation 强制 actor_kind==user + signoff", "task": "T12/T16", "tracked": false, "included_in_863a038": false, "final_action": "commit (add)"}
+    ],
+    "preliminary_closure_commit": "863a038e0a1424538369cfcdeb3f7fb8de20f3dc（docs-only 部分收口：7 files，纯文档/SSOT/roadmap/forensics，无任何代码/测试/CI 改动）",
+    "session_increment": "本会话补完 T15–T21：人工复核 UI 接线 / Layer B 测试 / CI 门禁 yaml 修复 / 权威复跑 / 本块 SSOT / 红线验证 / 最终收口报告；均为未提交工作树（STOP 等主理人审核）",
+    "tasks_total": 21,
+    "tasks_completed": 21,
+    "tasks": [
+      "T1-T4 Layer A 基座：intake-summary / decision-ledger / evidence(GET+POST) / evidence-decision 端点",
+      "T5-T14 Layer B 服务层：intake_service / activation_intake(provenance+coc) / evidence_storage_safety / permission_boundary / review_package / final_decision / human_approval / activation_gate / API 14 路由 / 审计 +4 枚举",
+      "T15 人工复核 UI 接线（Layer B：evidence-list / signoff / review-package 前端读取，禁写 no-go 之外结论）",
+      "T16 Layer B 测试补充：test_production_activation_readiness.py 扩至 68 例（4 新测试类，路由计数 13→14 含 /evidence-list）",
+      "T17 CI 门禁 activation-readiness-gate.yml：3 job（integrity/security/tests）+ 分支覆盖 + 修复 pyyaml 缺失（真实 CI 可跑）",
+      "T18 权威测试复跑：agents 2441 passed / backend 374 passed / 3 套件 110 passed / 完整性 9-9 / 安全 7-7 / 账本 PASS(104) / 硬编码 0",
+      "T19 SSOT / 基线更新：补本 phase_3_9_6 详细块；engineering_enabled=false 未改；无 engineering_approved",
+      "T20 最终红线验证：十条红线全未触发（见 red_lines）",
+      "T21 收口报告（>=28 章，phase3.9.6_production_activation_evidence_human_signoff_closure_report.md）后 STOP"
+    ],
+    "core_module": "agents/enterprise/production_release/",
+    "core_module_files": [
+      "activation_intake.py",
+      "intake_service.py",
+      "evidence_storage_safety.py",
+      "permission_boundary.py",
+      "review_package.py",
+      "final_decision.py",
+      "human_approval.py",
+      "activation_gate.py",
+      "service.py",
+      "release_candidate.py",
+      "freeze_manifest.py",
+      "freeze_checker.py",
+      "freeze_forbidden.py",
+      "__init__.py"
+    ],
+    "api_module": "backend/app/api/governance_activation.py（14 路由，无 /activate、无 /deploy-production）",
+    "frontend_module": "frontend/src/app/governance-activation/page.tsx（人工复核 UI，读取态，禁写放行）",
+    "ci_gate": ".github/workflows/activation-readiness-gate.yml（3 job，fail-closed，分支覆盖 3.9.6 载体 + 通配）",
+    "test_files": [
+      "tests/agents/test_production_activation_readiness.py（68 例，含 Layer B 4 类 + TestCIGateYaml）",
+      "tests/agents/test_enterprise_production_release.py",
+      "tests/agents/test_enterprise_rc_freeze_activation_gate.py"
+    ],
+    "audit_total": 104,
+    "audit_categories_added": [
+      "ACTIVATION_EVIDENCE_SUBMITTED",
+      "ACTIVATION_EVIDENCE_VALIDATED",
+      "HUMAN_SIGNOFF_REGISTERED",
+      "ACTIVATION_REVIEW_PACKAGE_GENERATED"
+    ],
+    "test_results": {
+      "agents_full_suite": "2441 passed（基线 2420 + T16 新增 Layer B 21 例）",
+      "backend_full_suite": "374 passed（零回归）",
+      "activation_three_suites": "110 passed（test_production_activation_readiness 68 + test_enterprise_production_release + test_enterprise_rc_freeze_activation_gate）",
+      "governance_integrity": "9/9",
+      "production_security_lint": "7/7",
+      "audit_ledger_validator": "PASS（total=104，0 orphan/0 ghost/0 duplicate-ownership，Git provenance verified）",
+      "hardcoded_scan": "0 命中"
+    },
+    "repository_integrity": "9/9（创建最终收口报告后达成；此前因 SSOT.report 幽灵登记 1 缺口，已闭环）",
+    "production_security": "7/7（生产安全七红线静态扫描，fail-closed）",
+    "engineering_enabled": false,
+    "engineering_approved_emitted": false,
+    "evidence_status": "AI 可产出 SUBMITTED / STRUCTURALLY_VALIDATED；APPROVED_BY_HUMAN / REJECTED_BY_HUMAN 仅真实人工推进（当前 pending）",
+    "human_signoff_status": "PENDING_REAL_HUMAN（无 AI 伪造签署；record_human_evidence_decision / HumanSignoffRegistry 强制 require_human_actor(USER)）",
+    "activation_gate_status": "ControlledActivationGate 激活；就绪度上限 READY_FOR_HUMAN_FINAL_REVIEW（材料就绪）；GO/NO-GO 由真实四角色在人类终端作出，AI 不代行",
+    "pending_human_actions": [
+      "真实四角色线下提交真实证据（production-owner / release-manager / security-owner / auditor）",
+      "真实四角色在人类终端签署 GO / NO-GO / NEED_MORE_EVIDENCE",
+      "主理人在人类终端显式置 engineering_enabled=true（唯一 AI 不代执行之动作）",
+      "真实密钥线下提供（production_secret 恒 PENDING_VERIFICATION，AI 不写真实密钥）",
+      "真实权限授予 / 真实回滚 / 真实恢复执行（当前仅演练）",
+      "RC 仓库级 Freeze 真实核验（主理人线下 + 专家复核）",
+      "主理人授权本次 final-closure delta 提交（若项目规则要求显式授权，则列 PENDING_HUMAN_COMMIT_AUTHORIZATION）"
+    ],
+    "readiness_package": "READY_FOR_HUMAN_FINAL_REVIEW（材料就绪度上限；GO 裁决由真实四角色在人类终端作出，AI 不代行）",
+    "forbidden_endpoints": ["/activate", "/deploy-production", "/go", "engineering_approved 输出"],
+    "verified_json_modified": false,
+    "engineering_enabled_modified": false,
+    "red_lines": {
+      "1_engineering_enabled": "false（agents/config.yaml:102，未改，零翻转）",
+      "2_no_engineering_approved": "未输出，列入 forbidden",
+      "3_no_ai_fabricated_signoff": "HumanSignoffRegistry / record_human_evidence_decision 强制 require_human_actor(USER)，AI 主体不可构造 HUMAN_ONLY 状态",
+      "4_no_ai_auto_approved_evidence": "submit_evidence 上限 STRUCTURALLY_VALIDATED，APPROVED_BY_HUMAN 仅真人推进",
+      "5_no_production_go": "收口态 PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO，不得写 PRODUCTION_GO",
+      "6_no_real_deploy": "CI/API 均不部署，仅冻结 + 人工签署",
+      "7_no_real_secret_write": "evidence_storage_safety 拒 inline 正文与裸密钥引用（sk-/ghp_/PRIVATE KEY/...），永存原文",
+      "8_no_real_permission_grant": "permission_boundary 强制 actor_kind==user 且需 governance:release:signoff，AI/SYSTEM 一律拒",
+      "9_no_ai_modify_human_decision": "FinalHumanDecisionLedger.record 要求真实 user，AI 改人工决策即抛错",
+      "10_no_bypass_gate": "所有放行路径经 ControlledActivationGate；build_final_activation_review_package 断言 engineering_enabled_false 且非 note 字段无放行词元"
+    },
+    "pending_verification": [
+      "真实四角色（production-owner / release-manager / security-owner / auditor）线下提交真实证据",
+      "真实四角色在人类终端签署 GO / NO-GO / NEED_MORE_EVIDENCE",
+      "主理人在人类终端显式置 engineering_enabled=true（唯一 AI 不代执行之动作）",
+      "真实密钥线下提供（production_secret 恒 PENDING_VERIFICATION）",
+      "真实权限授予 / 真实回滚 / 真实恢复执行（当前仅演练）",
+      "RC 仓库级 Freeze 真实核验（主理人线下 + 专家复核）"
+    ],
+    "report": ".ai/reviews/phase3.9.6_production_activation_evidence_human_signoff_closure_report.md",
+    "supersedes": ".ai/reviews/phase3.9.6_production_activation_evidence_readiness_report.md（前次收口报告，本文件为最终收口，覆盖 T1-T21）",
+    "roadmap_ref": ".ai/roadmap_v8.md §35.6",
+    "stop": "已 STOP：不进入 3.9.7、不自动激活、不提交超范畴代码、不 push；等主理人 + 四角色线下审核"
   }
 }
