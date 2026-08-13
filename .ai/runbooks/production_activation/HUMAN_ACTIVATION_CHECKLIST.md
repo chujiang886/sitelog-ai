@@ -84,5 +84,45 @@
 
 ---
 
+## 7. 机器闸门 1:1 映射（B1–B6 / PV1–PV6，与 `ProductionActivationReadinessGate` 严格对齐）
+
+> 本清单的每一步人工核验，都对应机器闸门（`activation_readiness.py` 的
+> `build_default_activation_blockers` / `build_default_pending_verification_registry`）中的
+> 一个事实项。二者必须 **1:1 双向一致**：清单不漏项、闸门不漏项、id 完全对齐。
+> 任何漂移都会让 CI 的边界对账契约测试（`test_phase3_9_6_evidence_boundary_contract.py`）失败。
+
+### 7.1 阻断器 B1–B6（不清除不得越过 BUILT_NO_GO）
+
+| 机器闸门 id | 含义 | 人工核验动作 | 责任角色 |
+| --- | --- | --- | --- |
+| `B1-real-idp` | 真实 IdP（jwt/oidc/sso-gateway）未通过生产校验 | 核验真实 IdP 生产校验结论 | security-owner |
+| `B2-real-secrets` | 真实生产密钥/凭证未注入（仅配置占位） | 核验真实凭证注入证据 | security-owner |
+| `B3-real-telemetry` | 真实生产遥测数据源未接入（仅合成演练） | 核验真实遥测接入证据 | release-manager |
+| `B4-real-alert-routing` | 真实告警路由（on-call/工单）未配置 | 核验真实告警路由配置 | incident-commander |
+| `B5-four-role-signoff` | 四角色真实线下签署未完成 | 核验四角色签署齐全且无 NO_GO | production-owner |
+| `B6-real-topology` | 真实生产拓扑/部署目标未决策 | 核验真实拓扑决策 | production-owner |
+
+### 7.2 待核验 PV1–PV6（须真实人工/真实生产数据提供与验证）
+
+| 机器闸门 id | 要求证据 | 责任角色 |
+| --- | --- | --- |
+| `PV1-real-idp` | 真实 IdP 校验报告 | security-owner |
+| `PV2-real-secrets` | 真实密钥注入证据 | security-owner |
+| `PV3-real-telemetry` | 真实遥测源证据 | release-manager |
+| `PV4-real-alert` | 真实告警路由证据 | incident-commander |
+| `PV5-real-topology` | 真实拓扑决策 | production-owner |
+| `PV6-engineering-enabled` | 主理人在人类终端显式置 `engineering_enabled=true` | 主理人（唯一 AI 不代执行之动作） |
+
+### 7.3 硬规则（HARD RULE）：`engineering_enabled` 置位前置条件
+
+> **`engineering_enabled` 只能在 `readiness_gate.status == READY_FOR_HUMAN_SIGNOFF` 且
+> B1–B6 全部清除、PV1–PV6 全部闭环后，由主理人在人类终端显式置 `true`。**
+> 在此之前，任何脚本、CI、Agent 均不得置位（含本清单的自动化解读）。
+> `HUMAN_GO_RECORDED ≠ PRODUCTION_ACTIVATED`：即便四角色已登记 GO，激活执行仍是主理人
+> 在人类终端的真实动作，AI 不代执行（红线①②⑤⑨⑩）。
+
+---
+
 *生成依据：Phase 3.9.6 `agents/enterprise/production_release/activation_readiness.py`、
-`human_signoff.py`、`governance_activation.py`。本清单为人工执行手册，非自动执行脚本。*
+`human_signoff.py`、`governance_activation.py`、`permission_boundary.py`、
+`evidence_storage_safety.py`。本清单为人工执行手册，非自动执行脚本。*

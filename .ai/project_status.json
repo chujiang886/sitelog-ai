@@ -4273,20 +4273,38 @@
     "identity": "BOIP AI Chief Architect / Production Activation Evidence Auditor / Human Signoff Governance Custodian",
     "branch": "feat/phase3.9.6-production-activation-evidence-readiness",
     "base_head": "863a038e0a1424538369cfcdeb3f7fb8de20f3dc",
-    "current_head": "7bc5cba52d37f550ac29d83c289f94b9b0ad5799（final-closure delta follow-up commit；父为 863a038，HEAD 已前进至本 commit，863a038 未 amend/reset）",
-    "final_closure_commit": "7bc5cba52d37f550ac29d83c289f94b9b0ad5799（本会话形成的独立 follow-up delta；未改写 863a038）",
+    "current_head": "94305aa2e91850196cbe03b5f0eb727c303594fb（3.9.6 core 最终收口：SSOT current_head/final_closure_commit 准确性修正；R1 边界对账收口见本会话追加提交，未改写 94305aa 历史）",
+    "final_closure_commit": "94305aa2e91850196cbe03b5f0eb727c303594fb（3.9.6 core 收口终点；R1 边界对账为叠加的 sub-delta，本次提交后终端态更新）",
     "final_delta_files": [
       {"file": ".ai/project_status.json", "purpose": "T19 SSOT 补齐 phase_3_9_6 详细对象（+93 行；phase_3_9_6_status 标志行已在 863a038 加入）", "task": "T19", "tracked": true, "included_in_863a038": false, "final_action": "commit (follow-up delta)"},
       {"file": ".github/workflows/activation-readiness-gate.yml", "purpose": "T17 CI 门禁：integrity/security job 补 pyyaml 安装步骤（真实 CI 可跑，修复本地绿而 CI 红）", "task": "T17", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
       {"file": "agents/enterprise/production_release/intake_service.py", "purpose": "T16 Layer B intake 服务：submit_evidence/record_human_evidence_decision/summarize/build_review_package 强化", "task": "T16", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
-      {"file": "backend/app/api/governance_activation.py", "purpose": "T15 新增 GET /evidence-list 端点（Layer B 受理证据清单，14 路由无 /activate /deploy-production）", "task": "T15", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
+      {"file": "backend/app/api/governance_activation.py", "purpose": "T15 新增 GET /evidence-list 端点（Layer B 受理证据清单；合计 15 路由：7 Layer A + 8 Layer B，无 /activate /deploy-production）", "task": "T15", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
       {"file": "frontend/src/app/governance-activation/page.tsx", "purpose": "T15 人工复核 UI 接线（读取态：evidence-list/signoff/review-package；禁写 no-go 之外结论）", "task": "T15", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
-      {"file": "tests/agents/test_production_activation_readiness.py", "purpose": "T16 Layer B 测试：4 新测试类（intake/存储安全/权限边界/fail-closed），路由计数 13→14（含 /evidence-list）", "task": "T16", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
+      {"file": "tests/agents/test_production_activation_readiness.py", "purpose": "T16 Layer B 测试：4 新测试类（intake/存储安全/权限边界/fail-closed），路由计数 14→15（含 /evidence-list，总计 7 Layer A + 8 Layer B）", "task": "T16", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
       {"file": "agents/enterprise/production_release/evidence_storage_safety.py", "purpose": "T13/T16 证据存储安全：拒 inline 正文、拒裸密钥引用（sk-/ghp_/PRIVATE KEY/...）、流式 sha256", "task": "T13/T16", "tracked": false, "included_in_863a038": false, "final_action": "commit (add)"},
       {"file": "agents/enterprise/production_release/permission_boundary.py", "purpose": "T12/T16 权限边界：deny-by-default 白名单；require_activation_operation 强制 actor_kind==user + signoff", "task": "T12/T16", "tracked": false, "included_in_863a038": false, "final_action": "commit (add)"}
     ],
+    "r1_reconciliation_delta": {
+      "terminal": "PHASE_3_9_6_EVIDENCE_BOUNDARY_RECONCILED_BUILT_NO_GO",
+      "purpose": "R1 边界对账会话（Phase 3.9.6-R1，非 3.9.7）：消弭 phase 事实漂移，Layer B 归属 3.9.6 的 Git 法证证明，真实路由/测试基线收敛",
+      "branch": "feat/phase3.9.6-production-activation-evidence-readiness（同 3.9.6，不新开分支，不进 3.9.7）",
+      "layer_b_attribution": "Layer B（activation_intake / intake_service / review_package / final_decision / human_approval / evidence_storage_safety / permission_boundary）于 commit 59807ca（T1–T11 核心）引入，属 Phase 3.9.6 核心，非 3.9.7；R1 仅补 evidence_storage_safety + permission_boundary + API/前端/契约测试接线",
+      "files": [
+        {"file": "tests/agents/test_phase3_9_6_evidence_boundary_contract.py", "purpose": "R1-14 边界契约测试 8 例（机器闸门 B1–B6/PV1–PV6 1:1、证据包 1:1 镜像、包 schema/红线/sha256、API 契约 15 路由、权限边界 7 操作、清单硬规则）", "tracked": false, "final_action": "commit (add)"},
+        {"file": "scripts/generate_production_activation_review_packet.py", "purpose": "R1-10/11 证据包 v2 确定性化：移除 source_commit/generated_at 易变字段，新增 layer_b 段 + packet_sha256 规范哈希，forbidden_endpoints 字段排除出禁词扫描", "task": "R1-10/11", "tracked": true, "final_action": "commit"},
+        {"file": "scripts/validate_production_activation_review_packet.py", "purpose": "R1-12 fail-closed 校验器：schema 2.x、终端 BUILT_NO_GO、engineering_enabled False、contains_real_secret False、sha256 防篡改、layer_b 存在、阻断器 6/pending 6、禁词扫描", "task": "R1-12", "tracked": false, "final_action": "commit (add)"},
+        {"file": "scripts/generate_production_activation_api_contract.py", "purpose": "R1-15 AST 抽取 API 契约（无需 import app），产出 .ai/baselines/production_activation_api_contract.json（route_count=15）", "task": "R1-15", "tracked": false, "final_action": "commit (add)"},
+        {"file": ".ai/baselines/production_activation_api_contract.json", "purpose": "R1-15 API 契约 SSOT（15 路由，7 Layer A + 8 Layer B）", "task": "R1-15", "tracked": true, "final_action": "commit"},
+        {"file": ".ai/release-gate/production_activation_review_packet.json", "purpose": "R1-10/11 证据包 v2 确定性重建（schema 2.0.0，含 layer_b）", "task": "R1-10/11", "tracked": true, "final_action": "commit"},
+        {"file": ".github/workflows/activation-readiness-gate.yml", "purpose": "R1-13 CI：activation-readiness-evidence-packet job（generate→validate→git diff --exit-code 包+契约）+ 将边界契约测试纳入 pytest；已在 94305aa 提交", "task": "R1-13", "tracked": true, "final_action": "commit"},
+        {"file": ".ai/runbooks/production_activation/HUMAN_ACTIVATION_CHECKLIST.md", "purpose": "R1-9 清单 §7 机器闸门 1:1 映射 B1–B6/PV1–PV6 + §7.3 硬规则（readiness_gate.status==READY_FOR_HUMAN_SIGNOFF 才放行 engineering_enabled）", "task": "R1-9", "tracked": true, "final_action": "commit"},
+        {"file": ".ai/reviews/phase3.9.6_r1_activation_evidence_boundary_reconciliation_report.md", "purpose": "R1-§27 最终边界对账收口报告（33 节），终端态 PHASE_3_9_6_EVIDENCE_BOUNDARY_RECONCILED_BUILT_NO_GO", "task": "R1-§27", "tracked": false, "final_action": "commit (add)"},
+        {"file": ".ai/reviews/phase3.9.6_production_activation_evidence_readiness_report.md", "purpose": "R1-22 重建收口报告（含 Layer B 节 + 正确路由/测试计数，消弭'无 Layer B'漂移）", "task": "R1-22", "tracked": true, "final_action": "commit"}
+      ]
+    },
     "preliminary_closure_commit": "863a038e0a1424538369cfcdeb3f7fb8de20f3dc（docs-only 部分收口：7 files，纯文档/SSOT/roadmap/forensics，无任何代码/测试/CI 改动）",
-    "session_increment": "本会话补完 T15–T21：人工复核 UI 接线 / Layer B 测试 / CI 门禁 yaml 修复 / 权威复跑 / 本块 SSOT / 红线验证 / 最终收口报告；均为未提交工作树（STOP 等主理人审核）",
+    "session_increment": "本会话（prior）完成 T15–T21 并收口于 7bc5cba/94305aa；后续 R1 边界对账会话（本次）修正 phase 事实漂移：15 路由（7 Layer A + 8 Layer B）、测试计数 2449/374/118、新增边界契约测试与验证器/契约生成器，并重建收口报告；均为未提交工作树（STOP 等主理人审核）",
     "tasks_total": 21,
     "tasks_completed": 21,
     "tasks": [
@@ -4295,7 +4313,7 @@
       "T15 人工复核 UI 接线（Layer B：evidence-list / signoff / review-package 前端读取，禁写 no-go 之外结论）",
       "T16 Layer B 测试补充：test_production_activation_readiness.py 扩至 68 例（4 新测试类，路由计数 13→14 含 /evidence-list）",
       "T17 CI 门禁 activation-readiness-gate.yml：3 job（integrity/security/tests）+ 分支覆盖 + 修复 pyyaml 缺失（真实 CI 可跑）",
-      "T18 权威测试复跑：agents 2441 passed / backend 374 passed / 3 套件 110 passed / 完整性 9-9 / 安全 7-7 / 账本 PASS(104) / 硬编码 0",
+      "T18 权威测试复跑（R1 复核）：agents 2449 passed / backend 374 passed / 激活 3 核心 110 + 边界契约 8 = 118 / 完整性 9-9 / 安全 7-7 / 账本 PASS(104) / 硬编码 0 / 前端 jest 117 / tsc 0",
       "T19 SSOT / 基线更新：补本 phase_3_9_6 详细块；engineering_enabled=false 未改；无 engineering_approved",
       "T20 最终红线验证：十条红线全未触发（见 red_lines）",
       "T21 收口报告（>=28 章，phase3.9.6_production_activation_evidence_human_signoff_closure_report.md）后 STOP"
@@ -4317,13 +4335,14 @@
       "freeze_forbidden.py",
       "__init__.py"
     ],
-    "api_module": "backend/app/api/governance_activation.py（14 路由，无 /activate、无 /deploy-production）",
+    "api_module": "backend/app/api/governance_activation.py（15 路由：7 Layer A + 8 Layer B，无 /activate、无 /deploy-production）",
     "frontend_module": "frontend/src/app/governance-activation/page.tsx（人工复核 UI，读取态，禁写放行）",
     "ci_gate": ".github/workflows/activation-readiness-gate.yml（3 job，fail-closed，分支覆盖 3.9.6 载体 + 通配）",
     "test_files": [
       "tests/agents/test_production_activation_readiness.py（68 例，含 Layer B 4 类 + TestCIGateYaml）",
       "tests/agents/test_enterprise_production_release.py",
-      "tests/agents/test_enterprise_rc_freeze_activation_gate.py"
+      "tests/agents/test_enterprise_rc_freeze_activation_gate.py",
+      "tests/agents/test_phase3_9_6_evidence_boundary_contract.py（8 例，R1 新增：机器闸门 B1–B6/PV1–PV6 1:1 映射、证据包 1:1 镜像、包 schema/红线/sha256、API 契约 15 路由、权限边界 7 操作、清单 1:1 硬规则）"
     ],
     "audit_total": 104,
     "audit_categories_added": [
@@ -4333,9 +4352,13 @@
       "ACTIVATION_REVIEW_PACKAGE_GENERATED"
     ],
     "test_results": {
-      "agents_full_suite": "2441 passed（基线 2420 + T16 新增 Layer B 21 例）",
+      "agents_full_suite": "2449 passed（含 R1 边界契约测试 8 例；零回归）",
       "backend_full_suite": "374 passed（零回归）",
-      "activation_three_suites": "110 passed（test_production_activation_readiness 68 + test_enterprise_production_release + test_enterprise_rc_freeze_activation_gate）",
+      "activation_three_core_suites": "110 passed（test_production_activation_readiness 68 + test_enterprise_production_release + test_enterprise_rc_freeze_activation_gate）",
+      "activation_boundary_contract": "8 passed（R1 新增 test_phase3_9_6_evidence_boundary_contract.py）",
+      "activation_all_files": "118 passed（3 核心套件 110 + 边界契约 8）",
+      "frontend_jest": "117 passed（零回归）",
+      "frontend_tsc": "0 error",
       "governance_integrity": "9/9",
       "production_security_lint": "7/7",
       "audit_ledger_validator": "PASS（total=104，0 orphan/0 ghost/0 duplicate-ownership，Git provenance verified）",
@@ -4382,7 +4405,8 @@
       "RC 仓库级 Freeze 真实核验（主理人线下 + 专家复核）"
     ],
     "report": ".ai/reviews/phase3.9.6_production_activation_evidence_human_signoff_closure_report.md",
-    "supersedes": ".ai/reviews/phase3.9.6_production_activation_evidence_readiness_report.md（前次收口报告，本文件为最终收口，覆盖 T1-T21）",
+    "r1_report": ".ai/reviews/phase3.9.6_r1_activation_evidence_boundary_reconciliation_report.md",
+    "supersedes": ".ai/reviews/phase3.9.6_production_activation_evidence_readiness_report.md（前次收口报告，本文件为最终收口，覆盖 T1-T21；R1 重建版见 r1_report 引用之 readiness 重建）",
     "roadmap_ref": ".ai/roadmap_v8.md §35.6",
     "stop": "已 STOP：不进入 3.9.7、不自动激活、不提交超范畴代码、不 push；等主理人 + 四角色线下审核"
   }

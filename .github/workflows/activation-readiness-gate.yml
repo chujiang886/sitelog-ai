@@ -108,6 +108,7 @@ jobs:
           tests/agents/test_production_activation_readiness.py
           tests/agents/test_enterprise_production_release.py
           tests/agents/test_enterprise_rc_freeze_activation_gate.py
+          tests/agents/test_phase3_9_6_evidence_boundary_contract.py
           -q
 
   activation-readiness-evidence-packet:

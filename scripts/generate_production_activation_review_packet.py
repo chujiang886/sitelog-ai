@@ -54,26 +54,14 @@ _FORBIDDEN_TOKENS = (
 )
 
 
-def _git_head_sha() -> str:
-    """当前提交 SHA（确定性：同一 commit 永远相同）。
-
-    用提交 SHA 而非时间戳，保证 CI 重新生成后字节级一致（``git diff --exit-code`` 可过）；
-    新鲜度由 ``packet_sha256`` 兜底——代码变更 → dossier 变 → 规范载荷变 → 哈希变 →
-    已提交包与重新生成包不一致 → 门禁失败 → 必须重新生成并提交。
-    """
-
-    out = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=str(ROOT),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return (out.stdout.strip() or "unknown")
-
-
 def _canonical_payload(packet: dict) -> str:
-    """排除 ``packet_sha256`` 后的规范序列化（排序键、紧凑分隔；source_commit 稳定，纳入哈希）。"""
+    """排除 ``packet_sha256`` 后的规范序列化（排序键、紧凑分隔）。
+
+    注意：包中**不嵌入**任何提交 SHA / 时间戳等每提交变化的值，保证在同一仓库状态下
+    重新生成字节级一致，从而 ``git diff --exit-code``（CI 漂移检测）只在 dossier 真正
+    变化时才失败——这是该门禁能正确工作的前提。新鲜度由 dossier 派生内容（审计账本 /
+    配置 / 契约）与 ``packet_sha256`` 共同兜底。
+    """
 
     canonical = {k: v for k, v in packet.items() if k != "packet_sha256"}
     return json.dumps(canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
@@ -122,7 +110,6 @@ def main() -> int:
         "artifact": "production_activation_review_packet",
         "phase": "3.9.6",
         "rc_id": RC_ID,
-        "source_commit": _git_head_sha(),
         "contains_real_secret": False,
         "terminal_status": d["status_terminal"],
         "engineering_enabled": d["engineering_enabled"],

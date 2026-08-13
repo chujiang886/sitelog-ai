@@ -3,7 +3,6 @@
   "artifact": "production_activation_review_packet",
   "phase": "3.9.6",
   "rc_id": "RC-3.9.6",
-  "source_commit": "863a038e0a1424538369cfcdeb3f7fb8de20f3dc",
   "contains_real_secret": false,
   "terminal_status": "PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO",
   "engineering_enabled": false,
@@ -398,5 +397,5 @@
     "四角色（production-owner / release-manager / security-owner / auditor）线下完成各自签署",
     "主理人在人类终端显式置 engineering_enabled=true（唯一人类终端动作，AI 不代执行）"
   ],
-  "packet_sha256": "e342314ae7c8272f9eff675009b02d682be7c8f9da4d47a30e601fd4e5fa1d89"
+  "packet_sha256": "3487c15f5e1463d39f1ada3ac09cdefc7af26adc1db3a857a8d91572bc1185b8"
 }
