@@ -1,8 +1,8 @@
 # Phase 3.9.6 收口报告 —— 现有阶段对账与生产激活证据准备层
 
 > 分支：`feat/phase3.9.6-production-activation-evidence-readiness`（自 R2 冻结点 `f7a2aba` 切出）
-> 收口 HEAD：`0dfd253`（含 `59807ca` T1–T11 核心 + `0dfd253` 审计账本登记）
-> 终端态：**`PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO`**
+> 收口 HEAD：`94305aa`（core 收口：59807ca T1–T11 → 0dfd253 审计账本 → 863a038 docs → 7bc5cba/94305aa SSOT 修正；R1 边界对账收口见本会话追加提交）
+> 终端态：**`PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO`**（Layer 就绪）；边界对账终端：**`PHASE_3_9_6_EVIDENCE_BOUNDARY_RECONCILED_BUILT_NO_GO`**
 > 姊妹报告：Phase 3.9.2/3.9.4/3.9.4-R2/3.9.5 各收口报告；`.ai/PHASE_BOUNDARY_LEDGER.md`
 
 ---
@@ -44,8 +44,9 @@ Authority + Production Governance Auditor + Phase Boundary Owner + 本阶段自�
 |----|----|
 | 当前分支 | `feat/phase3.9.6-production-activation-evidence-readiness` |
 | 分支起点（R2 冻结点） | `f7a2aba` |
-| 收口 HEAD | `0dfd253` |
-| 关键提交 | `59807ca` production activation evidence intake & human signoff governance (T1–T11)<br>`0dfd253` register phase 3.9.6 in the audit category ledger (100→104) |
+| 收口 HEAD | `94305aa`（core 收口：59807ca T1–T11 → 0dfd253 审计账本 → 863a038 docs → 7bc5cba/94305aa SSOT 修正） |
+| 关键提交 | `59807ca` production activation evidence intake & human signoff governance (T1–T11，含 Layer A + Layer B)<br>`0dfd253` register phase 3.9.6 in the audit category ledger (100→104)<br>`863a038` docs-only 部分收口<br>`7bc5cba` final-closure delta (T15–T21)<br>`94305aa` SSOT current_head/final_closure_commit 准确性修正 |
+| R1 边界对账 sub-delta | 本会话：证据包 v2 确定性化 + 验证器 + API 契约生成器/SSOT + 边界契约测试 + SSOT/台账/报告重建（见 §26-R1） |
 | 工作树状态 | 干净（本收口新增文件将随逻辑提交一并入仓） |
 
 ## 5. 与既有 3.9.6 增量对账（SIGKILL 污染澄清）
@@ -89,6 +90,28 @@ Authority + Production Governance Auditor + Phase Boundary Owner + 本阶段自�
 - `SoDValidator` —— 四角色齐备 / 全真实 USER / 不同自然人 / ok。
 - `ACTIVATION_READINESS_FORBIDDEN_COUNT = 340`（结构级禁名，`forbidden.py` 调用即抛）。
 
+### 8-B Layer B：证据受理与人工决策记录层（属 Phase 3.9.6，非 3.9.7）
+
+**归属与边界**：Layer B 于 commit `59807ca`（T1–T11 核心）与 Layer A 一同引入，是 Phase 3.9.6 的核心能力；
+R1 边界对账（Phase 3.9.6-R1）仅补 `evidence_storage_safety` + `permission_boundary` + API/前端/契约测试接线，**不新开 3.9.7**。
+Layer B 职责 = 真实证据受理 + 人工决策记录 + 复核包构建，**绝不执行生产激活**。
+关键不变量：**`HUMAN_GO_RECORDED ≠ PRODUCTION_ACTIVATED`**——Layer B 记录“人类已作出 GO/NO-GO 裁决”，
+但激活本身仍由主理人在人类终端显式置 `engineering_enabled=true` 完成。
+
+- `ActivationEvidenceIntakeService`（`intake_service.py`）：`submit_evidence` / `validate_evidence` /
+  `record_human_evidence_decision` / `build_review_package` / `summarize`；上限仅
+  `SUBMITTED` / `STRUCTURALLY_VALIDATED`，`APPROVED_BY_HUMAN` 仅真人推进。
+- `EvidenceStoragePolicy` + `EvidenceStorageSafety`（`evidence_storage_safety.py`）：拒 inline 正文、
+  拒裸密钥引用（`sk-` / `ghp_` / `PRIVATE KEY` / `password=` / `token=` / `api_key=` / `secret=`），
+  仅引用存储（红线⑦）；`compute_evidence_sha256` 提供链式完整性收据。
+- `ActivationPermissionBoundary`（`permission_boundary.py`）：deny-by-default 白名单（7 操作）；
+  `require_activation_operation` 强制 `actor_kind==user` + `RELEASE_SIGNOFF`；AI/SYSTEM 一律拒。
+- `FinalHumanDecisionLedger`（`final_decision.py`）：记录真实 user 决策，AI 改人工决策即抛错。
+- `FinalActivationReviewPackage` / `ActivationPermissionBoundary` / Chain of Custody / Evidence Provenance：
+  证据受理→校验→人工裁决→复核包全链路可溯源，审计事件由 `intake_service.py` ×6 +
+  `governance_activation.py` ×1 真实记录（+4 审计的真实调用点）。
+- Layer B API 路由（8）见 §15；机器闸门 1:1 映射见 `.ai/runbooks/production_activation/HUMAN_ACTIVATION_CHECKLIST.md` §7。
+
 ## 9. 证据包 v2
 
 `build_default_activation_evidence_bundle_v2(rc_id)` 聚合 3.9.0–3.9.5 关键证据（phase / artifact /
@@ -129,14 +152,22 @@ security_summary / identity_summary / dr_summary / observability_summary / telem
 incident_readiness / rollback / pending_verification / blockers / required_signatures。仅输事实与证据，
 不夹带 AI 审批结论。
 
-## 15. 后端 API（8 路由，无 /activate）
+## 15. 后端 API（15 路由：7 Layer A + 8 Layer B，无 /activate / /deploy-production）
 
 `backend/app/api/governance_activation.py`（注册入 `api/__init__.py` + `main.py`）：前缀
 `/governance/activation`，tags `["governance-activation"]`，复用 `RELEASE_READ`/`RELEASE_SIGNOFF`
-（admin 独享 signoff）。路由：7 个只读（`/readiness` `/evidence` `/blockers` `/pending-verifications`
-`/signoff-requirements` `/contract` `/review-packet`）+ `POST /signoff`（真实人工签署，强制 user 主体 +
-非空签名，记录 `audit.record_human_signoff_registered`）。**无任何 `/activate` 或 `/deploy-production`
-端点。**
+（admin 独享 signoff）。**全部端点强制 `_require_user_principal` + `_enforce_activation_operation`（deny-by-default）。**
+
+- **Layer A（7 路由，客观就绪态读取）**：`GET /readiness` `/evidence` `/blockers` `/pending-verifications`
+  `/signoff-requirements` `/contract` `/review-packet` + `POST /signoff`（真实人工签署，强制 user 主体 +
+  非空签名，记录 `audit.record_human_signoff_registered`）。
+- **Layer B（8 路由，证据受理与人工决策记录）**：`GET /intake-summary` `/decision-ledger` `/evidence-list`；
+  `GET /evidence` + `POST /evidence`（证据提交，存储安全策略强制引用不存正文）；`POST /evidence-decision`
+  （真实人工证据裁决，需 `RELEASE_SIGNOFF`）；`POST /review-package`（复核包构建）；`POST /final-decision`
+  （最终人工裁决，需 `RELEASE_SIGNOFF`，记录于 `FinalHumanDecisionLedger`）。
+
+**无任何 `/activate` 或 `/deploy-production` 端点。** Layer B 仅记录“人类已作出 GO/NO-GO 裁决”，
+不执行生产激活；`HUMAN_GO_RECORDED ≠ PRODUCTION_ACTIVATED`。
 
 ## 16. 前端看板
 
@@ -161,9 +192,9 @@ BUILT_NO_GO 琥珀色横幅，无自动 GO/激活/部署按钮，尾注明确"�
 （EvidenceScope 区分）；⑧ 测试不得用 skip/xfail 绕过至绿；⑨ 不提供 `/activate`/`/deploy-production`
 端点；⑩ 不自动执行运维动作/关闭事件。
 
-## 19. 测试矩阵（47 用例，fail-closed，无 skip/xfail）
+## 19. 测试矩阵（76 用例 = 68 就绪层 + 8 边界契约，fail-closed，无 skip/xfail）
 
-`tests/agents/test_production_activation_readiness.py`（47 用例，全部通过）：
+`tests/agents/test_production_activation_readiness.py`（68 用例，全部通过）：
 - dossier 终端态/engineering_enabled/闸门/契约/证据包/阻断器/pending/签署要求/SoD（9）；
 - 闸门 8 检查、永不 APPROVED 穷举、fail-closed（硬缺失/eng=true 仍 blocked/pending 判定）（7）；
 - 结构级禁名 340 项 + 关键禁名（2）；
@@ -174,16 +205,20 @@ BUILT_NO_GO 琥珀色横幅，无自动 GO/激活/部署按钮，尾注明确"�
 - 枚举无 APPROVED + 角色常量（3）；
 - build_default 工厂（4）；
 - 复核包 JSON 存在且 `contains_real_secret=False`（1）；
-- 后端 API 8 路由无禁用端点 + 唯一 POST=signoff（2）；
+- 后端 API 15 路由（7 Layer A + 8 Layer B）无禁用端点 + POST=signoff/evidence-decision/final-decision 需 signoff（2）；
 - 前端看板契约（3）；
 - CI yml 引用与 job 数 + 分支覆盖（2）。
+- `tests/agents/test_phase3_9_6_evidence_boundary_contract.py`（8 用例，R1 新增）：机器闸门 B1–B6/PV1–PV6 1:1 映射、证据包 1:1 镜像、包 schema/红线/sha256、API 契约 15 路由、权限边界 7 操作、清单 1:1 硬规则（8）。
 
 ## 20. 回归结果
 
 | 套件 | 结果 |
 |------|------|
-| agents 全量（`tests/agents`） | **2420 passed** |
+| agents 全量（`tests/agents`） | **2449 passed**（含 R1 边界契约测试 8 例） |
 | backend FastAPI（`backend/tests`） | **374 passed** |
+| 激活 3 核心套件 | **110 passed** |
+| 边界契约测试 | **8 passed** |
+| 激活全部文件 | **118 passed**（110 + 8） |
 | 前端 jest（`frontend/jest.config.js`） | **117 passed** |
 | 前端 tsc `--noEmit` | **0 error** |
 | 治理仓库完整性 | **9/9** |
@@ -223,8 +258,10 @@ BUILT_NO_GO 琥珀色横幅，无自动 GO/激活/部署按钮，尾注明确"�
 
 - `project_status.json`：新增 `phase_3_9_6_status = "PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO"`。
 - `roadmap_v8.md`：新增 §35.10（3.9.6 交付物与门禁）、§35.11（3.9.6 CI 门禁）。
-- `PHASE_BOUNDARY_LEDGER.md`：3.9.6 行收口（start `f7a2aba`，end `0dfd253`，状态 `BUILT_NO_GO`，
-  审计真实 +4 已注明，早期"臆测"误判已批注推翻）。
+- `PHASE_BOUNDARY_LEDGER.md`：3.9.6 行收口（start `f7a2aba`，end `94305aa`，状态 `PHASE_3_9_6_EVIDENCE_BOUNDARY_RECONCILED_BUILT_NO_GO`，
+  审计真实 +4 已注明，早期"臆测"误判已批注推翻；**Layer B 归属 3.9.6 声明见该行**）。
+- **R1 边界对账（本会话）**：消弭 phase 事实漂移——15 路由（7 Layer A + 8 Layer B）、测试基线 2449/374/118、
+  新增边界契约测试（8）+ 证据包校验器 + API 契约生成器/SSOT；重建本报告与 `.ai/reviews/phase3.9.6_r1_activation_evidence_boundary_reconciliation_report.md`。
 - `.ai/baselines/audit_action_category_ledger.json`：`total=104`，与枚举一致。
 
 ## 27. 阶段边界台账更新
@@ -263,14 +300,17 @@ reopen 治理态。
 
 收口后 STOP：不进入 3.9.7、不自动激活、不提交超出阶段范畴的代码。AI 在本阶段的一切产出均为"准备"
 性质，不构成任何放行授权。任何"全绿 CI / dossier / 复核包"均**不代表可以激活**——激活权只在主理人
-手中。
+手中。**R1 边界对账（Phase 3.9.6-R1）属本阶段收口范畴，不新开 3.9.7；Layer B 证据受理/人工决策记录层
+于 commit `59807ca`（T1–T11）引入，是 3.9.6 核心能力，非 3.9.7。**
 
 ## 33. 剩余风险与未决项
 
-- **R1**：真实生产激活证据（RC 冻结基线哈希、回滚 runbook 真实路径、真实凭证占位）尚未由四角色线下
+- **PR-1**：真实生产激活证据（RC 冻结基线哈希、回滚 runbook 真实路径、真实凭证占位）尚未由四角色线下
   提交 → 当前 `production_evidence_complete=False`，属预期内（BUILT_NO_GO）。
-- **R2**：四角色签署、主理人置 `engineering_enabled=true` 为真实人工动作，AI 不可代执行。
-- **R3**：合成演练结论不得被误读为生产验证（EvidenceScope 已结构级区分，红线⑦）。
+- **PR-2**：四角色签署、主理人置 `engineering_enabled=true` 为真实人工动作，AI 不可代执行。
+- **PR-3**：合成演练结论不得被误读为生产验证（EvidenceScope 已结构级区分，红线⑦）。
+- **R1（边界对账，本次）**：已完成——Layer B 归属 3.9.6 的 Git 法证、15 路由/测试基线收敛、SSOT/台账/报告重建，
+  终端态 `PHASE_3_9_6_EVIDENCE_BOUNDARY_RECONCILED_BUILT_NO_GO`。
 
 ## 34. 收口判定
 
@@ -289,12 +329,18 @@ reopen 治理态。
 - `.github/workflows/activation-readiness-gate.yml`（#188）
 - `docs/PRODUCTION_ACTIVATION_GOVERNANCE_GUIDE.md`（#190，新增 21 节）
 - `docs/PRODUCTION_DEPLOYMENT_GUIDE.md`（#190，§16）
-- `tests/agents/test_production_activation_readiness.py`（#190，47 用例）
+- `tests/agents/test_production_activation_readiness.py`（#190，68 例）
 - `scripts/generate_production_activation_review_packet.py`（#189）
 - `.ai/release-gate/production_activation_review_packet.json`（#189）
 - `.ai/runbooks/production_activation/HUMAN_ACTIVATION_CHECKLIST.md`（#189）
-- `.ai/project_status.json`、`roadmap_v8.md`、`PHASE_BOUNDARY_LEDGER.md`（#189，SSOT 对账）
+- `.ai/project_status.json`、`roadmap_v8.md`、`PHASE_BOUNDARY_LEDGER.md`（#189，SSOT 对账；R1 本会话修正路由/测试计数漂移 + Layer B 归属）
+- `scripts/generate_production_activation_review_packet.py`（R1 证据包 v2 确定性化，移除易变字段 + packet_sha256）
+- `scripts/validate_production_activation_review_packet.py`（R1 新增，fail-closed 校验器）
+- `scripts/generate_production_activation_api_contract.py`（R1 新增，AST 契约抽取）
+- `.ai/baselines/production_activation_api_contract.json`（R1 新增，route_count=15 SSOT）
+- `tests/agents/test_phase3_9_6_evidence_boundary_contract.py`（R1 新增，8 边界契约测试）
 - `.ai/progress/phase3.9.6_existing_work_forensics.md`（#189，§7 最终结论批注）
 - `.ai/reviews/phase3.9.6_production_activation_evidence_readiness_report.md`（本报告）
 
-— 收口报告结束。状态：`PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO`。STOP。
+— 收口报告重建（R1 边界对账）。Layer 就绪态：`PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO`；
+边界对账终端：`PHASE_3_9_6_EVIDENCE_BOUNDARY_RECONCILED_BUILT_NO_GO`。STOP。
