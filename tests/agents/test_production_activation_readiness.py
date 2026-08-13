@@ -442,12 +442,16 @@ class TestActivationAPIRoutes:
         router = _activation_router()
         paths = sorted({getattr(r, "path", "") for r in router.routes})
         activation = [p for p in paths if p.startswith("/governance/activation")]
-        # 8 个 Layer A 端点 + 6 个 Layer B 端点（含 T15 新增的 GET /evidence-list）：
-        #   Layer A: /readiness /signoff
+        # Layer A(7) + Layer B(7，含 T15 的 GET /evidence-list) + Layer C(9 最终评审只读)：
+        #   Layer A: /readiness /blockers /pending-verifications /signoff-requirements
+        #            /contract /review-packet /signoff(POST)
         #   Layer B: /intake-summary /decision-ledger /evidence(GET+POST 共享路径)
-        #            /evidence-list(GET, T15 新增) /evidence-decision /review-package
-        #            /final-decision
-        assert len(activation) == 14, activation
+        #            /evidence-list(GET) /evidence-decision /review-package(POST) /final-decision
+        #   Layer C: /final-review/{evidence-snapshot,completeness-matrix,signoff-matrix,
+        #            signoff-conflicts,evidence-drift,review-packet,readiness,verify-decision,
+        #            handoff-package}（9 个只读 GET，Phase 3.9.7 T14）
+        # 注：/evidence 同时有 GET+POST，故 24 条路由对应 23 个去重路径。
+        assert len(activation) == 23, activation
         # T15 新增的只读证据列表端点必须存在（供 Layer B 人工裁决下拉选 submission_id）。
         assert "/governance/activation/evidence-list" in activation
         # 禁设任何 /activate 或 /deploy-production 端点。
@@ -808,7 +812,7 @@ class TestLayerBPermissionBoundary:
 
     def test_deny_by_default_whitelist(self) -> None:
         desc = ActivationPermissionBoundary(rc_id=RC_ID).describe()
-        assert len(desc["operations"]) == 7
+        assert len(desc["operations"]) == 16
         for op in desc["operations"]:
             assert op["required_actor_kind"] == "user"
 

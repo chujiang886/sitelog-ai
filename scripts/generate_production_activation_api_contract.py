@@ -29,6 +29,19 @@ _LAYER_B_PATHS = {
     "/governance/activation/final-decision",
 }
 
+# Layer C 路径（Phase 3.9.7 最终人工评审只读层，9 个 GET，均 RELEASE_READ + 真实 USER）。
+_LAYER_C_PATHS = {
+    "/governance/activation/final-review/evidence-snapshot",
+    "/governance/activation/final-review/completeness-matrix",
+    "/governance/activation/final-review/signoff-matrix",
+    "/governance/activation/final-review/signoff-conflicts",
+    "/governance/activation/final-review/evidence-drift",
+    "/governance/activation/final-review/review-packet",
+    "/governance/activation/final-review/readiness",
+    "/governance/activation/final-review/verify-decision",
+    "/governance/activation/final-review/handoff-package",
+}
+
 _HTTP_METHODS = {"get", "post", "put", "delete", "patch"}
 
 
@@ -134,7 +147,12 @@ def main() -> int:
             continue
         full_path = _join_path(prefix, path)
         perm = _extract_permission(node)
-        layer = "B" if full_path in _LAYER_B_PATHS else "A"
+        if full_path in _LAYER_C_PATHS:
+            layer = "C"
+        elif full_path in _LAYER_B_PATHS:
+            layer = "B"
+        else:
+            layer = "A"
         audit = "append-only AuditService" if method != "GET" else "read-only"
         routes.append(
             {
@@ -165,6 +183,7 @@ def main() -> int:
         "layers": {
             "A": sorted({r["path"] for r in routes if r["layer"] == "A"}),
             "B": sorted({r["path"] for r in routes if r["layer"] == "B"}),
+            "C": sorted({r["path"] for r in routes if r["layer"] == "C"}),
         },
         "forbidden_endpoints": ["/activate", "/deploy-production", "/go", "engineering_approved 输出"],
         "routes": routes,

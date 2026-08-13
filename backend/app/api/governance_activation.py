@@ -46,6 +46,7 @@ Layer B 所有写操作均复用 T12 ``require_activation_operation`` 做 fail-c
 
 from __future__ import annotations
 
+import hashlib
 import subprocess
 import sys
 import uuid
@@ -94,6 +95,31 @@ from agents.enterprise.production_release.permission_boundary import (  # noqa: 
     require_activation_operation,
 )
 from agents.enterprise.red_line import EnterpriseRedLineViolationError  # noqa: E402
+
+# Phase 3.9.7 最终人工评审只读层（Layer C）依赖：纯粹只读聚合 T1-T11 领域结构，
+# 不持有生产状态、不翻转 engineering_enabled、不宣布 GO、不激活（红线①②④⑤⑨⑩）。
+from agents.enterprise.production_release.activation_evidence import (  # noqa: E402
+    REQUIRED_SIGNOFF_ROLES,
+)
+from agents.enterprise.production_release.final_review import (  # noqa: E402
+    FINAL_REVIEW_EVIDENCE_FACT_KINDS,
+    FinalReviewEvidenceFact,
+    build_final_review_evidence_snapshot,
+    FINAL_REVIEW_COMPLETENESS_ITEMS,
+    CompletenessStatus,
+    CompletenessItem,
+    build_activation_evidence_completeness_matrix,
+    SignoffMatrixStatus,
+    SignoffMatrixEntry,
+    build_four_role_signoff_matrix,
+    HumanSignoffConflictDetector,
+    ActivationEvidenceDriftDetector,
+    build_final_activation_review_packet,
+    FinalReviewReadinessEvaluator,
+    HumanFinalDecisionVerifier,
+    build_production_activation_handoff_package,
+    build_activation_abort_condition_catalog,
+)
 
 from app.core.csrf import csrf_protect  # noqa: E402
 from app.identity import (  # noqa: E402
@@ -248,6 +274,166 @@ def _dossier(rc_id: str) -> dict:
     return assemble_activation_readiness_dossier(
         rc_id=rc_id, root_dir=str(_BOIP_ROOT), signoff_registry=registry
     )
+
+
+# --------------------------------------------------------------------------- #
+# Phase 3.9.7 最终人工评审只读层（Layer C）组装辅助                                  #
+# --------------------------------------------------------------------------- #
+def _sha256_file(path) -> Optional[str]:
+    """只读哈希一个文件（失败返回 None），绝不读取/返回文件原文。"""
+
+    try:
+        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    except (OSError, IsADirectoryError):
+        return None
+
+
+#: Phase 3.9.7 终审证据事实的引用坐标映射（只读；只存引用与哈希，绝不复制 secret）。
+_FINAL_REVIEW_FACT_REFS: Dict[str, str] = {
+    "rc_freeze_manifest": ".ai/release-gate/rc_freeze_manifest.json",
+    "governance_integrity_report": ".ai/runbooks/production_activation/GOVERNANCE_INTEGRITY_REPORT.md",
+    "security_review": "scripts/lint/check_production_security.py",
+    "staging_validation": ".ai/runbooks/production_activation/STAGING_VALIDATION.md",
+    "rollback_drill": ".ai/runbooks/PRODUCTION_ROLLBACK_RUNBOOK.md",
+    "recovery_validation": ".ai/runbooks/production_activation/RECOVERY_VALIDATION.md",
+    "human_signoff_registry": "audit:HumanSignoffRegistry",
+    "final_review_package": "pending_verification",
+    "final_decision_ledger": "audit:FinalHumanDecisionLedger",
+    "readiness_evaluation": "pending_verification",
+    "handoff_package": "pending_verification",
+}
+
+
+def _final_review_repo_facts() -> Dict[str, Dict[str, Any]]:
+    """只读扫描仓库事实（不复制 secret / 原文）。
+
+    返回 ``fact_kind -> {"source_ref", "sha256", "present"}``。文件类事实以存在性 +
+    哈希陈述；审计/待核验类事实以 ``present=False`` + 引用坐标陈述（绝不编造）。
+    """
+
+    facts: Dict[str, Dict[str, Any]] = {}
+    for kind in FINAL_REVIEW_EVIDENCE_FACT_KINDS:
+        ref = _FINAL_REVIEW_FACT_REFS.get(kind, "unknown")
+        if ref.startswith("audit:") or ref in ("pending_verification", "unknown"):
+            facts[kind] = {"source_ref": ref, "sha256": None, "present": False}
+            continue
+        p = _BOIP_ROOT / ref
+        present = p.is_file()
+        facts[kind] = {
+            "source_ref": ref,
+            "sha256": _sha256_file(p) if present else None,
+            "present": present,
+        }
+    return facts
+
+
+def _final_review_dossier(rc_id: str, org_id: str) -> dict:
+    """组装 Phase 3.9.7 最终人工评审只读材料（T1-T11），不含任何裁决 / 放行。
+
+    BUILT_NO_GO 态下：完整性矩阵全 MISSING、四角色签署全 MISSING、无冲突、无漂移、
+    就绪度归并为 SIGNOFF_INCOMPLETE、人工终裁校验为 PENDING（无真实裁决记录）。
+    所有结构均 fail-closed，不翻转 ``engineering_enabled``、不宣布 GO、不激活
+    （红线①②④⑤⑨⑩）。
+    """
+
+    scan = _final_review_repo_facts()
+    facts = tuple(
+        FinalReviewEvidenceFact(
+            fact_id=f"fact-{kind}",
+            fact_kind=kind,
+            source_ref=meta["source_ref"],
+            sha256=meta["sha256"],
+            present=meta["present"],
+            captured_at=_ts(),
+        )
+        for kind, meta in scan.items()
+    )
+    snapshot = build_final_review_evidence_snapshot(
+        snapshot_id=f"fr-snapshot-{rc_id}", rc_id=rc_id, facts=facts
+    )
+    # 漂移检测用"当前事实哈希"与快照同源采集，故无漂移（只读、无改写）。
+    current_facts = {
+        kind: {"sha256": meta["sha256"], "required": True}
+        for kind, meta in scan.items()
+    }
+
+    ci_items = tuple(
+        CompletenessItem(
+            item_id=f"ci-{kind}",
+            item_kind=kind,
+            status=CompletenessStatus.MISSING,
+        )
+        for kind in FINAL_REVIEW_COMPLETENESS_ITEMS
+    )
+    completeness = build_activation_evidence_completeness_matrix(
+        matrix_id=f"fr-completeness-{rc_id}", rc_id=rc_id, items=ci_items
+    )
+
+    entries = tuple(
+        SignoffMatrixEntry(role=SignoffRole(r), status=SignoffMatrixStatus.MISSING)
+        for r in REQUIRED_SIGNOFF_ROLES
+    )
+    signoff = build_four_role_signoff_matrix(
+        matrix_id=f"fr-signoff-{rc_id}", rc_id=rc_id, entries=entries
+    )
+
+    signoff_snapshot = _get_registry(rc_id).snapshot()
+    conflicts = HumanSignoffConflictDetector().detect(
+        signoff_entries=entries,
+        completeness_items=ci_items,
+        signoff_snapshot=signoff_snapshot,
+    )
+    drift = ActivationEvidenceDriftDetector().detect(
+        snapshot=snapshot, current_facts=current_facts
+    )
+    readiness_eval = FinalReviewReadinessEvaluator().build_evaluation(
+        evaluation_id=f"fr-readiness-{rc_id}",
+        rc_id=rc_id,
+        completeness=completeness,
+        signoff=signoff,
+        conflicts=conflicts,
+        drift=drift,
+        blocked=False,
+    )
+
+    evidence_summary = {"rc_id": rc_id, "intake_complete": False, "human_rejected_ids": []}
+    review_packet = build_final_activation_review_packet(
+        packet_id=f"fr-packet-{rc_id}",
+        rc_id=rc_id,
+        generated_for_actor="readonly-custodian",
+        evidence_summary=evidence_summary,
+        signoff_snapshot=signoff_snapshot,
+        decision_log_size=0,
+    )
+    handoff = build_production_activation_handoff_package(
+        handoff_id=f"fr-handoff-{rc_id}",
+        rc_id=rc_id,
+        review_packet_id=review_packet.packet_id,
+        readiness_state=readiness_eval.state.value,
+        items=(),
+    )
+    abort_catalog = build_activation_abort_condition_catalog(rc_id=rc_id)
+    verification = HumanFinalDecisionVerifier().verify(
+        decision=None, package=review_packet.review_package
+    )
+
+    return {
+        "engineering_enabled": False,
+        "rc_id": rc_id,
+        "org_id": org_id,
+        "evidence_snapshot": snapshot.to_dict(),
+        "completeness_matrix": completeness.to_dict(),
+        "signoff_matrix": signoff.to_dict(),
+        "conflicts": [c.to_dict() for c in conflicts],
+        "drift": [d.to_dict() for d in drift],
+        "review_packet": review_packet.to_dict(),
+        "readiness": readiness_eval.to_dict(),
+        "verification": verification.to_dict(),
+        "handoff_package": handoff.to_dict(),
+        "abort_catalog": abort_catalog.to_dict(),
+        "note": "FINAL_REVIEW_READONLY: 仅汇总只读材料；不含 AI 裁决、不翻转 "
+        "engineering_enabled、不宣布 GO、不激活（红线①②④⑤⑨⑩）",
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -799,3 +985,229 @@ def record_final_decision(
         raise HTTPException(status_code=403, detail=str(e))
 
     return decision.to_dict()
+
+
+# --------------------------------------------------------------------------- #
+# Layer C：Phase 3.9.7 最终人工评审只读端点（9 个 GET，T14）                         #
+#                                                                              #
+# 全部 fail-closed：强制真实 USER + RELEASE_READ + T13 白名单操作；返回 payload   #
+# 顶层恒含 ``engineering_enabled: False``；绝不翻转开关、不宣布 GO、不激活          #
+# （红线①②④⑤⑨⑩）。所有材料由 ``_final_review_dossier`` 只读聚合，AI 不构造裁决。   #
+# --------------------------------------------------------------------------- #
+def _final_review_require(
+    *, operation: "ActivationOperation", principal: GovernancePrincipal, org_id: Optional[str]
+) -> str:
+    """Layer C 端点公共前置：真实 USER + 组织对齐 + T13 白名单门禁。"""
+
+    _require_user_principal(principal)
+    resolved = _org(principal, org_id)
+    _enforce_activation_operation(operation=operation, principal=principal)
+    return resolved
+
+
+@router.get("/final-review/evidence-snapshot")
+def final_review_evidence_snapshot(
+    rc_id: str = DEFAULT_RC_ID,
+    org_id: OrgHeader = None,
+    principal: GovernancePrincipal = Depends(
+        require_governance_permission(GovernancePermission.RELEASE_READ)
+    ),
+):
+    """T1 最终评审证据事实快照（只读；仅引用与哈希，绝不复制 secret / 原文）。"""
+
+    _final_review_require(
+        operation=ActivationOperation.VIEW_FINAL_REVIEW_EVIDENCE,
+        principal=principal,
+        org_id=org_id,
+    )
+    d = _final_review_dossier(rc_id, org_id or "")
+    return {
+        "engineering_enabled": False,
+        "rc_id": rc_id,
+        "evidence_snapshot": d["evidence_snapshot"],
+    }
+
+
+@router.get("/final-review/completeness-matrix")
+def final_review_completeness_matrix(
+    rc_id: str = DEFAULT_RC_ID,
+    org_id: OrgHeader = None,
+    principal: GovernancePrincipal = Depends(
+        require_governance_permission(GovernancePermission.RELEASE_READ)
+    ),
+):
+    """T2 激活证据完整性矩阵（8 项；BUILT_NO_GO 态全 MISSING，不含 AI 审批）。"""
+
+    _final_review_require(
+        operation=ActivationOperation.VIEW_FINAL_REVIEW_COMPLETENESS,
+        principal=principal,
+        org_id=org_id,
+    )
+    d = _final_review_dossier(rc_id, org_id or "")
+    return {
+        "engineering_enabled": False,
+        "rc_id": rc_id,
+        "completeness_matrix": d["completeness_matrix"],
+    }
+
+
+@router.get("/final-review/signoff-matrix")
+def final_review_signoff_matrix(
+    rc_id: str = DEFAULT_RC_ID,
+    org_id: OrgHeader = None,
+    principal: GovernancePrincipal = Depends(
+        require_governance_permission(GovernancePermission.RELEASE_READ)
+    ),
+):
+    """T3 四角色真实人工签署矩阵（BUILT_NO_GO 态全 MISSING，AI 不构造 RECORDED）。"""
+
+    _final_review_require(
+        operation=ActivationOperation.VIEW_FINAL_REVIEW_SIGNOFF_MATRIX,
+        principal=principal,
+        org_id=org_id,
+    )
+    d = _final_review_dossier(rc_id, org_id or "")
+    return {
+        "engineering_enabled": False,
+        "rc_id": rc_id,
+        "signoff_matrix": d["signoff_matrix"],
+    }
+
+
+@router.get("/final-review/signoff-conflicts")
+def final_review_signoff_conflicts(
+    rc_id: str = DEFAULT_RC_ID,
+    org_id: OrgHeader = None,
+    principal: GovernancePrincipal = Depends(
+        require_governance_permission(GovernancePermission.RELEASE_READ)
+    ),
+):
+    """T4 人工签署冲突候选（只读标记；仅报告，不自动解决、不代判，红线⑨⑩）。"""
+
+    _final_review_require(
+        operation=ActivationOperation.VIEW_FINAL_REVIEW_SIGNOFF_CONFLICTS,
+        principal=principal,
+        org_id=org_id,
+    )
+    d = _final_review_dossier(rc_id, org_id or "")
+    return {
+        "engineering_enabled": False,
+        "rc_id": rc_id,
+        "conflicts": d["conflicts"],
+    }
+
+
+@router.get("/final-review/evidence-drift")
+def final_review_evidence_drift(
+    rc_id: str = DEFAULT_RC_ID,
+    org_id: OrgHeader = None,
+    principal: GovernancePrincipal = Depends(
+        require_governance_permission(GovernancePermission.RELEASE_READ)
+    ),
+):
+    """T5 激活证据漂移发现（只读报告；仅陈述，不自动整改、不重生成评审包，红线⑨⑩）。"""
+
+    _final_review_require(
+        operation=ActivationOperation.VIEW_FINAL_REVIEW_EVIDENCE_DRIFT,
+        principal=principal,
+        org_id=org_id,
+    )
+    d = _final_review_dossier(rc_id, org_id or "")
+    return {
+        "engineering_enabled": False,
+        "rc_id": rc_id,
+        "drift": d["drift"],
+    }
+
+
+@router.get("/final-review/review-packet")
+def final_review_review_packet(
+    rc_id: str = DEFAULT_RC_ID,
+    org_id: OrgHeader = None,
+    principal: GovernancePrincipal = Depends(
+        require_governance_permission(GovernancePermission.RELEASE_READ)
+    ),
+):
+    """T6 最终激活评审包（复用 3.9.6 评审包工厂 + SourceTrace；附 SourceTrace，不含裁决）。"""
+
+    _final_review_require(
+        operation=ActivationOperation.BUILD_FINAL_REVIEW_PACKET,
+        principal=principal,
+        org_id=org_id,
+    )
+    d = _final_review_dossier(rc_id, org_id or "")
+    return {
+        "engineering_enabled": False,
+        "rc_id": rc_id,
+        "review_packet": d["review_packet"],
+    }
+
+
+@router.get("/final-review/readiness")
+def final_review_readiness(
+    rc_id: str = DEFAULT_RC_ID,
+    org_id: OrgHeader = None,
+    principal: GovernancePrincipal = Depends(
+        require_governance_permission(GovernancePermission.RELEASE_READ)
+    ),
+):
+    """T7 最终评审就绪度评估 + T11 激活中止条件目录（只读；最高就绪度=请人来判，不宣布 GO）。"""
+
+    _final_review_require(
+        operation=ActivationOperation.EVALUATE_FINAL_REVIEW_READINESS,
+        principal=principal,
+        org_id=org_id,
+    )
+    d = _final_review_dossier(rc_id, org_id or "")
+    return {
+        "engineering_enabled": False,
+        "rc_id": rc_id,
+        "readiness": d["readiness"],
+        "abort_catalog": d["abort_catalog"],
+    }
+
+
+@router.get("/final-review/verify-decision")
+def final_review_verify_decision(
+    rc_id: str = DEFAULT_RC_ID,
+    org_id: OrgHeader = None,
+    principal: GovernancePrincipal = Depends(
+        require_governance_permission(GovernancePermission.RELEASE_READ)
+    ),
+):
+    """T9 人工最终裁决校验（只读；无真实裁决记录时为 PENDING，VALID 也不翻转开关/不激活）。"""
+
+    _final_review_require(
+        operation=ActivationOperation.VERIFY_HUMAN_FINAL_DECISION,
+        principal=principal,
+        org_id=org_id,
+    )
+    d = _final_review_dossier(rc_id, org_id or "")
+    return {
+        "engineering_enabled": False,
+        "rc_id": rc_id,
+        "verification": d["verification"],
+    }
+
+
+@router.get("/final-review/handoff-package")
+def final_review_handoff_package(
+    rc_id: str = DEFAULT_RC_ID,
+    org_id: OrgHeader = None,
+    principal: GovernancePrincipal = Depends(
+        require_governance_permission(GovernancePermission.RELEASE_READ)
+    ),
+):
+    """T10 生产激活交接包（execution_status 恒 pending_human_terminal_action，禁部署，红线①⑤）。"""
+
+    _final_review_require(
+        operation=ActivationOperation.BUILD_FINAL_ACTIVATION_HANDOFF,
+        principal=principal,
+        org_id=org_id,
+    )
+    d = _final_review_dossier(rc_id, org_id or "")
+    return {
+        "engineering_enabled": False,
+        "rc_id": rc_id,
+        "handoff_package": d["handoff_package"],
+    }

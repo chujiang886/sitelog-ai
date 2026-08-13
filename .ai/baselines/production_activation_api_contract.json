@@ -3,7 +3,7 @@
   "artifact": "production_activation_api_contract",
   "rc_id": "RC-3.9.6",
   "generated_from": "backend/app/api/governance_activation.py",
-  "route_count": 15,
+  "route_count": 24,
   "layers": {
     "A": [
       "/governance/activation/blockers",
@@ -22,6 +22,17 @@
       "/governance/activation/final-decision",
       "/governance/activation/intake-summary",
       "/governance/activation/review-package"
+    ],
+    "C": [
+      "/governance/activation/final-review/completeness-matrix",
+      "/governance/activation/final-review/evidence-drift",
+      "/governance/activation/final-review/evidence-snapshot",
+      "/governance/activation/final-review/handoff-package",
+      "/governance/activation/final-review/readiness",
+      "/governance/activation/final-review/review-packet",
+      "/governance/activation/final-review/signoff-conflicts",
+      "/governance/activation/final-review/signoff-matrix",
+      "/governance/activation/final-review/verify-decision"
     ]
   },
   "forbidden_endpoints": [
@@ -110,6 +121,96 @@
       "permission": "RELEASE_SIGNOFF",
       "csrf_protected": true,
       "audit": "append-only AuditService"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/final-review/completeness-matrix",
+      "handler": "final_review_completeness_matrix",
+      "layer": "C",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/final-review/evidence-drift",
+      "handler": "final_review_evidence_drift",
+      "layer": "C",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/final-review/evidence-snapshot",
+      "handler": "final_review_evidence_snapshot",
+      "layer": "C",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/final-review/handoff-package",
+      "handler": "final_review_handoff_package",
+      "layer": "C",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/final-review/readiness",
+      "handler": "final_review_readiness",
+      "layer": "C",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/final-review/review-packet",
+      "handler": "final_review_review_packet",
+      "layer": "C",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/final-review/signoff-conflicts",
+      "handler": "final_review_signoff_conflicts",
+      "layer": "C",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/final-review/signoff-matrix",
+      "handler": "final_review_signoff_matrix",
+      "layer": "C",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
+    },
+    {
+      "method": "GET",
+      "path": "/governance/activation/final-review/verify-decision",
+      "handler": "final_review_verify_decision",
+      "layer": "C",
+      "actor_kind": "user",
+      "permission": "RELEASE_READ",
+      "csrf_protected": true,
+      "audit": "read-only"
     },
     {
       "method": "GET",

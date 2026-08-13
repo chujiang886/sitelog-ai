@@ -1,8 +1,14 @@
-"""Phase 3.9.6 T12 权限边界（Permission Boundary）。
+"""Phase 3.9.6 T12 + Phase 3.9.7 权限边界（Permission Boundary）。
 
 把"谁可以对生产激活证据层做什么"收敛为单一事实源（SSOT）。后端 API（T14）与
 测试（T16）都复用本模块，避免权限判断散落各处、出现"某端点漏掉 human-gating"的
 治理黑洞。
+
+Phase 3.9.7 在 3.9.6 七项操作之上**新增 9 项只读操作**（VIEW_FINAL_REVIEW_* /
+BUILD_FINAL_REVIEW_PACKET / EVALUATE_FINAL_REVIEW_READINESS /
+VERIFY_HUMAN_FINAL_DECISION / BUILD_FINAL_ACTIVATION_HANDOFF），统一映射
+``PERM_RELEASE_READ``，全部 fail-closed：仍强制真实 USER、不翻转
+``engineering_enabled``、不宣布 GO、不激活。
 
 设计要点（fail-closed）
 ----------------------
@@ -56,6 +62,17 @@ class ActivationOperation(str, Enum):
     BUILD_REVIEW_PACKAGE = "build_review_package"          # 生成供人裁决材料包
     RECORD_FINAL_DECISION = "record_final_decision"        # 真实 USER 最终裁决登记
 
+    # --- Phase 3.9.7 最终人工评审只读操作（fail-closed，统一映射 PERM_RELEASE_READ）---
+    VIEW_FINAL_REVIEW_EVIDENCE = "view_final_review_evidence"                # 只读：终审证据快照
+    VIEW_FINAL_REVIEW_COMPLETENESS = "view_final_review_completeness"        # 只读：完整性矩阵
+    VIEW_FINAL_REVIEW_SIGNOFF_MATRIX = "view_final_review_signoff_matrix"    # 只读：四角色签署矩阵
+    VIEW_FINAL_REVIEW_SIGNOFF_CONFLICTS = "view_final_review_signoff_conflicts"  # 只读：签署冲突
+    VIEW_FINAL_REVIEW_EVIDENCE_DRIFT = "view_final_review_evidence_drift"    # 只读：证据漂移
+    BUILD_FINAL_REVIEW_PACKET = "build_final_review_packet"                  # 只读：终审评审包
+    EVALUATE_FINAL_REVIEW_READINESS = "evaluate_final_review_readiness"      # 只读：就绪度评估
+    VERIFY_HUMAN_FINAL_DECISION = "verify_human_final_decision"              # 只读：人工终裁核验
+    BUILD_FINAL_ACTIVATION_HANDOFF = "build_final_activation_handoff"        # 只读：交接包
+
 
 #: 操作 → 最小治理权限（白名单映射；缺省即拒绝）。
 OPERATION_PERMISSION: dict = {
@@ -66,6 +83,16 @@ OPERATION_PERMISSION: dict = {
     ActivationOperation.REGISTER_SIGNOFF: PERM_RELEASE_SIGNOFF,
     ActivationOperation.BUILD_REVIEW_PACKAGE: PERM_RELEASE_READ,
     ActivationOperation.RECORD_FINAL_DECISION: PERM_RELEASE_SIGNOFF,
+    # --- Phase 3.9.7 最终人工评审只读操作（统一 PERM_RELEASE_READ，fail-closed）---
+    ActivationOperation.VIEW_FINAL_REVIEW_EVIDENCE: PERM_RELEASE_READ,
+    ActivationOperation.VIEW_FINAL_REVIEW_COMPLETENESS: PERM_RELEASE_READ,
+    ActivationOperation.VIEW_FINAL_REVIEW_SIGNOFF_MATRIX: PERM_RELEASE_READ,
+    ActivationOperation.VIEW_FINAL_REVIEW_SIGNOFF_CONFLICTS: PERM_RELEASE_READ,
+    ActivationOperation.VIEW_FINAL_REVIEW_EVIDENCE_DRIFT: PERM_RELEASE_READ,
+    ActivationOperation.BUILD_FINAL_REVIEW_PACKET: PERM_RELEASE_READ,
+    ActivationOperation.EVALUATE_FINAL_REVIEW_READINESS: PERM_RELEASE_READ,
+    ActivationOperation.VERIFY_HUMAN_FINAL_DECISION: PERM_RELEASE_READ,
+    ActivationOperation.BUILD_FINAL_ACTIVATION_HANDOFF: PERM_RELEASE_READ,
 }
 
 #: 仅"写入 / 裁决"类操作需要 RELEASE_SIGNOFF；其余为只读（RELEASE_READ）。

@@ -115,11 +115,13 @@ def test_packet_tamper_evident_sha256() -> None:
 def test_api_contract_route_count_and_layers() -> None:
     assert CONTRACT_PATH.exists(), f"contract missing: {CONTRACT_PATH}"
     c = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
-    assert c["route_count"] == 15, f"expected 15 routes, got {c['route_count']}"
+    assert c["route_count"] == 24, f"expected 24 routes, got {c['route_count']}"
     routes = c["routes"]
-    assert len(routes) == 15
+    assert len(routes) == 24
     layer_b = {r["path"] for r in routes if r["layer"] == "B"}
     assert len(layer_b) == 7, f"expected 7 distinct Layer B paths, got {len(layer_b)}"
+    layer_c = {r["path"] for r in routes if r["layer"] == "C"}
+    assert len(layer_c) == 9, f"expected 9 distinct Layer C final-review paths, got {len(layer_c)}"
     for r in routes:
         assert not r["path"].endswith("/activate")
         assert not r["path"].endswith("/deploy-production")
@@ -134,7 +136,7 @@ def test_api_contract_route_count_and_layers() -> None:
 def test_permission_boundary_whitelist() -> None:
     boundary = ActivationPermissionBoundary(rc_id="RC-3.9.6").describe()
     ops = boundary["operations"]
-    assert len(ops) == 7
+    assert len(ops) == 16
     for op in ops:
         assert op["required_actor_kind"] == "user"
         assert op["required_permission"] in (

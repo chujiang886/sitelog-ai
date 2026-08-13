@@ -62,7 +62,6 @@ from agents.enterprise.production_release.review_package import (
 )
 from agents.enterprise.red_line import (
     EnterpriseRedLineViolationError,
-    _RedLineForbiddenMixin,
     safety_invariants_ok,
 )
 
@@ -393,7 +392,7 @@ class SignoffMatrixEntry:
         return {
             "role": self.role.value,
             "status": self.status.value,
-            "recorded_by": self.record_by or self.recorded_by,
+            "recorded_by": self.recorded_by,
             "decision": self.decision,
             "conflict_note": self.conflict_note,
         }
