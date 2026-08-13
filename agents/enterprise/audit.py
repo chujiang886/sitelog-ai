@@ -298,6 +298,41 @@ class AuditActionCategory(str, Enum):
     FINAL_ACTIVATION_READINESS_EVALUATED = "final_activation_readiness_evaluated"
     HUMAN_FINAL_DECISION_VERIFIED = "human_final_decision_verified"
     ACTIVATION_HANDOFF_PACKAGE_GENERATED = "activation_handoff_package_generated"
+    # Phase 3.9.7-change：企业生产变更管控平面（审计动作大类 108 → 121）。
+    # CHANGE_REQUEST_CREATED / CHANGE_PLAN_REGISTERED / CHANGE_WINDOW_RESERVED /
+    # CHANGE_PREFLIGHT_CHECKED / CHANGE_CHECKPOINT_RECORDED / CHANGE_ABORT_POLICY_REGISTERED /
+    # CHANGE_ROLLBACK_REFERENCE_REGISTERED / CHANGE_POST_VERIFICATION_REGISTERED /
+    # CHANGE_EVIDENCE_SUBMITTED / CHANGE_SIMULATION_PERFORMED /
+    # CHANGE_FAILURE_SCENARIO_EVALUATED / CHANGE_PACKAGE_GENERATED /
+    # CHANGE_HUMAN_DECISION_RECORDED。
+    # 十三类均为**只读事实型 / 责任留痕型**动作：仅如实记录「变更请求已创建」
+    # 「计划/窗口/预检/检查点/中止策略/回滚引用/变更后验证已登记」「证据已提交」
+    # 「受控仿真已执行（synthetic）」「失败场景已评估」「变更包已生成（材料≠执行）」
+    # 「真实人工变更裁决已登记」。任何一个都不表示真实执行、放行或激活。
+    #
+    # 语义红线（务必与 Phase 3.9.7 ①~⑩ 对齐）：
+    # - CHANGE_SIMULATION_PERFORMED 记录的是「受控仿真已运行」这一事实，is_simulation 恒 True，
+    #   AI 不把仿真结果描述为真实 Production Change（红线⑨）；
+    # - CHANGE_HUMAN_DECISION_RECORDED 记录的是「真实人工裁决已被登记」这一事实，
+    #   AI 不构造、不代决，actor_kind 恒 USER；绝不翻转 engineering_enabled；
+    # - CHANGE_PACKAGE_GENERATED 产出的是「供真实人工裁决的材料包」，simulated_only 恒 True，
+    #   执行状态恒 PENDING_HUMAN_TERMINAL_ACTION，永不含 engineering_approved /
+    #   PRODUCTION_GO 结论。
+    # 十三类绝不承载自动批准 / 自动执行 / 翻转 engineering_enabled / 宣布 Production GO
+    # 语义（红线①~⑩）。当前总数 121。
+    CHANGE_REQUEST_CREATED = "change_request_created"
+    CHANGE_PLAN_REGISTERED = "change_plan_registered"
+    CHANGE_WINDOW_RESERVED = "change_window_reserved"
+    CHANGE_PREFLIGHT_CHECKED = "change_preflight_checked"
+    CHANGE_CHECKPOINT_RECORDED = "change_checkpoint_recorded"
+    CHANGE_ABORT_POLICY_REGISTERED = "change_abort_policy_registered"
+    CHANGE_ROLLBACK_REFERENCE_REGISTERED = "change_rollback_reference_registered"
+    CHANGE_POST_VERIFICATION_REGISTERED = "change_post_verification_registered"
+    CHANGE_EVIDENCE_SUBMITTED = "change_evidence_submitted"
+    CHANGE_SIMULATION_PERFORMED = "change_simulation_performed"
+    CHANGE_FAILURE_SCENARIO_EVALUATED = "change_failure_scenario_evaluated"
+    CHANGE_PACKAGE_GENERATED = "change_package_generated"
+    CHANGE_HUMAN_DECISION_RECORDED = "change_human_decision_recorded"
 
 
 def require_human_actor(actor_kind: Any) -> None:
@@ -3515,6 +3550,312 @@ class AuditService(_RedLineForbiddenMixin):
             actor_kind=AuditActorKind.USER,
             actor_id=actor_id,
             category=AuditActionCategory.ACTIVATION_REVIEW_PACKAGE_GENERATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    # --------------------------------------------------------------------------- #
+    # Phase 3.9.7-change：企业生产变更管控平面审计动作（13 类，108 → 121）
+    # --------------------------------------------------------------------------- #
+    def record_change_request_created(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "create_change_request",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次真实人工创建变更请求（只读，红线①/③/⑥）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.CHANGE_REQUEST_CREATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_change_plan_registered(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "register_change_plan",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次真实人工登记变更计划（材料 ≠ 执行，红线③/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.CHANGE_PLAN_REGISTERED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_change_window_reserved(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "reserve_change_window",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次真实人工预约变更窗口（只读登记，红线③/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.CHANGE_WINDOW_RESERVED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_change_preflight_recorded(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "record_change_preflight",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次真实人工记录变更前预检（禁止自动放行，红线②/③/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.CHANGE_PREFLIGHT_CHECKED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_change_checkpoint_recorded(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "record_change_checkpoint",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次真实人工记录变更检查点（人工留痕，红线③/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.CHANGE_CHECKPOINT_RECORDED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_change_abort_policy_registered(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "register_change_abort_policy",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次真实人工登记变更中止策略（human_abort_required 恒 True，红线③/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.CHANGE_ABORT_POLICY_REGISTERED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_change_rollback_reference_registered(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "register_change_rollback_ref",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次真实人工登记回滚引用（仅引用，不执行真实回滚，红线③/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.CHANGE_ROLLBACK_REFERENCE_REGISTERED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_post_change_verification_registered(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "record_post_change_verification",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次真实人工登记变更后验证（AI 不替人验证，红线⑨/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.CHANGE_POST_VERIFICATION_REGISTERED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_change_evidence_submitted(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "submit_change_evidence",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次真实人工提交变更证据（只收引用，不收原文，红线⑦）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.CHANGE_EVIDENCE_SUBMITTED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_change_simulation_performed(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "perform_change_simulation",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次受控（合成）仿真执行（is_simulation 恒 True，红线⑨）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.CHANGE_SIMULATION_PERFORMED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_failure_scenario_evaluated(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "evaluate_failure_scenario",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次失败场景评估（只读，不执行回滚/修复，红线③/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.CHANGE_FAILURE_SCENARIO_EVALUATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_change_package_generated(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "build_change_package",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次受控变更包生成（材料 ≠ 执行，simulated_only 恒 True，红线⑤/⑩）。"""
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.CHANGE_PACKAGE_GENERATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_change_human_decision_recorded(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "record_change_decision",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> "AuditRecord":
+        """记录一次真实人工变更裁决被登记（记录 ≠ 执行，红线①②⑤⑨⑩）。
+
+        裁决只能来自真实自然人；即便登记 GO，``engineering_enabled`` 仍为 False、
+        执行态仍为 ``PENDING_HUMAN_TERMINAL_ACTION``——执行由主理人在人类终端显式发起。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.CHANGE_HUMAN_DECISION_RECORDED,
             action=action,
             target=target,
             detail=detail,
