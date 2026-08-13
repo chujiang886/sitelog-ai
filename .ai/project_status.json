@@ -4598,7 +4598,7 @@
     ],
     "scope_note": "纯模拟验证层：在隔离 sandbox 中演练完整生产激活流程，验证所有不可逆边界（engineering_enabled / 真实签署 / 真实 GO / 真实部署 / 真实密钥 / 真实权限 / 真实数据 / 绕过门禁 / 命名空间污染）在 SIMULATION_ONLY 约束下均 fail-closed。不触碰任何真实生产证据、不登记真实签署、不写入真实 FinalDecisionLedger、不部署。",
     "tasks_total": 21,
-    "tasks_completed": 20,
+    "tasks_completed": 21,
     "tasks": [
       "T1-T11 隔离模拟沙盒 simulation.py（run_production_activation_dry_run / build_decision_scenario_matrix 14 / ProductionActivationNegativePathMatrix 12 全 rejected / build_simulation_context / 污染守卫）",
       "T12 AuditActionCategory 契约 121→129（+8 SIMULATION_ONLY 类目）+ ledger 重建（.ai/baselines/audit_action_category_ledger.json + .ai/AUDIT_ACTION_CATEGORY_LEDGER.md）+ 基线 phase3.8_governance_release_baseline.json total 121→129 显式对齐（T17 修复治理完整性缺口）",
@@ -4610,7 +4610,7 @@
       "T18 SSOT / 基线更新：补本 phase_3_9_8 详细块（本条目）",
       "T19 红线核验：十条最高红线全未触发（见 red_lines）",
       "T20 Git 收尾（pending）：统一提交 T12-T16 全部未提交交付物，working tree 收敛为 clean，禁 add -A/force push/rewrite",
-      "T21 收口报告 .ai/reviews/phase3.9.8_production_activation_dry_run_simulation_closure_report.md（29 项强制章节，pending）"
+      "T21 收口报告 .ai/reviews/phase3.9.8_production_activation_dry_run_simulation_closure_report.md（29 项强制章节，已交付）"
     ],
     "core_module": "agents/enterprise/production_release/simulation.py（隔离模拟沙盒，dry-run / 场景矩阵 14 / 负路径矩阵 12 / 污染守卫，production_activated 恒 False、real_signoff_count 恒 0、engineering_enabled 恒 False）",
     "api_module": "backend/app/api/governance_activation_simulation.py（6 端点：GET /、/scenarios、/negative-paths、/report/latest、/report/{id}，POST /run；SIMULATION ONLY，无 /activate /deploy-production /go）",
