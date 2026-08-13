@@ -4501,8 +4501,8 @@
       "9_no_ai_modify_human_decision": "Layer C 不提供任何决策写入端点；人工裁决校验只读、不翻转开关",
       "10_no_bypass_gate": "Layer C 不绕过 ControlledActivationGate；所有材料由 _final_review_dossier 只读聚合"
     },
-    "report": ".ai/reviews/phase3.9.7_production_activation_final_human_review_readiness_report.md",
-    "roadmap_ref": ".ai/roadmap_v8.md（拟增补 Phase 3.9.7 节）",
+    "report": ".ai/reviews/phase3.9.7_production_final_human_review_readiness_closure_report.md",
+    "roadmap_ref": ".ai/roadmap_v8.md（§35.12 Phase 3.9.7 交付物与门禁 / §35.13 状态结论与 STOP 纪律）",
     "stop": "已 STOP：不进入 3.9.8、不自动激活、不输出 engineering_approved、不真实部署、不 AI 生成 GO、不代替四角色签署；等主理人 + 四角色线下提交真实证据并签署后，由主理人在人类终端显式置 enabled=true。"
   },
   "phase_3_9_7_change": {

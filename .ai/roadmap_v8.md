@@ -2017,3 +2017,29 @@ GovernanceWorkflowRepository (require_human_actor + OrgScopeError)  ──snapsh
 - **语义边界（红线）**：即便全绿，也只代表 `PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO` / `READY_FOR_HUMAN_REVIEW` / `READY_FOR_HUMAN_SIGNOFF`，**绝不 APPROVED / GO / 自动激活**。
 - **分支覆盖**：`main`（占位）+ `feat/phase3.9.6-production-activation-evidence-readiness`（显式）+ 通配 `feat/phase3.9.*` / `feat/phase*-release-*` / `release/**` + 历史 `feat/phase3.9.2-production-release-gate`（保留）。`pull_request` 保持无分支过滤（最严格）。
 
+### 35.12 Phase 3.9.7 交付物与门禁（生产激活最终人工评审与 Go/No-Go 就绪层）
+
+- **身份**：BOIP AI Chief Architect / Production Activation Final Review Auditor / Human Go/No-Go Readiness Custodian（**非签署 / 非批准 / 非激活主体**）。
+- **分支**：`feat/phase3.9.7-production-activation-final-human-review-readiness`（自 3.9.6 收口 HEAD 分出，保留真实 ancestry，不重写历史）。
+- **终端态**：🟠 `PRODUCTION_FINAL_HUMAN_REVIEW_READINESS_BUILT_NO_GO`（全部最终评审材料 / 四角色人工签署结构 / 冲突与漂移探测 / 复核包 / 交接包 / 中止条件目录已就位，但**无真实生产激活、无真实 GO 决策、无真实人工签署**）。
+- **核心交付**（Layer C，已提交 `agents/enterprise/production_release/final_review.py`）：
+  - `FINAL_REVIEW_EVIDENCE_FACT_KINDS`（11 类只读证据事实枚举）+ `FinalReviewEvidenceFact` + `build_final_review_evidence_snapshot`（从仓库事实合成只读证据快照，fail-closed）。
+  - `FINAL_REVIEW_COMPLETENESS_ITEMS`（8 项）+ `CompletenessStatus` + `build_activation_evidence_completeness_matrix`（证据完备矩阵，缺失项显式列出）。
+  - `SignoffRole` + `SignoffMatrixStatus` + `SignoffMatrixEntry` + `build_four_role_signoff_matrix`（四角色签署矩阵：production-owner / release-manager / security-owner / auditor 缺位即 fail-closed）。
+  - `HumanSignoffConflictDetector` + `ActivationEvidenceDriftDetector`（冲突 / 证据漂移探测，复用 3.9.6 `HumanSignoffRegistry` 与 `audit.py` 真实提交溯源）。
+  - `build_final_activation_review_packet` + `FinalReviewReadinessEvaluator` + `HumanFinalDecisionVerifier`（复核包 / 就绪评估 / 人工最终决策校验——**校验仅判 `valid`/`invalid`，永不 `approved`**）。
+  - `build_production_activation_handoff_package` + `build_activation_abort_condition_catalog`（交接包 `execution_status` 恒 `pending_human_activation`；中止条件目录逐项 `blocking=False` 因缺真实四角色签署）。
+- **权限边界**（已提交 `agents/enterprise/production_release/permission_boundary.py`）：`ActivationOperation` 自 7 → **16**，新增 9 个只读操作（`view_final_review_*` / `build_final_review_packet` / `evaluate_final_review_readiness` / `verify_human_final_decision` / `build_final_activation_handoff`），统一映射 `PERM_RELEASE_READ`，fail-closed（缺省拒绝）。
+- **后端 API**（已提交 `backend/app/api/governance_activation.py`，路由 15 → **24**）：新增 Layer C 9 只读 GET 端点（`/final-review/evidence-snapshot` `/completeness-matrix` `/signoff-matrix` `/signoff-conflicts` `/evidence-drift` `/review-packet` `/readiness` `/verify-decision` `/handoff-package`），全部 `_require_user_principal` + `require_governance_permission(RELEASE_READ)` + `csrf_protect`，返回恒含 `engineering_enabled: False`，**无 `/activate` / `/deploy-production` 端点**。
+- **契约 SSOT**：`.ai/baselines/production_activation_api_contract.json` `route_count=24`（Layer A=7 / B=7 / C=9），由 `scripts/generate_production_activation_api_contract.py` 重建；契约测试 `test_phase3_9_6_evidence_boundary_contract.py` 与 `test_production_activation_readiness.py` 断言已同步（24 路由 / 16 操作 / 23 激活路径）。
+- **前端看板**（已提交 `frontend/src/app/governance-activation/page.tsx`）：新增只读自组件 `FinalHumanReviewPanel`，挂载即并行拉取 9 个 Layer C GET 端点并只读展示（含 `engineering_enabled=false` 恒显标 + 可折叠 JSON），无自动 GO / 激活 / 部署按钮；tsc 0 error / jest 117 passed。
+- **测试**（已提交 `tests/agents/test_phase3_9_7_final_review_api.py`）：9 端点静态断言（GET / 权限 RELEASE_READ / actor_kind=user / csrf_protected=True / 无 activate/deploy）+ dossier fail-closed 单元断言（engineering_enabled=False / readiness=signoff_incomplete / 四角色全缺 / 0 冲突 / 0 漂移 / verification=invalid / handoff=pending）。
+- **CI 门禁**（已扩展 `.github/workflows/activation-readiness-gate.yml`）：显式纳入 `feat/phase3.9.7-production-activation-final-human-review-readiness`，在 3.9.6 readiness 套件内追加 `test_phase3_9_7_final_review_api.py`。
+- **审计账本**：本阶段未新增审计大类（Layer C 全为只读合成，沿用 3.9.6 既有 104 类 + change-control 108→121 增量为前期独立提交，与本阶段 scope 隔离）；`.ai/baselines/audit_action_category_ledger.json` 经校验 `total=121`，0 orphan/ghost/dup，Git 溯源通过。
+- **红线**：十条最高红线全部未触发；`engineering_enabled=false`（未改）；无 `engineering_approved`；无真实生产部署；无 AI 构造人工签署；无 AI 创建最终 GO 决策；无绕过 `ControlledActivationGate`。
+
+### 35.13 状态结论与 STOP 纪律（3.9.7）
+
+- **状态：🟠 PRODUCTION_FINAL_HUMAN_REVIEW_READINESS_BUILT_NO_GO（3.9.7 已收口，2026-08-13）**。
+- **STOP：完成全部安全任务后停止**，不进下一 Phase、不开 `engineering_enabled`、不输出 `engineering_approved`、不真实部署、不自行执行四角色生产签署、不 AI 生成 GO 决策。后续仅由主理人 + 专家线下推进：真实人工四角色（production-owner / release-manager / security-owner / auditor）提交真实证据并签署 → 终端显式置 `engineering_enabled=true` → 真实部署。收口报告见 `.ai/reviews/phase3.9.7_production_final_human_review_readiness_closure_report.md`。
+
