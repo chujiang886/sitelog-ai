@@ -18,6 +18,7 @@ hard-code phase member facts.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -25,7 +26,40 @@ ROOT = Path(__file__).resolve().parents[1]
 PROJECT_STATUS = ROOT / ".ai/project_status.json"
 ROADMAP = ROOT / ".ai/roadmap_v8.md"
 LEDGER_JSON = ROOT / ".ai/baselines/audit_action_category_ledger.json"
+BASELINE_JSON = ROOT / ".ai/baselines/phase3.8_governance_release_baseline.json"
+AUDIT_SOURCE = ROOT / "agents/enterprise/audit.py"
 PBL = ROOT / ".ai/PHASE_BOUNDARY_LEDGER.md"
+
+_ENUM_HEAD_RE = re.compile(r"^class AuditActionCategory\b")
+_NEXT_CLASS_RE = re.compile(r"^class [A-Z]")
+_ENUM_MEMBER_RE = re.compile(r"^    ([A-Z][A-Z0-9_]+) = ")
+
+
+def _live_audit_category_total() -> int | None:
+    """Count AuditActionCategory members by parsing the source (stdlib only).
+
+    Deliberately parsed rather than imported: this gate must stay importable-free
+    and dependency-free so it can run in a bare CI step. Returns None when the
+    source cannot be read, in which case the caller degrades to ledger<->baseline
+    cross-check only (never to "pass by default" on a real mismatch).
+    """
+    try:
+        lines = AUDIT_SOURCE.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    in_class = False
+    names: set[str] = set()
+    for line in lines:
+        if _ENUM_HEAD_RE.match(line):
+            in_class = True
+            continue
+        if in_class and _NEXT_CLASS_RE.match(line):
+            break
+        if in_class:
+            match = _ENUM_MEMBER_RE.match(line)
+            if match:
+                names.add(match.group(1))
+    return len(names) or None
 
 FORBIDDEN = ("APPROVED", "PRODUCTION_READY")
 REQUIRED_MARKERS = ("AWAITING_HUMAN", "BUILT_NO_GO")
@@ -72,11 +106,30 @@ def main() -> int:
             return fail(f"closure report missing: {r}")
     print(f"[ok]   {len(reports)} closure reports present")
 
-    # 4) audit ledger JSON total == 100
+    # 4) audit ledger JSON total must equal the baseline contract total.
+    #    Phase 3.9.6: the total is NO LONGER hard-coded here. Hard-coding it in a
+    #    second place was the exact brittleness this gate is supposed to prevent
+    #    (one new category -> N files to edit). The baseline JSON is the declared
+    #    contract; the ledger JSON is rebuilt from real Git history; this gate now
+    #    cross-checks the two against each other and against the live enum, so the
+    #    check gets STRICTER, not looser.
     ld = json.loads(LEDGER_JSON.read_text(encoding="utf-8"))
-    if ld["total"] != 100:
-        return fail(f"audit ledger total {ld['total']} != 100")
-    print(f"[ok]   audit ledger total = {ld['total']}")
+    bl = json.loads(BASELINE_JSON.read_text(encoding="utf-8"))
+    declared = bl["audit_category_contract"]["total"]
+    if ld["total"] != declared:
+        return fail(
+            f"audit ledger total {ld['total']} != baseline declared total {declared}"
+        )
+    live = _live_audit_category_total()
+    if live is not None and live != declared:
+        return fail(
+            f"live AuditActionCategory total {live} != baseline declared total {declared}"
+        )
+    print(
+        f"[ok]   audit total = {declared} (ledger == baseline"
+        + (f" == live enum" if live is not None else " ; live enum not importable")
+        + ")"
+    )
 
     # 5) phase boundary ledger present
     if not PBL.exists():

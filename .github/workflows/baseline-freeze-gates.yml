@@ -11,13 +11,24 @@ name: Baseline Freeze Gates (Audit Ledger / Phase Boundary / Repo Clean)
 #   repository-clean-gate   工作树清洁，无未提交 / 来源不明源码。
 #
 # 任一 job 失败即整条流水线失败（fail-closed，无 continue-on-error）。
+#
+# ── 分支覆盖策略（Phase 3.9.6 T1 对齐，2026-08-13）─────────────────────────────
+# 与 release-gate.yml 保持同一策略：显式声明 main + 真实集成载体，并附通配策略，
+# 使后续阶段新建集成分支时基线冻结门禁自动生效，避免"门禁只盯历史分支"的漂移。
 
 on:
   pull_request:
   push:
     branches:
-      - "feat/phase3.9.4-r2-definitive-baseline-freeze"
+      # 长期主干（占位保留）
       - "main"
+      # 真实基线冻结 / RC 集成载体（显式）
+      - "feat/phase3.9.4-r2-definitive-baseline-freeze"
+      - "feat/phase3.9.5-release-line-reconciliation"
+      # 后续阶段集成分支策略（通配）
+      - "feat/phase3.9.*"
+      - "feat/phase*-release-*"
+      - "release/**"
 
 permissions:
   contents: read

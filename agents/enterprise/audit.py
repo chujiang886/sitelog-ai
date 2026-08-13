@@ -227,9 +227,9 @@ class AuditActionCategory(str, Enum):
     # CONTROLLED_ACTIVATION_GATE_EVALUATED / HUMAN_ACTIVATION_APPROVAL_RECORDED /
     # RC_FREEZE_GENERATED / RC_FREEZE_CHECK_PASSED / RC_FREEZE_VERIFIED）属 3.9.2 受控激活
     # / RC 冻结闸门层扩展，随 3.9.3 提交 8c7c9c5 一并入库，详见
-    # .ai/progress/phase3.9.4_audit_contract_provenance.md。当前总数 100（含 3.9.4
-    # 新增 4 类遥测审计：TELEMETRY_PROVIDER_CHECKED / SYNTHETIC_DRILL_STARTED /
-    # SYNTHETIC_DRILL_COMPLETED / TELEMETRY_EVIDENCE_RECORDED）。
+    # .ai/progress/phase3.9.4_audit_contract_provenance.md。截至 3.9.4 收口总数 100
+    # （含 3.9.4 新增 4 类遥测审计：TELEMETRY_PROVIDER_CHECKED / SYNTHETIC_DRILL_STARTED /
+    # SYNTHETIC_DRILL_COMPLETED / TELEMETRY_EVIDENCE_RECORDED）；3.9.6 再 +4 → 104。
     OBSERVABILITY_HEALTH_CHECK = "observability_health_check"
     ALERT_CANDIDATE_CREATED = "alert_candidate_created"
     INCIDENT_CREATED = "incident_created"
@@ -255,11 +255,30 @@ class AuditActionCategory(str, Enum):
     # TELEMETRY_EVIDENCE_RECORDED。四类均为**只读事实型 / 责任留痕型**动作：仅如实记录
     # 「真实人工巡检遥测 Provider」「合成事故演练开始 / 完成」「真实人工记录遥测证据」。
     # 绝不承载自动 ACK / 自动 RESOLVE / 自动 CLOSE / 真实外发告警 / 自动回滚语义（红线①~⑭）。
-    # 当前总数 100。
+    # 该阶段收口时总数 100（后续 3.9.6 +4 → 104，见文件末尾一段）。
     TELEMETRY_PROVIDER_CHECKED = "telemetry_provider_checked"
     SYNTHETIC_DRILL_STARTED = "synthetic_drill_started"
     SYNTHETIC_DRILL_COMPLETED = "synthetic_drill_completed"
     TELEMETRY_EVIDENCE_RECORDED = "telemetry_evidence_recorded"
+    # Phase 3.9.6（T11）：生产激活证据接收与人工签署治理层（审计动作大类 100 → 104）。
+    # ACTIVATION_EVIDENCE_SUBMITTED / ACTIVATION_EVIDENCE_VALIDATED /
+    # HUMAN_SIGNOFF_REGISTERED / ACTIVATION_REVIEW_PACKAGE_GENERATED。
+    # 四类均为**只读事实型 / 责任留痕型**动作：仅如实记录「真实人工提交激活证据」
+    # 「结构校验完成（≠批准）」「真实人工签署登记」「人工最终评审包生成」。
+    #
+    # 语义红线（务必与 Phase 3.9.6 ③④⑨⑩ 对齐，评审时按此口径核对）：
+    # - ACTIVATION_EVIDENCE_VALIDATED 只表示「结构完整 / 哈希一致 / 来源可核验」，
+    #   **绝不等价于 approved**，不解除任何闸门阻断；
+    # - HUMAN_SIGNOFF_REGISTERED 记录的是「签署已发生」这一外部事实，AI 不构造、
+    #   不代签，actor_kind 恒 USER 且必须携带真实 signature_reference；
+    # - ACTIVATION_REVIEW_PACKAGE_GENERATED 产出的是**供人工裁决的材料包**，
+    #   不是裁决本身，永不含 engineering_approved / PRODUCTION_GO 结论。
+    # 四类绝不承载自动批准 / 自动激活 / 翻转 engineering_enabled / 宣布 Production GO
+    # 语义（红线①~⑩）。当前总数 104。
+    ACTIVATION_EVIDENCE_SUBMITTED = "activation_evidence_submitted"
+    ACTIVATION_EVIDENCE_VALIDATED = "activation_evidence_validated"
+    HUMAN_SIGNOFF_REGISTERED = "human_signoff_registered"
+    ACTIVATION_REVIEW_PACKAGE_GENERATED = "activation_review_package_generated"
 
 
 def require_human_actor(actor_kind: Any) -> None:
@@ -3366,6 +3385,117 @@ class AuditService(_RedLineForbiddenMixin):
             actor_kind=AuditActorKind.USER,
             actor_id=actor_id,
             category=AuditActionCategory.HUMAN_ACTIVATION_APPROVAL_RECORDED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    # ------------------------------------------------------------------ #
+    # Phase 3.9.6（T11）：生产激活证据接收与人工签署治理层（+4 → 104）
+    # ------------------------------------------------------------------ #
+    def record_activation_evidence_submitted(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "submit_activation_evidence",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工提交激活证据（只读事实，actor_kind 恒 USER，红线③/⑨）。
+
+        仅记录"某真实自然人提交了某条证据的引用与哈希"这一事实；**不**存证据原文、
+        **不**代表该证据已被采信、**不**解除任何闸门阻断。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.ACTIVATION_EVIDENCE_SUBMITTED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_activation_evidence_validated(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "validate_activation_evidence",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次激活证据**结构校验**完成（红线④：validated ≠ approved）。
+
+        本类别语义被严格限定为"结构完整 / 哈希一致 / 来源可核验"。它不是批准，
+        不产生放行效力；真实采信与否由真实人工在签署阶段判断。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.ACTIVATION_EVIDENCE_VALIDATED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_human_signoff_registered(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "register_human_signoff",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次真实人工签署被登记（责任留痕，红线③/⑨）。
+
+        本方法**不**构造签署（签署发生在系统之外，凭 signature_reference 可溯）；
+        这里仅把"签署已发生"如实留痕，并强制 actor 为真实 USER。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.HUMAN_SIGNOFF_REGISTERED,
+            action=action,
+            target=target,
+            detail=detail,
+            ts=ts,
+        )
+
+    def record_activation_review_package_generated(
+        self,
+        *,
+        record_id: str,
+        actor_id: str,
+        action: str = "generate_activation_review_package",
+        target: str = "",
+        detail: str = "",
+        ts: str = "",
+    ) -> AuditRecord:
+        """记录一次人工最终评审包生成（红线⑤/⑩：材料 ≠ 裁决）。
+
+        评审包只是"供人工裁决的材料汇总"，永不含 engineering_approved /
+        PRODUCTION_GO 结论，也不翻转 engineering_enabled。
+        """
+
+        return self._append(
+            record_id=record_id,
+            actor_kind=AuditActorKind.USER,
+            actor_id=actor_id,
+            category=AuditActionCategory.ACTIVATION_REVIEW_PACKAGE_GENERATED,
             action=action,
             target=target,
             detail=detail,

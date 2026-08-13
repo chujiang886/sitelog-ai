@@ -89,13 +89,18 @@ EXPECTED_CATEGORIES = {
     # Phase 3.9.4：生产遥测接入适配与合成运维验证层（+4）
     "telemetry_provider_checked", "synthetic_drill_started",
     "synthetic_drill_completed", "telemetry_evidence_recorded",
+    # Phase 3.9.6：生产激活证据接收与人工签署治理层（+4）
+    # 四类均对应本阶段真实新增的人工行为通道（提交 / 结构校验 / 签署登记 / 复核包生成），
+    # 语义上限止于「材料就绪」，任何一类都不表示批准、放行或激活（红线②④⑤）。
+    "activation_evidence_submitted", "activation_evidence_validated",
+    "human_signoff_registered", "activation_review_package_generated",
 }
 
 
 def test_audit_action_category_has_knowledge_members() -> None:
     members = {c.value for c in AuditActionCategory}
     assert members == EXPECTED_CATEGORIES
-    assert len(members) == 100
+    assert len(members) == 104
     # 程序化校验：枚举每个成员名均存在（规避手写元组形近污染，3.8.11 教训）。
     for name in AuditActionCategory.__members__:
         assert hasattr(AuditActionCategory, name)

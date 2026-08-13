@@ -21,7 +21,7 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from agents.config_loader import load_engineering_enabled
 from agents.enterprise.production_release.activation_evidence import (
@@ -178,6 +178,101 @@ class ControlledActivationGate(_RedLineForbiddenMixin):
             missing=missing,
             evaluated_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
+
+    # ------------------------------------------------------------------ #
+    # Phase 3.9.6 T10：接入证据接收层 / 签署登记簿 / 最终裁决登记簿           #
+    # ------------------------------------------------------------------ #
+
+    #: 3.9.6 追加的检查键（叠加在 ``CHECK_KEYS`` 之上，不改动原 8 项语义）。
+    INTAKE_CHECK_KEYS = (
+        "evidence_intake_complete",
+        "signoff_registry_complete",
+        "review_package_ready",
+        "human_decision_binding_valid",
+    )
+
+    def evaluate_with_activation_intake(
+        self,
+        *,
+        base_result: "ControlledActivationGateResult",
+        intake_summary: Any = None,
+        signoff_snapshot: Any = None,
+        review_package: Any = None,
+        decision_ledger: Any = None,
+    ) -> "ControlledActivationGateResult":
+        """在 3.9.2 客观判定之上，叠加 3.9.6 证据接收 / 签署 / 裁决三层事实。
+
+        为什么是"叠加"而不是"改写 ``evaluate``"
+        ---------------------------------------
+        ``evaluate`` 的 8 项检查是 3.9.2 已冻结的契约，被 ``ci_release_gate.py`` 与
+        ``activation_readiness.py`` 依赖。3.9.6 只允许**收紧**闸门，绝不允许放宽 ——
+        因此本方法读取 ``base_result`` 后只做两件事：追加检查项、按最差事实降级状态。
+        任何一项新检查失败，状态只会从 READY 降到 PENDING/BLOCKED，**永不反向提升**。
+
+        红线⑩ 的核心断言在最后：即便 ``decision_ledger.human_go_recorded()`` 为真、
+        且绑定校验通过，本方法返回的状态上限依然是 ``READY_FOR_HUMAN_REVIEW``。
+        闸门**永远不会**返回 ``ACTIVATED_BY_HUMAN`` —— 激活不是一次函数调用的结果。
+        """
+
+        checks: Dict[str, bool] = dict(base_result.checks)
+
+        # 1. 证据接收：必需类型全部获得真实人工批准
+        checks["evidence_intake_complete"] = bool(
+            getattr(intake_summary, "intake_complete", False)
+        )
+
+        # 2. 签署登记簿：四角色齐备且全部真实 GO
+        checks["signoff_registry_complete"] = bool(
+            getattr(signoff_snapshot, "signoff_complete", False)
+        )
+
+        # 3. 评审材料就绪（材料齐 ≠ 放行，只是"轮到人了"）
+        readiness = getattr(getattr(review_package, "readiness", None), "value", "")
+        checks["review_package_ready"] = readiness == "ready_for_human_final_review"
+
+        # 4. 人工裁决绑定有效性：
+        #    - 无裁决 → False（fail-closed：没人拍板就不算通过）；
+        #    - 有裁决但材料已变（摘要不匹配）→ False，且属**硬失败** —— 沿用
+        #      "对旧材料的批准"是最危险的治理漏洞之一；
+        #    - 有裁决、绑定成立、且为 GO → True（仍不等于放行）。
+        binding_valid = False
+        if decision_ledger is not None and review_package is not None:
+            verdict = decision_ledger.verify_binding(review_package)
+            binding_valid = bool(verdict.get("bound")) and bool(
+                decision_ledger.human_go_recorded()
+            )
+        checks["human_decision_binding_valid"] = binding_valid
+
+        missing = [k for k in self.INTAKE_CHECK_KEYS if not checks[k]]
+        all_missing = list(base_result.missing) + missing
+
+        # 状态归并：最差事实优先，且永不高于 base_result。
+        if base_result.status is ControlledActivationGateStatus.BLOCKED:
+            status = ControlledActivationGateStatus.BLOCKED
+        elif not checks["evidence_intake_complete"]:
+            # 客观证据都没收齐，属硬阻断
+            status = ControlledActivationGateStatus.BLOCKED
+        elif missing:
+            # 证据齐但人工侧（签署 / 材料 / 裁决）未完备 → 待人工
+            status = ControlledActivationGateStatus.PENDING_VERIFICATION
+        else:
+            # 全部通过：上限仍是"请人来审"，绝不放行（红线②③⑤⑩）
+            status = ControlledActivationGateStatus.READY_FOR_HUMAN_REVIEW
+
+        result = ControlledActivationGateResult(
+            gate_id=f"{base_result.gate_id}+intake",
+            rc_id=base_result.rc_id,
+            status=status,
+            checks=checks,
+            missing=all_missing,
+            evaluated_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        )
+        # 红线⑩ 终局断言：闸门任何路径都不得产出"已激活"。
+        if result.status is ControlledActivationGateStatus.ACTIVATED_BY_HUMAN:
+            raise EnterpriseRedLineViolationError(
+                "受控激活闸门不得返回 ACTIVATED_BY_HUMAN（红线⑩）"
+            )
+        return result
 
 
 __all__ = [

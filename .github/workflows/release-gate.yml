@@ -1,6 +1,6 @@
 name: Release Candidate Freeze & Controlled Activation Gate
 
-# Phase 3.9.2 发布闸门层 CI 门禁（只读，fail-closed）。
+# 生产发布闸门层 CI 门禁（只读，fail-closed）。
 #
 # 与通用 CI（ci.yml）及身份/生产安全门禁（identity-governance.yml）互补：本流水线
 # 只盯"发布候选是否已冻结、受控激活闸门是否未 BLOCKED"。它**不部署、不激活、
@@ -12,13 +12,36 @@ name: Release Candidate Freeze & Controlled Activation Gate
 #   release-gate-tests       发布闸门层单元 / 集成测试。
 #
 # 任一 job 失败即整条流水线失败（fail-closed）。
+#
+# ── 分支覆盖策略（Phase 3.9.6 T1 对齐，2026-08-13）─────────────────────────────
+# 发布闸门必须对**真实的 RC / release 集成载体**生效，而不能只监听某个已经不再承担
+# 集成职责的历史分支。RC 冻结基线（boip-rc-3.9.2）自 Phase 3.9.5 起由
+# feat/phase3.9.5-release-line-reconciliation 承载，Phase 3.9.4-R2 之后的治理层
+# 增量则落在 feat/phase3.9.4-r2-definitive-baseline-freeze 上；两者都必须被门禁覆盖。
+# 因此这里同时声明：
+#   1) main —— 长期主干（当前尚未创建，占位保留，防止未来落主干后漏跑）；
+#   2) 真实 RC / 基线集成分支（显式列出，可读、可审计）；
+#   3) 后续 release integration 分支通配（feat/phase3.9.* / feat/phase*-release-* /
+#      release/**），保证下一个阶段新建集成分支时门禁自动生效、无需再改 CI；
+#   4) 历史 feat/phase3.9.2-production-release-gate 保留（不破坏既有 CI 契约）。
+# pull_request 触发保持"无分支过滤"= 覆盖所有目标分支的 PR，属最严格配置，勿收窄。
+# 分支覆盖的机器可读校验见 scripts/check_ci_release_gate_branches.py（fail-closed）。
 
 on:
   pull_request:
   push:
     branches:
-      - "feat/phase3.9.2-production-release-gate"
+      # 1) 长期主干（占位保留）
       - "main"
+      # 2) 真实 RC / 基线集成载体（显式）
+      - "feat/phase3.9.5-release-line-reconciliation"
+      - "feat/phase3.9.4-r2-definitive-baseline-freeze"
+      # 3) 后续 release integration 分支策略（通配，自动覆盖新建集成分支）
+      - "feat/phase3.9.*"
+      - "feat/phase*-release-*"
+      - "release/**"
+      # 4) 历史发布闸门分支（保留，不破坏既有 CI）
+      - "feat/phase3.9.2-production-release-gate"
 
 permissions:
   contents: read

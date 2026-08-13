@@ -12,7 +12,9 @@
 ## 0. 当前冻结态（Phase 3.9.4-R2）
 
 - 冻结分支：`feat/phase3.9.4-r2-definitive-baseline-freeze`
-- 冻结 HEAD：`ab1f7cd`（本台账撰写时尚在增长；以 `git rev-parse HEAD` 为准）
+- 冻结 HEAD：`f7a2aba`（R2 最终收口提交 —— `docs(r2): record exact R2 deliverable commit hash (8d7ccaa) in closure report §14`）
+  - 台账初稿曾记 `ab1f7cd`，那是 R2 收口前的中途 HEAD；已按真实 Git（Phase 3.9.6 T2 收口提交完整性核验）修正为 R2 真实终点。
+  - 该冻结点之后的增量属 **Phase 3.9.6**（见 §1 表末行），在同一分支上叠加，不改写 R2 冻结事实。
 - 状态：`PHASE_3_9_4_DEFINITIVE_BASELINE_FROZEN_BUILT_NO_GO`
 - 含义：Git 事实唯一、测试事实唯一、Audit 事实唯一（JSON Ledger）、SSOT 唯一、工作树清洁、阶段边界明确、无未提交关键修复、无未来 Phase 污染、无报告与代码矛盾。
 - 下一步：等待主理人 + 专家线下真实四角色（production-owner / release-manager / security-owner / auditor）签署，方可推进激活（开启 `engineering_enabled`）。
@@ -29,8 +31,9 @@
 | 3.9.3 | `feat/phase3.9.3-production-observability-incident-readiness` | — | `8c7c9c5` | `phase3.9.3_production_observability_incident_readiness_report.md` | BUILT_NO_GO | 可观测性/SRE/事故响应准备（不真接入/不真告警）；审计 +13（83→96） | 否 |
 | 3.9.4 | `feat/phase3.9.4-telemetry-synthetic-operations` | `9201a7d` | `a905213` | `phase3.9.4_telemetry_synthetic_operations_report.md`（36§） | BUILT_NO_GO | 生产遥测适配 + 合成运维验证；审计 +4（96→100） | 否 |
 | 3.9.4-R1 | `fix/phase3.9.4-final-evidence-quality-closure`（意图分支） | — | 实际落点见下 | `phase3.9.4_r1_final_evidence_quality_closure_report.md` | CLOSED（交付物于 R2 提交） | 证据一致性与质量基线收口；Audit 溯源台账 + 校验器（R1 版）；JWT 修复 `e7952e9` 落 3.9.5 线 | 否 |
-| 3.9.4-R2 | `feat/phase3.9.4-r2-definitive-baseline-freeze` | `4983e7b` | （本阶段 HEAD） | `phase3.9.4_r2_definitive_baseline_freeze_report.md`（本文件姊妹报告） | FROZEN_BUILT_NO_GO / AWAITING_HUMAN | 权威基线冻结：Audit JSON Ledger SSOT + build/validator、本台账、CI 三道新门禁、多 CWD 测试稳定、全量回归 | 否 |
+| 3.9.4-R2 | `feat/phase3.9.4-r2-definitive-baseline-freeze` | `4983e7b` | `f7a2aba` | `phase3.9.4_r2_definitive_baseline_freeze_report.md`（本文件姊妹报告） | FROZEN_BUILT_NO_GO / AWAITING_HUMAN | 权威基线冻结：Audit JSON Ledger SSOT + build/validator、本台账、CI 三道新门禁、多 CWD 测试稳定、全量回归 | 否 |
 | 3.9.5 | `feat/phase3.9.5-release-line-reconciliation` | `e0cae50` | `4983e7b` | `phase3.9.5_release_line_reconciliation_closure_report.md`（27§）+ `phase3.9.2_release_candidate_freeze_activation_gate_closure_report.md`（23§） | RELEASE_LINE_RECONCILED_RC_FROZEN_AWAITING_HUMAN | RC 冻结核心 + 受控激活闸门 + CI release gate + 回滚 runbook + SSOT/roadmap 对账（审计不变，仍 100） | 否 |
+| 3.9.6 | `feat/phase3.9.6-production-activation-evidence-readiness`（自 R2 冻结点 `f7a2aba` 切出，保留真实 ancestry，不重写历史） | `f7a2aba`（R2 冻结点 = 3.9.6 起点） | （收口中；HEAD 收口后回填） | `phase3.9.6_production_activation_evidence_readiness_report.md`（收口后生成） | WIP_BUILT_NO_GO → 目标 `PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO` | 生产激活证据接收 + 人工签署治理层（T1–T4 已存于工作树）+ 证据包 v2 / 四角色要求 / SoD / 就绪门禁 / 阻断器 / pending 登记 / 复核包 / 最终人工裁决契约 / 工程激活契约 / 结构级 guard / API/UI / CI 门禁；审计 **+4（100→104）**：`ACTIVATION_EVIDENCE_SUBMITTED` / `ACTIVATION_EVIDENCE_VALIDATED` / `HUMAN_SIGNOFF_REGISTERED` / `ACTIVATION_REVIEW_PACKAGE_GENERATED` —— 四类均由本阶段**真实新增的接收/签署/复核能力**所必需，非为阶段编号强行凑数（Task 22 判据：先有真实行为，后有审计类目） | 否（等待主理人 + 四角色线下签署） |
 
 ## 2. 3.9.5 资产审计结论（R2-6 / R2-7）
 
