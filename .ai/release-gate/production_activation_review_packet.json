@@ -1,0 +1,322 @@
+{
+  "schema_version": "1.0.0",
+  "artifact": "production_activation_review_packet",
+  "phase": "3.9.6",
+  "rc_id": "RC-3.9.6",
+  "generated_at": "2026-08-13T02:59:37.627677+00:00",
+  "contains_real_secret": false,
+  "terminal_status": "PRODUCTION_ACTIVATION_EVIDENCE_READY_BUILT_NO_GO",
+  "engineering_enabled": false,
+  "governance_integrity_9_9": true,
+  "evidence_bundle_complete": false,
+  "readiness_gate": {
+    "gate_id": "parg",
+    "status": "blocked",
+    "checks": {
+      "engineering_enabled_false": true,
+      "evidence_bundle_complete": false,
+      "governance_integrity_9_9": true,
+      "rollback_reference_present": true,
+      "recovery_validation_present": true,
+      "no_activation_blockers": false,
+      "human_signoffs_complete": false,
+      "no_pending_verification": false
+    },
+    "missing": [
+      "evidence_bundle_complete",
+      "no_activation_blockers",
+      "human_signoffs_complete",
+      "no_pending_verification"
+    ],
+    "note": "PRODUCTION_ACTIVATION_READINESS_GATE_ONLY: 仅判定就绪前置态；绝不 APPROVED；激活由主理人在人类终端执行"
+  },
+  "contract": {
+    "required_gates": [
+      "engineering_enabled_false",
+      "evidence_bundle_complete",
+      "governance_integrity_9_9",
+      "rollback_reference_present",
+      "recovery_validation_present",
+      "no_activation_blockers",
+      "human_signoffs_complete",
+      "no_pending_verification"
+    ],
+    "required_evidence": [
+      "activation-evidence-bundle-v2"
+    ],
+    "required_signoffs": [
+      "production-owner",
+      "release-manager",
+      "security-owner",
+      "auditor"
+    ],
+    "blocker_count": 6,
+    "pending_count": 6,
+    "activation_allowed_for_human": false,
+    "note": "ENGINEERING_ACTIVATION_CONTRACT: AI 只判定 activation_allowed_for_human；真实 engineering_enabled=true 仅能由主理人在人类终端、四角色签署后显式执行"
+  },
+  "evidence_bundle": {
+    "bundle_id": "aeb-v2-3.9.6",
+    "version": "3.9.6",
+    "item_count": 7,
+    "production_evidence_complete": false,
+    "items": [
+      {
+        "phase": "3.9.0",
+        "artifact": "production-readiness",
+        "commit": "a538e1e",
+        "report": "phase3.9.0_production_readiness_preparation_report.md",
+        "hash": null,
+        "verification_status": "pending_verification",
+        "human_review_status": "pending_human_review",
+        "evidence_scope": "staging",
+        "is_real_production_evidence": false
+      },
+      {
+        "phase": "3.9.1",
+        "artifact": "staging-validation-dr",
+        "commit": "66f9b57",
+        "report": "phase3.9.1_staging_validation_disaster_recovery_report.md",
+        "hash": null,
+        "verification_status": "pending_verification",
+        "human_review_status": "pending_human_review",
+        "evidence_scope": "staging",
+        "is_real_production_evidence": false
+      },
+      {
+        "phase": "3.9.2",
+        "artifact": "release-gate-rc-freeze",
+        "commit": "1f223db",
+        "report": "phase3.9.2_production_release_gate_evidence_package_report.md",
+        "hash": null,
+        "verification_status": "pending_verification",
+        "human_review_status": "pending_human_review",
+        "evidence_scope": "staging",
+        "is_real_production_evidence": false
+      },
+      {
+        "phase": "3.9.3",
+        "artifact": "observability-incident",
+        "commit": "8c7c9c5",
+        "report": "phase3.9.3_production_observability_incident_readiness_report.md",
+        "hash": null,
+        "verification_status": "pending_verification",
+        "human_review_status": "pending_human_review",
+        "evidence_scope": "staging",
+        "is_real_production_evidence": false
+      },
+      {
+        "phase": "3.9.4",
+        "artifact": "telemetry-synthetic",
+        "commit": "a905213",
+        "report": "phase3.9.4_telemetry_synthetic_operations_report.md",
+        "hash": null,
+        "verification_status": "pending_verification",
+        "human_review_status": "pending_human_review",
+        "evidence_scope": "synthetic",
+        "is_real_production_evidence": false
+      },
+      {
+        "phase": "3.9.4-R2",
+        "artifact": "baseline-freeze",
+        "commit": "f7a2aba",
+        "report": "phase3.9.4_r2_definitive_baseline_freeze_report.md",
+        "hash": null,
+        "verification_status": "pending_verification",
+        "human_review_status": "pending_human_review",
+        "evidence_scope": "human",
+        "is_real_production_evidence": false
+      },
+      {
+        "phase": "3.9.5",
+        "artifact": "rc-freeze-reconcile",
+        "commit": "4983e7b",
+        "report": "phase3.9.5_release_line_reconciliation_closure_report.md",
+        "hash": null,
+        "verification_status": "pending_verification",
+        "human_review_status": "pending_human_review",
+        "evidence_scope": "staging",
+        "is_real_production_evidence": false
+      }
+    ]
+  },
+  "blockers": [
+    {
+      "blocker_id": "B1-real-idp",
+      "category": "identity",
+      "description": "真实 IdP（jwt/oidc/sso-gateway）尚未通过生产校验",
+      "source": "phase3.8.28 / phase3.9.2",
+      "evidence": "pending_real_idp_validation",
+      "owner_role": "security-owner",
+      "resolution_status": "open"
+    },
+    {
+      "blocker_id": "B2-real-secrets",
+      "category": "secret",
+      "description": "真实生产密钥/凭证尚未注入（仅配置占位）",
+      "source": "phase3.9.2",
+      "evidence": "pending_real_secrets",
+      "owner_role": "security-owner",
+      "resolution_status": "open"
+    },
+    {
+      "blocker_id": "B3-real-telemetry",
+      "category": "observability",
+      "description": "真实生产遥测数据源尚未接入（当前仅合成演练）",
+      "source": "phase3.9.4",
+      "evidence": "pending_real_telemetry_source",
+      "owner_role": "release-manager",
+      "resolution_status": "open"
+    },
+    {
+      "blocker_id": "B4-real-alert-routing",
+      "category": "incident",
+      "description": "真实告警路由（on-call / 工单）尚未配置",
+      "source": "phase3.9.3",
+      "evidence": "pending_real_alert_routing",
+      "owner_role": "incident-commander",
+      "resolution_status": "open"
+    },
+    {
+      "blocker_id": "B5-four-role-signoff",
+      "category": "governance",
+      "description": "四角色真实线下签署尚未完成",
+      "source": "phase3.9.6",
+      "evidence": "pending_four_role_signoff",
+      "owner_role": "production-owner",
+      "resolution_status": "open"
+    },
+    {
+      "blocker_id": "B6-real-topology",
+      "category": "infra",
+      "description": "真实生产拓扑/部署目标尚未决策",
+      "source": "phase3.9.6",
+      "evidence": "pending_real_topology_decision",
+      "owner_role": "production-owner",
+      "resolution_status": "open"
+    }
+  ],
+  "pending_verification": [
+    {
+      "id": "PV1-real-idp",
+      "phase": "3.8.28",
+      "item": "真实 IdP 校验",
+      "reason": "当前 IdP 仅配置占位，未经真实生产校验",
+      "required_evidence": "real_idp_validation_report",
+      "required_role": "security-owner",
+      "current_status": "pending_verification",
+      "source_report": "phase3.8.28-enterprise-identity-report.md"
+    },
+    {
+      "id": "PV2-real-secrets",
+      "phase": "3.9.2",
+      "item": "真实生产密钥注入",
+      "reason": "密钥仅在配置中占位，未注入真实生产凭证",
+      "required_evidence": "real_secret_injection_evidence",
+      "required_role": "security-owner",
+      "current_status": "pending_verification",
+      "source_report": "phase3.9.2_production_release_gate_evidence_package_report.md"
+    },
+    {
+      "id": "PV3-real-telemetry",
+      "phase": "3.9.4",
+      "item": "真实遥测源接入",
+      "reason": "当前仅合成演练通过，无真实生产遥测",
+      "required_evidence": "real_telemetry_source_evidence",
+      "required_role": "release-manager",
+      "current_status": "pending_verification",
+      "source_report": "phase3.9.4_telemetry_synthetic_operations_report.md"
+    },
+    {
+      "id": "PV4-real-alert",
+      "phase": "3.9.3",
+      "item": "真实告警路由",
+      "reason": "告警路由未接真实 on-call/工单系统",
+      "required_evidence": "real_alert_routing_evidence",
+      "required_role": "incident-commander",
+      "current_status": "pending_verification",
+      "source_report": "phase3.9.3_production_observability_incident_readiness_report.md"
+    },
+    {
+      "id": "PV5-real-topology",
+      "phase": "3.9.6",
+      "item": "真实生产拓扑决策",
+      "reason": "部署拓扑/目标尚未由主理人决策",
+      "required_evidence": "real_topology_decision",
+      "required_role": "production-owner",
+      "current_status": "pending_verification",
+      "source_report": ""
+    },
+    {
+      "id": "PV6-engineering-enabled",
+      "phase": "3.9.6",
+      "item": "engineering_enabled 翻转",
+      "reason": "须四角色签署且主理人在人类终端显式置 true",
+      "required_evidence": "four_role_signoff + human_terminal_action",
+      "required_role": "production-owner",
+      "current_status": "pending_verification",
+      "source_report": ""
+    }
+  ],
+  "signoff_requirements": [
+    {
+      "required_role": "production-owner",
+      "required_actor_kind": "user",
+      "required_evidence": [],
+      "current_status": "pending_human_signoff",
+      "signed_by": null,
+      "signed_at": null,
+      "decision": null,
+      "reason": null,
+      "is_satisfied": false
+    },
+    {
+      "required_role": "release-manager",
+      "required_actor_kind": "user",
+      "required_evidence": [],
+      "current_status": "pending_human_signoff",
+      "signed_by": null,
+      "signed_at": null,
+      "decision": null,
+      "reason": null,
+      "is_satisfied": false
+    },
+    {
+      "required_role": "security-owner",
+      "required_actor_kind": "user",
+      "required_evidence": [],
+      "current_status": "pending_human_signoff",
+      "signed_by": null,
+      "signed_at": null,
+      "decision": null,
+      "reason": null,
+      "is_satisfied": false
+    },
+    {
+      "required_role": "auditor",
+      "required_actor_kind": "user",
+      "required_evidence": [],
+      "current_status": "pending_human_signoff",
+      "signed_by": null,
+      "signed_at": null,
+      "decision": null,
+      "reason": null,
+      "is_satisfied": false
+    }
+  ],
+  "sod": {
+    "four_roles_present": false,
+    "all_real_user": true,
+    "policy_distinct_natural_persons": "pending_policy_verification",
+    "distinct_actor_ids": [],
+    "ok": false,
+    "note": "SOD_ONLY: 校验四角色齐备且均为真实 USER；是否要求'不同自然人'在无权威策略时标 pending_policy_verification，不擅自断言"
+  },
+  "human_review_required": true,
+  "automated_approval_prohibited": true,
+  "next_human_actions": [
+    "主理人 + 四角色线下提交真实生产激活证据（RC 冻结基线 / 回滚 runbook / 真实凭证占位）",
+    "四角色（production-owner / release-manager / security-owner / auditor）线下完成各自签署",
+    "主理人显式置 engineering_enabled=true（唯一人类终端动作，AI 不代执行）"
+  ]
+}

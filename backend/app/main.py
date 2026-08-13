@@ -14,6 +14,7 @@ from app.api import (
     governance_identity_router,
     governance_operations_router,
     governance_release_router,
+    governance_activation_router,
     governance_observability_router,
     governance_telemetry_router,
     health_router,
@@ -56,6 +57,7 @@ app.include_router(governance_identity_router)
 app.include_router(governance_dashboard_router)
 app.include_router(governance_operations_router)
 app.include_router(governance_release_router)
+app.include_router(governance_activation_router)
 app.include_router(governance_observability_router)
 app.include_router(governance_telemetry_router)
 register_cors(app)
