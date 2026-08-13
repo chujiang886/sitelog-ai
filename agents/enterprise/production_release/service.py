@@ -123,6 +123,7 @@ class ProductionReleaseService(_RedLineForbiddenMixin):
         org_id: str,
         audit: AuditService,
         identity: Any = None,
+        root_dir: str = ".",
     ) -> None:
         if not safety_invariants_ok():
             raise EnterpriseRedLineViolationError(
@@ -131,9 +132,10 @@ class ProductionReleaseService(_RedLineForbiddenMixin):
         self._org_id = str(org_id).strip()
         self._audit = audit
         self._identity = identity
-        self._evidence_svc = ProductionReleaseEvidenceService(root_dir=".")
+        self._root_dir = root_dir
+        self._evidence_svc = ProductionReleaseEvidenceService(root_dir=root_dir)
         self._gate = ProductionReleaseGate()
-        self._package_builder = ReleasePackageBuilder(root_dir=".")
+        self._package_builder = ReleasePackageBuilder(root_dir=root_dir)
         self._approval_svc = HumanActivationApprovalService(audit=audit)
 
     # ------------------------------------------------------------------ #

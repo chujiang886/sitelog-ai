@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+from pathlib import Path
 
 import pytest
 from dataclasses import FrozenInstanceError
@@ -90,12 +91,17 @@ _REQUIRED_AUDIT_CATEGORIES = {
     "release_manifest_generated",
 }
 
-_ROOT = os.path.abspath(".")
+# 仓库根（把"仓库相对路径"工件解析为绝对路径，使测试与调用工作目录无关）。
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# 与调用工作目录无关：用仓库根解析"仓库相对路径"工件（避免从 backend/ 跑测试时
+# 把 rel 前缀到 CWD 上导致 FileNotFoundError）。
+_ROOT = str(REPO_ROOT)
 
 
 def _service() -> ProductionReleaseService:
     return ProductionReleaseService(
-        org_id="org-1", audit=AuditService(org_id="org-1")
+        org_id="org-1", audit=AuditService(org_id="org-1"), root_dir=str(REPO_ROOT)
     )
 
 
@@ -113,7 +119,7 @@ def _ev(
 
 
 def _chain_of(items) -> dict:
-    return ProductionReleaseEvidenceService().build_evidence_chain(items)
+    return ProductionReleaseEvidenceService(root_dir=str(REPO_ROOT)).build_evidence_chain(items)
 
 
 def _all_true_scan() -> dict:
@@ -398,7 +404,7 @@ def test_service_forbids_create_human_signoff() -> None:
 # T6 清单 SHA-256 + T7 回滚引用（只描述）
 # =========================================================================== #
 def test_manifest_sha256_for_existing_and_missing_artifacts() -> None:
-    builder = ReleasePackageBuilder(root_dir=".")
+    builder = ReleasePackageBuilder(root_dir=str(REPO_ROOT))
     rel = "agents/enterprise/production_release/forbidden.py"
     man = builder.build_manifest(
         release_version="1.0.0",
@@ -416,7 +422,7 @@ def test_manifest_sha256_for_existing_and_missing_artifacts() -> None:
 
 
 def test_rollback_reference_verified_only_when_refs_present() -> None:
-    builder = ReleasePackageBuilder(root_dir=".")
+    builder = ReleasePackageBuilder(root_dir=str(REPO_ROOT))
     complete = builder.build_rollback_reference(
         last_known_good_version="0.9.0",
         last_known_good_commit="def456",

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -55,6 +56,9 @@ ORG_A = "test-org-a"
 ORG_B = "test-org-b"
 RELEASE_ID = "RC-3.9.2"
 
+# 仓库根（用于把"仓库相对路径"工件解析为绝对路径，使测试与调用工作目录无关）。
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 
 @pytest.fixture()
 def audit_a():
@@ -64,7 +68,7 @@ def audit_a():
 
 @pytest.fixture()
 def svc_a(audit_a):
-    return ProductionReleaseService(org_id=ORG_A, audit=audit_a)
+    return ProductionReleaseService(org_id=ORG_A, audit=audit_a, root_dir=str(REPO_ROOT))
 
 
 def _all_checks_true() -> dict:
