@@ -2,7 +2,7 @@
 
 > 分支：`feat/phase3.9.6-production-activation-evidence-readiness`（自 R2 冻结点 `f7a2aba` 切出，**不新开 3.9.7 分支**）
 > R1 起点（3.9.6 core 收口 HEAD）：`94305aa`
-> R1 收口提交：本会话形成（HEAD 由 `94305aa` 前进 1；commit 后回填精确 hash）
+> R1 收口提交：`49d6191b9dd52779a13a7d8044f35ec0baef6e65`（§27 最终边界对账收口；HEAD 由 94305aa 前进）
 > 终端态：**`PHASE_3_9_6_EVIDENCE_BOUNDARY_RECONCILED_BUILT_NO_GO`**
 > 姊妹报告：`.ai/reviews/phase3.9.6_production_activation_evidence_readiness_report.md`（R1 重建版）、`.ai/reviews/phase3.9.6_production_activation_evidence_human_signoff_closure_report.md`、`.ai/PHASE_BOUNDARY_LEDGER.md`
 
@@ -71,7 +71,7 @@ Phase Boundary Authority + Quality Baseline Owner 身份执行，被授予 Git �
 | 当前分支 | `feat/phase3.9.6-production-activation-evidence-readiness` |
 | 分支起点（R2 冻结点） | `f7a2aba` |
 | 3.9.6 core 关键提交链 | `59807ca`(T1–T11, 含 Layer A+B) → `0dfd253`(审计账本 100→104) → `863a038`(docs 部分收口) → `7bc5cba`(final-closure delta T15–T21) → `94305aa`(SSOT current_head/final_closure_commit 准确性修正) |
-| R1 收口提交 | 本会话（94305aa 基础上前进 1） |
+| R1 收口提交 | `49d6191b9dd52779a13a7d8044f35ec0baef6e65`（§27 最终边界对账收口；94305aa 基础上前进） |
 | 工作树状态 | R1 改动待提交（STOP 等主理人审核） |
 
 ## 7. 真实路由基线（15 路由 = 7 Layer A + 8 Layer B）

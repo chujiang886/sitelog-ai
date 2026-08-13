@@ -4287,6 +4287,7 @@
     ],
     "r1_reconciliation_delta": {
       "terminal": "PHASE_3_9_6_EVIDENCE_BOUNDARY_RECONCILED_BUILT_NO_GO",
+      "closure_commit": "49d6191b9dd52779a13a7d8044f35ec0baef6e65（R1 §27 最终边界对账收口报告）",
       "purpose": "R1 边界对账会话（Phase 3.9.6-R1，非 3.9.7）：消弭 phase 事实漂移，Layer B 归属 3.9.6 的 Git 法证证明，真实路由/测试基线收敛",
       "branch": "feat/phase3.9.6-production-activation-evidence-readiness（同 3.9.6，不新开分支，不进 3.9.7）",
       "layer_b_attribution": "Layer B（activation_intake / intake_service / review_package / final_decision / human_approval / evidence_storage_safety / permission_boundary）于 commit 59807ca（T1–T11 核心）引入，属 Phase 3.9.6 核心，非 3.9.7；R1 仅补 evidence_storage_safety + permission_boundary + API/前端/契约测试接线",
