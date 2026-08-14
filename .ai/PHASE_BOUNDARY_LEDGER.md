@@ -37,6 +37,7 @@
 | 3.9.7 | `feat/phase3.9.7-production-activation-final-human-review-readiness` | `94305aa`（3.9.6 core 收口线，本分支共祖起点） | `1fe5a94` | `phase3.9.7_production_final_human_review_readiness_closure_report.md` | `PRODUCTION_FINAL_HUMAN_REVIEW_READINESS_BUILT_NO_GO` | 生产激活最终人工评审与 Go/No-Go 就绪层（Layer C 只读 24 路由）；同集成载体含 change-control 提交 7ad04ab/82174eb（审计 108→121，正交 additive） | 否（等待主理人 + 四角色线下签署与真实证据提交） |
 | 3.9.7-change | `feat/phase3.9.7-production-activation-final-human-review-readiness`（同集成载体） | `94305aa`（3.9.6 收口线；change-control 为 additive 叠加于 final-review 载体） | `b45da40` | `phase3.9.7_production_change_control_report.md` | `PRODUCTION_CHANGE_CONTROL_BUILT_NO_GO` | 生产变更管控与受控激活编排层（只读变更管控平面，19 模块 + governance_change.py 路由，无真实执行；审计 108→121，+13 CHANGE_* 类目） | 否（等待主理人 + 四角色线下签署与真实证据提交） |
 | 3.9.8 | `feat/phase3.9.8-production-activation-dry-run` | `1fe5a94`（3.9.7 收口 HEAD，分支切出点；祖先链 1fe5a94←b45da40←28102dc） | `5d3a21f` | `phase3.9.8_production_activation_dry_run_simulation_closure_report.md` | `PRODUCTION_ACTIVATION_DRY_RUN_VALIDATED_BUILT_NO_GO` | 生产激活干跑、人工决策演练与不可逆边界验证层（纯模拟 SIMULATION_ONLY sandbox，无真实激活/部署/签署/GO）；**未完成 Real Staging Runtime Integration & Validation**，Real Staging 不得标记 completed | 否（等待主理人 + 四角色线下签署与真实证据提交） |
+| 3.9.9 (Real Staging) | `feat/phase3.9.9-real-staging-runtime-validation` | `3abca6d`（3.9.8 证据盖章 HEAD，本分支切出点） | `01dd970`（T39-41 代码收口）+ 本 commit（SSOT 同步 + 43§ 报告） | `.ai/reviews/phase3.9.9_real_staging_runtime_integration_validation_report.md`（43§） | `PHASE_3_9_9_REAL_STAGING_RUNTIME_VALIDATION_BUILT_NO_GO` | 真实预生产运行时接入与验证层（describe-only / fail-closed，结构证明 Staging ≠ Production）；18 模块 + CI 闸门 + 43§ 收口报告；审计 0 新增（仍 129 分支基线） | 否（等待主理人 + 四角色线下签署与真实 External Staging 资源登记） |
 
 ## 2. 3.9.5 资产审计结论（R2-6 / R2-7）
 
@@ -67,7 +68,8 @@
 
 ## 5. 与其他 SSOT 的关系
 
-- `AuditActionCategory` 总数 = 100，机器可读 SSOT = `.ai/baselines/audit_action_category_ledger.json`（由 `scripts/build_audit_category_ledger.py` 从 Git 重建），人类可读镜像 = `.ai/AUDIT_ACTION_CATEGORY_LEDGER.md`。
+- `AuditActionCategory` 总数 = 141（权威累计：3.9.7-change +13→121；3.9.8 +8→129；3.9.9 prod-change-control +12→141；Real Staging 3.9.9 贡献 0 新类目，仍 129 分支基线），机器可读 SSOT = `.ai/baselines/audit_action_category_ledger.json`（由 `scripts/build_audit_category_ledger.py` 从 Git 重建），人类可读镜像 = `.ai/AUDIT_ACTION_CATEGORY_LEDGER.md`。
+- 注：3.9.8 收口报告 `audit_total=129` 为阶段快照（不重写历史）；本分支 `audit.py` 基线 = `d03a7f1f`（129 类），无 155 漂移残留。
 - `project_status.json`：`phase_3_9_5_status = "RELEASE_LINE_RECONCILED_RC_FROZEN_AWAITING_HUMAN"`，与 roadmap §35.7、本台账一致。
 - `roadmap_v8.md`：§35.1–§35.7 覆盖 3.9.0–3.9.5；§35.8（本 R2 增补）覆盖 3.9.4-R2。
 - 所有 Phase 状态在以上四处一致，无 APPROVED/GO/PRODUCTION_READY 误标。

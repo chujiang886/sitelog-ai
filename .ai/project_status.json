@@ -4278,14 +4278,70 @@
     "current_head": "94305aa2e91850196cbe03b5f0eb727c303594fb（3.9.6 core 最终收口：SSOT current_head/final_closure_commit 准确性修正；R1 边界对账收口见本会话追加提交，未改写 94305aa 历史）",
     "final_closure_commit": "94305aa2e91850196cbe03b5f0eb727c303594fb（3.9.6 core 收口终点；R1 边界对账为叠加的 sub-delta，本次提交后终端态更新）",
     "final_delta_files": [
-      {"file": ".ai/project_status.json", "purpose": "T19 SSOT 补齐 phase_3_9_6 详细对象（+93 行；phase_3_9_6_status 标志行已在 863a038 加入）", "task": "T19", "tracked": true, "included_in_863a038": false, "final_action": "commit (follow-up delta)"},
-      {"file": ".github/workflows/activation-readiness-gate.yml", "purpose": "T17 CI 门禁：integrity/security job 补 pyyaml 安装步骤（真实 CI 可跑，修复本地绿而 CI 红）", "task": "T17", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
-      {"file": "agents/enterprise/production_release/intake_service.py", "purpose": "T16 Layer B intake 服务：submit_evidence/record_human_evidence_decision/summarize/build_review_package 强化", "task": "T16", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
-      {"file": "backend/app/api/governance_activation.py", "purpose": "T15 新增 GET /evidence-list 端点（Layer B 受理证据清单；合计 15 路由：7 Layer A + 8 Layer B，无 /activate /deploy-production）", "task": "T15", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
-      {"file": "frontend/src/app/governance-activation/page.tsx", "purpose": "T15 人工复核 UI 接线（读取态：evidence-list/signoff/review-package；禁写 no-go 之外结论）", "task": "T15", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
-      {"file": "tests/agents/test_production_activation_readiness.py", "purpose": "T16 Layer B 测试：4 新测试类（intake/存储安全/权限边界/fail-closed），路由计数 14→15（含 /evidence-list，总计 7 Layer A + 8 Layer B）", "task": "T16", "tracked": true, "included_in_863a038": false, "final_action": "commit"},
-      {"file": "agents/enterprise/production_release/evidence_storage_safety.py", "purpose": "T13/T16 证据存储安全：拒 inline 正文、拒裸密钥引用（sk-/ghp_/PRIVATE KEY/...）、流式 sha256", "task": "T13/T16", "tracked": false, "included_in_863a038": false, "final_action": "commit (add)"},
-      {"file": "agents/enterprise/production_release/permission_boundary.py", "purpose": "T12/T16 权限边界：deny-by-default 白名单；require_activation_operation 强制 actor_kind==user + signoff", "task": "T12/T16", "tracked": false, "included_in_863a038": false, "final_action": "commit (add)"}
+      {
+        "file": ".ai/project_status.json",
+        "purpose": "T19 SSOT 补齐 phase_3_9_6 详细对象（+93 行；phase_3_9_6_status 标志行已在 863a038 加入）",
+        "task": "T19",
+        "tracked": true,
+        "included_in_863a038": false,
+        "final_action": "commit (follow-up delta)"
+      },
+      {
+        "file": ".github/workflows/activation-readiness-gate.yml",
+        "purpose": "T17 CI 门禁：integrity/security job 补 pyyaml 安装步骤（真实 CI 可跑，修复本地绿而 CI 红）",
+        "task": "T17",
+        "tracked": true,
+        "included_in_863a038": false,
+        "final_action": "commit"
+      },
+      {
+        "file": "agents/enterprise/production_release/intake_service.py",
+        "purpose": "T16 Layer B intake 服务：submit_evidence/record_human_evidence_decision/summarize/build_review_package 强化",
+        "task": "T16",
+        "tracked": true,
+        "included_in_863a038": false,
+        "final_action": "commit"
+      },
+      {
+        "file": "backend/app/api/governance_activation.py",
+        "purpose": "T15 新增 GET /evidence-list 端点（Layer B 受理证据清单；合计 15 路由：7 Layer A + 8 Layer B，无 /activate /deploy-production）",
+        "task": "T15",
+        "tracked": true,
+        "included_in_863a038": false,
+        "final_action": "commit"
+      },
+      {
+        "file": "frontend/src/app/governance-activation/page.tsx",
+        "purpose": "T15 人工复核 UI 接线（读取态：evidence-list/signoff/review-package；禁写 no-go 之外结论）",
+        "task": "T15",
+        "tracked": true,
+        "included_in_863a038": false,
+        "final_action": "commit"
+      },
+      {
+        "file": "tests/agents/test_production_activation_readiness.py",
+        "purpose": "T16 Layer B 测试：4 新测试类（intake/存储安全/权限边界/fail-closed），路由计数 14→15（含 /evidence-list，总计 7 Layer A + 8 Layer B）",
+        "task": "T16",
+        "tracked": true,
+        "included_in_863a038": false,
+        "final_action": "commit"
+      },
+      {
+        "file": "agents/enterprise/production_release/evidence_storage_safety.py",
+        "purpose": "T13/T16 证据存储安全：拒 inline 正文、拒裸密钥引用（sk-/ghp_/PRIVATE KEY/...）、流式 sha256",
+        "task": "T13/T16",
+        "tracked": false,
+        "included_in_863a038": false,
+        "final_action": "commit (add)"
+      },
+      {
+        "file": "agents/enterprise/production_release/permission_boundary.py",
+        "purpose": "T12/T16 权限边界：deny-by-default 白名单；require_activation_operation 强制 actor_kind==user + signoff",
+        "task": "T12/T16",
+        "tracked": false,
+        "included_in_863a038": false,
+        "final_action": "commit (add)"
+      }
     ],
     "r1_reconciliation_delta": {
       "terminal": "PHASE_3_9_6_EVIDENCE_BOUNDARY_RECONCILED_BUILT_NO_GO",
@@ -4294,16 +4350,75 @@
       "branch": "feat/phase3.9.6-production-activation-evidence-readiness（同 3.9.6，不新开分支，不进 3.9.7）",
       "layer_b_attribution": "Layer B（activation_intake / intake_service / review_package / final_decision / human_approval / evidence_storage_safety / permission_boundary）于 commit 59807ca（T1–T11 核心）引入，属 Phase 3.9.6 核心，非 3.9.7；R1 仅补 evidence_storage_safety + permission_boundary + API/前端/契约测试接线",
       "files": [
-        {"file": "tests/agents/test_phase3_9_6_evidence_boundary_contract.py", "purpose": "R1-14 边界契约测试 8 例（机器闸门 B1–B6/PV1–PV6 1:1、证据包 1:1 镜像、包 schema/红线/sha256、API 契约 15 路由、权限边界 7 操作、清单硬规则）", "tracked": false, "final_action": "commit (add)"},
-        {"file": "scripts/generate_production_activation_review_packet.py", "purpose": "R1-10/11 证据包 v2 确定性化：移除 source_commit/generated_at 易变字段，新增 layer_b 段 + packet_sha256 规范哈希，forbidden_endpoints 字段排除出禁词扫描", "task": "R1-10/11", "tracked": true, "final_action": "commit"},
-        {"file": "scripts/validate_production_activation_review_packet.py", "purpose": "R1-12 fail-closed 校验器：schema 2.x、终端 BUILT_NO_GO、engineering_enabled False、contains_real_secret False、sha256 防篡改、layer_b 存在、阻断器 6/pending 6、禁词扫描", "task": "R1-12", "tracked": false, "final_action": "commit (add)"},
-        {"file": "scripts/generate_production_activation_api_contract.py", "purpose": "R1-15 AST 抽取 API 契约（无需 import app），产出 .ai/baselines/production_activation_api_contract.json（route_count=15）", "task": "R1-15", "tracked": false, "final_action": "commit (add)"},
-        {"file": ".ai/baselines/production_activation_api_contract.json", "purpose": "R1-15 API 契约 SSOT（15 路由，7 Layer A + 8 Layer B）", "task": "R1-15", "tracked": true, "final_action": "commit"},
-        {"file": ".ai/release-gate/production_activation_review_packet.json", "purpose": "R1-10/11 证据包 v2 确定性重建（schema 2.0.0，含 layer_b）", "task": "R1-10/11", "tracked": true, "final_action": "commit"},
-        {"file": ".github/workflows/activation-readiness-gate.yml", "purpose": "R1-13 CI：activation-readiness-evidence-packet job（generate→validate→git diff --exit-code 包+契约）+ 将边界契约测试纳入 pytest；已在 94305aa 提交", "task": "R1-13", "tracked": true, "final_action": "commit"},
-        {"file": ".ai/runbooks/production_activation/HUMAN_ACTIVATION_CHECKLIST.md", "purpose": "R1-9 清单 §7 机器闸门 1:1 映射 B1–B6/PV1–PV6 + §7.3 硬规则（readiness_gate.status==READY_FOR_HUMAN_SIGNOFF 才放行 engineering_enabled）", "task": "R1-9", "tracked": true, "final_action": "commit"},
-        {"file": ".ai/reviews/phase3.9.6_r1_activation_evidence_boundary_reconciliation_report.md", "purpose": "R1-§27 最终边界对账收口报告（33 节），终端态 PHASE_3_9_6_EVIDENCE_BOUNDARY_RECONCILED_BUILT_NO_GO", "task": "R1-§27", "tracked": false, "final_action": "commit (add)"},
-        {"file": ".ai/reviews/phase3.9.6_production_activation_evidence_readiness_report.md", "purpose": "R1-22 重建收口报告（含 Layer B 节 + 正确路由/测试计数，消弭'无 Layer B'漂移）", "task": "R1-22", "tracked": true, "final_action": "commit"}
+        {
+          "file": "tests/agents/test_phase3_9_6_evidence_boundary_contract.py",
+          "purpose": "R1-14 边界契约测试 8 例（机器闸门 B1–B6/PV1–PV6 1:1、证据包 1:1 镜像、包 schema/红线/sha256、API 契约 15 路由、权限边界 7 操作、清单硬规则）",
+          "tracked": false,
+          "final_action": "commit (add)"
+        },
+        {
+          "file": "scripts/generate_production_activation_review_packet.py",
+          "purpose": "R1-10/11 证据包 v2 确定性化：移除 source_commit/generated_at 易变字段，新增 layer_b 段 + packet_sha256 规范哈希，forbidden_endpoints 字段排除出禁词扫描",
+          "task": "R1-10/11",
+          "tracked": true,
+          "final_action": "commit"
+        },
+        {
+          "file": "scripts/validate_production_activation_review_packet.py",
+          "purpose": "R1-12 fail-closed 校验器：schema 2.x、终端 BUILT_NO_GO、engineering_enabled False、contains_real_secret False、sha256 防篡改、layer_b 存在、阻断器 6/pending 6、禁词扫描",
+          "task": "R1-12",
+          "tracked": false,
+          "final_action": "commit (add)"
+        },
+        {
+          "file": "scripts/generate_production_activation_api_contract.py",
+          "purpose": "R1-15 AST 抽取 API 契约（无需 import app），产出 .ai/baselines/production_activation_api_contract.json（route_count=15）",
+          "task": "R1-15",
+          "tracked": false,
+          "final_action": "commit (add)"
+        },
+        {
+          "file": ".ai/baselines/production_activation_api_contract.json",
+          "purpose": "R1-15 API 契约 SSOT（15 路由，7 Layer A + 8 Layer B）",
+          "task": "R1-15",
+          "tracked": true,
+          "final_action": "commit"
+        },
+        {
+          "file": ".ai/release-gate/production_activation_review_packet.json",
+          "purpose": "R1-10/11 证据包 v2 确定性重建（schema 2.0.0，含 layer_b）",
+          "task": "R1-10/11",
+          "tracked": true,
+          "final_action": "commit"
+        },
+        {
+          "file": ".github/workflows/activation-readiness-gate.yml",
+          "purpose": "R1-13 CI：activation-readiness-evidence-packet job（generate→validate→git diff --exit-code 包+契约）+ 将边界契约测试纳入 pytest；已在 94305aa 提交",
+          "task": "R1-13",
+          "tracked": true,
+          "final_action": "commit"
+        },
+        {
+          "file": ".ai/runbooks/production_activation/HUMAN_ACTIVATION_CHECKLIST.md",
+          "purpose": "R1-9 清单 §7 机器闸门 1:1 映射 B1–B6/PV1–PV6 + §7.3 硬规则（readiness_gate.status==READY_FOR_HUMAN_SIGNOFF 才放行 engineering_enabled）",
+          "task": "R1-9",
+          "tracked": true,
+          "final_action": "commit"
+        },
+        {
+          "file": ".ai/reviews/phase3.9.6_r1_activation_evidence_boundary_reconciliation_report.md",
+          "purpose": "R1-§27 最终边界对账收口报告（33 节），终端态 PHASE_3_9_6_EVIDENCE_BOUNDARY_RECONCILED_BUILT_NO_GO",
+          "task": "R1-§27",
+          "tracked": false,
+          "final_action": "commit (add)"
+        },
+        {
+          "file": ".ai/reviews/phase3.9.6_production_activation_evidence_readiness_report.md",
+          "purpose": "R1-22 重建收口报告（含 Layer B 节 + 正确路由/测试计数，消弭'无 Layer B'漂移）",
+          "task": "R1-22",
+          "tracked": true,
+          "final_action": "commit"
+        }
       ]
     },
     "preliminary_closure_commit": "863a038e0a1424538369cfcdeb3f7fb8de20f3dc（docs-only 部分收口：7 files，纯文档/SSOT/roadmap/forensics，无任何代码/测试/CI 改动）",
@@ -4384,7 +4499,12 @@
       "主理人授权本次 final-closure delta 提交（若项目规则要求显式授权，则列 PENDING_HUMAN_COMMIT_AUTHORIZATION）"
     ],
     "readiness_package": "READY_FOR_HUMAN_FINAL_REVIEW（材料就绪度上限；GO 裁决由真实四角色在人类终端作出，AI 不代行）",
-    "forbidden_endpoints": ["/activate", "/deploy-production", "/go", "engineering_approved 输出"],
+    "forbidden_endpoints": [
+      "/activate",
+      "/deploy-production",
+      "/go",
+      "engineering_approved 输出"
+    ],
     "verified_json_modified": false,
     "engineering_enabled_modified": false,
     "red_lines": {
@@ -4488,7 +4608,11 @@
       "主理人在人类终端显式置 engineering_enabled=true（唯一 AI 不代执行之动作）",
       "真实密钥线下提供（production_secret 恒 PENDING_VERIFICATION，AI 不写真实密钥）"
     ],
-    "forbidden_endpoints": ["/activate", "/deploy-production", "engineering_approved 输出"],
+    "forbidden_endpoints": [
+      "/activate",
+      "/deploy-production",
+      "engineering_approved 输出"
+    ],
     "verified_json_modified": false,
     "engineering_enabled_modified": false,
     "red_lines": {
@@ -4544,12 +4668,30 @@
     "frontend_module": "frontend/src/app/governance-change/page.tsx（只读看板，无写入口）",
     "gate_script": "scripts/check_production_change_control_gate.py（断言 engineering_enabled=false、无真实执行端点、无 AUTO_* 态、审计类目一致、契约 JSON 与代码一致）",
     "api_contract_baseline": ".ai/baselines/production_change_api_contract.json（27 present / 8 absent）",
-    "missing_real_execution_routes": ["/execute", "/deploy", "/rollback", "/apply", "/migrate", "/activate", "/trigger-go", "/auto-execute"],
+    "missing_real_execution_routes": [
+      "/execute",
+      "/deploy",
+      "/rollback",
+      "/apply",
+      "/migrate",
+      "/activate",
+      "/trigger-go",
+      "/auto-execute"
+    ],
     "audit_categories_added": [
-      "CHANGE_REQUEST_CREATED", "CHANGE_PLAN_REGISTERED", "CHANGE_WINDOW_RESERVED", "CHANGE_PREFLIGHT_CHECKED",
-      "CHANGE_CHECKPOINT_RECORDED", "CHANGE_ABORT_POLICY_REGISTERED", "CHANGE_ROLLBACK_REFERENCE_REGISTERED",
-      "CHANGE_POST_VERIFICATION_REGISTERED", "CHANGE_EVIDENCE_SUBMITTED", "CHANGE_SIMULATION_PERFORMED",
-      "CHANGE_FAILURE_SCENARIO_EVALUATED", "CHANGE_PACKAGE_GENERATED", "CHANGE_HUMAN_DECISION_RECORDED"
+      "CHANGE_REQUEST_CREATED",
+      "CHANGE_PLAN_REGISTERED",
+      "CHANGE_WINDOW_RESERVED",
+      "CHANGE_PREFLIGHT_CHECKED",
+      "CHANGE_CHECKPOINT_RECORDED",
+      "CHANGE_ABORT_POLICY_REGISTERED",
+      "CHANGE_ROLLBACK_REFERENCE_REGISTERED",
+      "CHANGE_POST_VERIFICATION_REGISTERED",
+      "CHANGE_EVIDENCE_SUBMITTED",
+      "CHANGE_SIMULATION_PERFORMED",
+      "CHANGE_FAILURE_SCENARIO_EVALUATED",
+      "CHANGE_PACKAGE_GENERATED",
+      "CHANGE_HUMAN_DECISION_RECORDED"
     ],
     "audit_total": 121,
     "red_lines_enforced": {
@@ -4579,7 +4721,15 @@
       "主理人在人类终端显式置 engineering_enabled=true（唯一 AI 不代执行之动作）",
       "真实密钥/真实生产数据变更线下进行（AI 不代写）"
     ],
-    "forbidden_endpoints": ["/execute", "/deploy", "/rollback", "/apply", "/migrate", "/activate", "engineering_approved 输出"],
+    "forbidden_endpoints": [
+      "/execute",
+      "/deploy",
+      "/rollback",
+      "/apply",
+      "/migrate",
+      "/activate",
+      "engineering_approved 输出"
+    ],
     "verified_json_modified": false,
     "engineering_enabled_modified": false,
     "report": ".ai/reviews/phase3.9.7_production_change_control_report.md",
@@ -4670,7 +4820,12 @@
       "主理人在人类终端显式置 engineering_enabled=true（唯一 AI 不代执行之动作）",
       "真实密钥线下提供（production_secret 恒 PENDING_VERIFICATION，AI 不写真实密钥）"
     ],
-    "forbidden_endpoints": ["/activate", "/deploy-production", "/go", "engineering_approved 输出"],
+    "forbidden_endpoints": [
+      "/activate",
+      "/deploy-production",
+      "/go",
+      "engineering_approved 输出"
+    ],
     "verified_json_modified": false,
     "engineering_enabled_modified": false,
     "red_lines": {
@@ -4688,5 +4843,87 @@
     "report": ".ai/reviews/phase3.9.8_production_activation_dry_run_simulation_closure_report.md",
     "roadmap_ref": ".ai/roadmap_v8.md（Phase 3.9.8 交付物与门禁）",
     "stop": "已 STOP：不进入 3.9.9、不自动激活、不输出 engineering_approved、不真实部署、不 AI 生成 GO、不代替四角色签署、不登记真实签署；等主理人 + 四角色线下提交真实证据并签署后，由主理人在人类终端显式置 enabled=true。"
+  },
+  "phase_3_9_9_real_staging_status": {
+    "phase": "3.9.9",
+    "suffix": "real_staging_runtime_validation",
+    "official_name": "Real Staging Runtime Integration & Validation Layer（真实预生产运行时接入与验证层）",
+    "status": "PHASE_3_9_9_REAL_STAGING_RUNTIME_VALIDATION_BUILT_NO_GO",
+    "terminal_state": "PHASE_3_9_9_REAL_STAGING_RUNTIME_VALIDATION_BUILT_NO_GO",
+    "is_production": false,
+    "external_pending": true,
+    "human_verification_required": true,
+    "closed_at": "2026-08-13",
+    "report_dated": "2026-08-13",
+    "identity": "BOIP AI Chief Architect + Real Staging Runtime Integration & Validation Engineer + Staging Isolation Safety Verifier（非 Production 激活/部署/签署主体）",
+    "branch": "feat/phase3.9.9-real-staging-runtime-validation",
+    "branch_base": "3abca6d9192f9a245db08c9f68bd446d12baf87c（3.9.8 证据盖章 HEAD；本分支切出点）",
+    "current_head": "01dd9704f8f05897020d5e21068bc6df18841a50（T39-41 代码收口；SSOT 同步 + 43 节收口报告为最终 closure commit，列入 delivered_commits 末项）",
+    "delivered_commits": [
+      "b3304b76f6102a6b14d944abfe37235e2b842b25 Task 0 baseline validation + T1-T3 environment model / staging fingerprint / isolation guard",
+      "c13302231a060f339fbb60c58f9b9448495b7c39 T2+T3 staging config / secret provider / local profile / manifest / deployment / execution scope",
+      "2cc6064801438691ba164f8ac7210de95d137ab2 T4-T7 staging DB / data policy / identity provider / token isolation / observability / alerting / llm-voice",
+      "96ebc400802be54ba06b43b97b4661ac366fd60a T8-T10 evidence chain / validation gate / packet + validator / scanner / human checklist",
+      "01dd9704f8f05897020d5e21068bc6df18841a50 T39-41 status read-only aggregation + CI gate entrypoint",
+      "<SSOT sync + 43§ closure report commit — 即本 commit；current_head 指向代码收口 01dd970>"
+    ],
+    "scope_note": "真实预生产环境（Local Staging / 已验证非生产 External Staging）运行时接入与验证层；非 Production 激活。全部组件 describe-only / fail-closed：不连接/不执行/不修改任何真实资源；apply()/connect()/invoke()/trigger()/synthesize() 永远抛错。结构上证明 Staging ≠ Production（环境分类 / 隔离护栏 / 指纹 / 执行边界 / 证据链 / 包扫描 / 契约）。",
+    "tasks_total": 72,
+    "tasks_completed": 43,
+    "tasks_note": "43 项强制交付全部完成（T0-T40 代码 + SSOT 同步 + CI gate + 43 节收口报告）。Task 44-72 = 真实 External Staging 接入 / 跨环境隔离实证 / 四角色签署 / 主理人置 enabled，属 Human Verification Pending，AI 不代执行。",
+    "core_modules": [
+      "agents/staging_runtime/config.py（环境分类 + 隔离护栏 + 指纹）",
+      "agents/staging_runtime/secret_provider.py（staging 密钥隔离，拒绝 production_secret_refs）",
+      "agents/staging_runtime/local_profile.py（LocalStagingProfile 恒 LOCAL_STAGING）",
+      "agents/staging_runtime/manifest.py（build_staging_runtime_manifest 恒非生产）",
+      "agents/staging_runtime/deployment.py（plan() 人工步骤 / apply() 永远抛错）",
+      "agents/staging_runtime/execution_scope.py（FORBIDDEN_PRODUCTION_ACTIONS 22 / ALLOWED_STAGING_ACTIONS 12）",
+      "agents/staging_runtime/db.py（拒绝复用 Production DSN / migration apply 抛错）",
+      "agents/staging_runtime/data_policy.py（ALLOWED synthetic/masked/public/anonymized）",
+      "agents/staging_runtime/identity_provider.py（拒绝复用 Production IdP）",
+      "agents/staging_runtime/token_isolation.py（staging 令牌 ≠ production 令牌）",
+      "agents/staging_runtime/observability.py（describe_checks / collects_real_data=False）",
+      "agents/staging_runtime/alerting.py（拒绝复用 Production alert）",
+      "agents/staging_runtime/llm_voice.py（拒绝 Production endpoint / 语音链路）",
+      "agents/staging_runtime/evidence.py（SHA-256 证据链 custody）",
+      "agents/staging_runtime/gate.py（9 项结构性校验电池 + 终端态断言）",
+      "agents/staging_runtime/packet.py（包完整性 + production 泄漏扫描 + 5 项人工核查清单）",
+      "agents/staging_runtime/status.py（current_staging_status 只读聚合 + build_staging_contract）"
+    ],
+    "ci_gate": "scripts/staging_runtime_gate.py（运行 Gate+Packet+Scanner，失败 exit 1；实测 exit 0 → terminal_state=PHASE_3_9_9_REAL_STAGING_RUNTIME_VALIDATION_BUILT_NO_GO / is_production=false / external_pending=true / human_verification_required=true / evidence_hash=4988b6c8c1b5447c3c958e474b653302d58bd469c8e63931564ce5ccbc0c6d68）",
+    "test_files": [
+      "tests/agents/test_staging_runtime_isolation.py（31）",
+      "tests/agents/test_staging_runtime_config.py（18）",
+      "tests/agents/test_staging_runtime_t3.py（10）",
+      "tests/agents/test_staging_runtime_t4_t7.py（24）",
+      "tests/agents/test_staging_runtime_t8_t10.py（13）"
+    ],
+    "test_totals": {
+      "staging_suite": "96 passed（31+18+10+24+13，零回归）",
+      "agents_full_suite": "收口前全量回归确认（见收口报告 §34）"
+    },
+    "engineering_enabled": false,
+    "engineering_approved_emitted": false,
+    "verified_json_modified": false,
+    "engineering_enabled_modified": false,
+    "red_lines_inherited": "继承 3.9.8 十条最高红线 + Real Staging 22 条 Forbidden Production Actions；engineering_enabled=false 全程守约（config.yaml:102 未改）；禁真实部署 / DB migration / 配置修改 / 写 Secret / 改 DB / 回滚 / 输出 GO / 代四角色签署 / 改 enabled / 把 Staging 说成 Production / 复用 Production 资源（DB·Secret·IdP·Storage·Alert）/ 自动关 Incident / 跑 Runbook / skip 掩盖失败 / 删除断言换绿 / 伪造结果 / 推导 Production Approved。",
+    "evidence_hash": "4988b6c8c1b5447c3c958e474b653302d58bd469c8e63931564ce5ccbc0c6d68",
+    "pending_human_actions": [
+      "主理人 + 四角色（production-owner / release-manager / security-owner / auditor）线下提供真实 External Staging 资源（DB DSN / Secret / IdP / Storage / Alert）并登记",
+      "真实 External Staging 接入实证 + 跨环境隔离验证（staging 令牌 ≠ production 令牌 / 不复用 production 命名空间）",
+      "四角色在人类终端签署 Staging Validation GO",
+      "主理人在人类终端显式置 engineering_enabled=true（仅限真实 Production 激活，不属本阶段）"
+    ],
+    "forbidden_endpoints": [
+      "/execute",
+      "/deploy",
+      "/rollback",
+      "/apply",
+      "/migrate",
+      "/activate",
+      "engineering_approved 输出"
+    ],
+    "report": ".ai/reviews/phase3.9.9_real_staging_runtime_integration_validation_report.md",
+    "stop": "已 STOP：不进入 3.9.10、不自动激活、不真实部署、不输出 engineering_approved、不 AI 生成 GO、不代替四角色签署、不登记真实签署、不写真实密钥、不修改 engineering_enabled；等主理人 + 四角色线下提供真实 External Staging 资源并验证后，由主理人在人类终端显式置 enabled=true。"
   }
 }
