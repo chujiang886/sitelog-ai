@@ -106,7 +106,7 @@ scripts/lint/check_production_security.py  =>  7/7 PASS
   [ok] engineering_enabled 保持 false（0 处）
   [ok] static-dev 不得为缺省身份（0 处）
 scripts/lint/check_hardcoded.py            =>  0 命中（硬编码扫描通过）
-scripts/lint/check_fabrication.py          =>  0 本阶段交付物命中（仅历史 wind_pressure 夹具，exit 0）
+scripts/lint/check_fabrication.py          =>  exit 1（34 处命中均为历史 wind_pressure 夹具/文档；0 本阶段交付物命中，不阻塞）
 ```
 
 ---
