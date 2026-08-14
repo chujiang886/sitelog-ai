@@ -4,6 +4,9 @@
 - ``environment``：``RuntimeEnvironment`` / ``EnvironmentIdentity`` / ``EnvironmentResources`` / ``classify_environment``
 - ``fingerprint``：``EnvironmentFingerprint`` / ``compute_environment_fingerprint``
 - ``isolation_guard``：``EnvironmentIsolationGuard`` / ``IsolationVerdict`` / ``StagingIsolationViolationError``
+- ``config``：``load_staging_identity`` / ``StagingResourceReadiness`` / ``staging_resource_readiness``
+- ``secret_provider``：``StagingSecretProvider`` / ``StagingSecretIsolationError``
+- ``local_profile``：``LocalStagingProfile`` / ``LocalStagingService`` / ``LocalStagingProfileError``
 
 最高红线（fail-closed，覆盖本阶段 22 条之核心）：
 ① 全程 ``engineering_enabled=false``（护栏构造即断言 ``safety_invariants_ok()``）。
@@ -36,6 +39,40 @@ from agents.staging_runtime.isolation_guard import (
     IsolationViolation,
     StagingIsolationViolationError,
 )
+from agents.staging_runtime.config import (
+    load_staging_identity,
+    load_forbidden_production_fingerprints,
+    staging_resource_readiness,
+    StagingResourceReadiness,
+    StagingConfigError,
+)
+from agents.staging_runtime.secret_provider import (
+    StagingSecretProvider,
+    StagingSecretIsolationError,
+    StagingSecretResolution,
+)
+from agents.staging_runtime.local_profile import (
+    LocalStagingProfile,
+    LocalStagingService,
+    LocalStagingProfileError,
+)
+from agents.staging_runtime.manifest import (
+    StagingRuntimeManifest,
+    StagingManifestProductionError,
+    build_staging_runtime_manifest,
+)
+from agents.staging_runtime.deployment import (
+    StagingDeploymentForbiddenError,
+    StagingDeploymentPlan,
+    StagingDeploymentProvider,
+)
+from agents.staging_runtime.execution_scope import (
+    FORBIDDEN_PRODUCTION_ACTIONS,
+    ALLOWED_STAGING_ACTIONS,
+    StagingExecutionScopeViolation,
+    StagingExecutionVerdict,
+    StagingExecutionScope,
+)
 
 __all__ = [
     "RuntimeEnvironment",
@@ -51,4 +88,26 @@ __all__ = [
     "IsolationVerdict",
     "IsolationViolation",
     "StagingIsolationViolationError",
+    "load_staging_identity",
+    "load_forbidden_production_fingerprints",
+    "staging_resource_readiness",
+    "StagingResourceReadiness",
+    "StagingConfigError",
+    "StagingSecretProvider",
+    "StagingSecretIsolationError",
+    "StagingSecretResolution",
+    "LocalStagingProfile",
+    "LocalStagingService",
+    "LocalStagingProfileError",
+    "StagingRuntimeManifest",
+    "StagingManifestProductionError",
+    "build_staging_runtime_manifest",
+    "StagingDeploymentForbiddenError",
+    "StagingDeploymentPlan",
+    "StagingDeploymentProvider",
+    "FORBIDDEN_PRODUCTION_ACTIONS",
+    "ALLOWED_STAGING_ACTIONS",
+    "StagingExecutionScopeViolation",
+    "StagingExecutionVerdict",
+    "StagingExecutionScope",
 ]

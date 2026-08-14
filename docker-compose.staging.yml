@@ -1,0 +1,60 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 3.9.9 Real Staging Runtime Integration & Validation Layer
+# Local Staging Docker Compose（**本地预生产，非生产**）
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 本文件仅描述本机预生产形态，用于真实预生产运行时接入与验证：
+# - 永远不是 production（environment 固定 local_staging）。
+# - 不承载任何真实密钥：数据库密码等经 ${STAGING_SECRET_*} 环境变量引用。
+# - 端口刻意避开生产常用端口（API 8081 / PG 5433 / Redis 6380），降低误连风险。
+#
+# 红线：本文件**不**执行真实部署、**不**启动容器、**不**修改生产配置；
+#       真实部署由人工在授权后执行。配套 .env.staging.example 仅含占位。
+#
+# 启动（人工授权后）：cp .env.staging.example .env.staging && docker compose -f docker-compose.staging.yml --env-file .env.staging up
+
+x-phase: "3.9.9-local-staging"
+x-non-production: true
+
+services:
+  boip-staging-api:
+    image: boip/staging-api:local
+    # 非生产 API 端口（避开生产 8080）
+    ports:
+      - "8081:8080"
+    environment:
+      APP_ENV: local_staging
+      STAGING_ENVIRONMENT: local_staging
+      STAGING_DB_DSN: ${STAGING_DB_DSN:pending_verification}
+      STAGING_IDP_ISSUER: ${STAGING_IDP_ISSUER:pending_verification}
+      STAGING_STORAGE_BUCKET: ${STAGING_STORAGE_BUCKET:pending_verification}
+      STAGING_ALERT_CHANNEL: ${STAGING_ALERT_CHANNEL:pending_verification}
+      STAGING_SECRET_REF: ${STAGING_SECRET_REF:pending_verification}
+    depends_on:
+      - boip-staging-postgres
+      - boip-staging-redis
+    restart: "no"
+
+  boip-staging-postgres:
+    image: postgres:16-alpine
+    # 非生产 PG 端口（避开生产 5432）
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: boip_staging
+      POSTGRES_USER: boip_staging
+      POSTGRES_PASSWORD: ${STAGING_SECRET_DB_PASSWORD:pending_verification}
+    volumes:
+      - boip-staging-pgdata:/var/lib/postgresql/data
+    restart: "no"
+
+  boip-staging-redis:
+    image: redis:7-alpine
+    # 非生产 Redis 端口（避开生产 6379）
+    ports:
+      - "6380:6379"
+    restart: "no"
+
+volumes:
+  boip-staging-pgdata:
+    driver: local

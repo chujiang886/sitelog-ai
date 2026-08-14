@@ -118,6 +118,20 @@ def load_verified_thresholds(
     return _load(target)
 
 
+def load_staging_config(
+    config_path: Path | str = DEFAULT_CONFIG_PATH,
+) -> Mapping[str, Any]:
+    """读取 ``staging.*`` 段（Phase 3.9.9 Real Staging Runtime Integration）。
+
+    返回普通 dict（已做环境变量插值）。缺省返回空 dict（等价无 staging 配置）。
+    本段只描述「非生产」预生产环境的接入形状，不承载任何生产资源；真实外部
+    Staging 资源缺省以 ``pending_verification`` 占位，由上层标记
+    ``PENDING_EXTERNAL_STAGING_RESOURCE`` 后再继续可独立验证的工程。
+    """
+
+    return _load_section("staging", config_path)
+
+
 def load_engineering_enabled(
     config_path: Path | str = DEFAULT_CONFIG_PATH,
 ) -> bool:
@@ -137,5 +151,6 @@ __all__ = [
     "load_environment_data_config",
     "load_llm_config",
     "load_verified_thresholds",
+    "load_staging_config",
     "load_engineering_enabled",
 ]

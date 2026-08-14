@@ -100,3 +100,33 @@ orchestrator:
     - design
   # 第四步 engineering 留待 TD-005 偿还时再启用
   engineering_enabled: false
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase 3.9.9 — Real Staging Runtime Integration & Validation Layer（Task 4）
+# ═══════════════════════════════════════════════════════════════════════════
+# 本地预生产（Local Staging）环境描述。本段只描述「非生产」预生产环境的接入形状，
+# 不承载任何生产资源：所有 resource 值经 ${VAR:pending_verification} 占位、由环境
+# 变量注入；缺省回落 pending_verification（即「未提供真实外部 Staging 资源」），
+# 系统据此标记 PENDING_EXTERNAL_STAGING_RESOURCE 后，继续完成 Local Staging 等
+# 可独立验证的工程。五类资源（database/secret/identity_provider/storage/alert）
+# 经 EnvironmentIsolationGuard 结构性校验，永不指向生产等效资源。
+#
+# 红线：本段 environment 取值只能是 local_staging | external_staging，永远不是
+# production；forbidden_production_fingerprints 为生产指纹黑名单占位（收口时由治理
+# 注入真实生产指纹；此处保持空，不内联任何真实生产值）。
+staging:
+  environment: local_staging        # local_staging | external_staging（绝不 production）
+  purpose: "Real non-production pre-prod runtime integration & validation (Phase 3.9.9)"
+  resources:
+    # 非生产 DSN；经隔离校验不得等于生产 DSN（fail-closed）
+    database: ${STAGING_DB_DSN:pending_verification}
+    # 非生产 Secret 引用；经隔离校验不得等于生产 Secret
+    secret: ${STAGING_SECRET_REF:pending_verification}
+    # 非生产 IdP issuer；经隔离校验不得等于生产 IdP
+    identity_provider: ${STAGING_IDP_ISSUER:pending_verification}
+    # 非生产存储桶；经隔离校验不得等于生产存储
+    storage: ${STAGING_STORAGE_BUCKET:pending_verification}
+    # 非生产告警通道；经隔离校验不得等于生产告警
+    alert: ${STAGING_ALERT_CHANNEL:pending_verification}
+  # 生产等效指纹黑名单（占位空，不写真实生产值；收口时由治理注入）
+  forbidden_production_fingerprints: []
