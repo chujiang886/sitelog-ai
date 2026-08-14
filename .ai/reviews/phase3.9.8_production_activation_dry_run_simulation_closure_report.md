@@ -15,22 +15,31 @@
 | 状态含义 | 在**隔离 sandbox** 完成完整生产激活流程的纯模拟演练，验证所有不可逆边界在 `SIMULATION_ONLY` 约束下均 fail-closed；**生产未激活、无真实 GO、无真实签署、engineering_enabled=false**。 |
 | 是否为 GO / APPROVED | **否**。Dry-Run 结论仅 `SIMULATION_PASS` / `SIMULATION_BLOCKED`，刻意无 `PRODUCTION_GO`。 |
 | 收敛动作 | 阶段收口即 STOP，等待主理人 + 真实四角色线下审核与签署。 |
+| Real Staging 状态 | **未完成** — 本阶段为 Production Activation Dry-Run & Human Decision Simulation Layer（纯模拟验证层），**未完成 Real Staging Runtime Integration & Validation**；Real Staging 不得标记 completed。真实部署/激活由主理人 + 四角色线下完成。 |
 
 ---
 
 ## 2. Git HEAD
 
 ```
-0d8414ee2091ecf32be2de8881885782f62ad9cc   # T20 主交付（14 files / +1368 -12）
-f56bb7de3b6780dc86850127214594710bfa6840   # T20 SSOT delta（current_head/delivered_commits/tasks_completed）
+930e147fea670349b9f5b287b07855dd62b6517d   # T1-T12 隔离沙盒 + 审计 121→129 + CI gate 骨架（父 = 1fe5a94）
+0d8414ee2091ecf32be2de8881885782f62ad9cc   # T12-T16 主交付（14 files / +1368 -12）
+f56bb7de3b6780dc86850127214594710bfa6840   # T18/T20 SSOT 收口同步（current_head/delivered_commits/tasks_completed）+ 本报告落盘
+dd18295e8dd5bcf13cd9622fba9ae5ac2a9641fa   # T20 收口报告补全至 29 节
+ef88cf2baa4125295476d3baa5165cb3bc33d020   # fix 收口报告路径引用 + 阶段事实对齐
+5d3a21f3bfc59b01763cc6d09d093c976b3b7542   # fix 防编造扫描 exit 码统一（exit 1；0 本阶段交付物命中，不阻塞）
 ```
 
-本阶段 commit 链（分支 `feat/phase3.9.8-production-activation-dry-run`）：
+本阶段 commit 链（分支 `feat/phase3.9.8-production-activation-dry-run`，全单父线性链）：
 
 | commit | 说明 |
 |---|---|
+| `930e147` | T1–T12 隔离沙盒：simulation.py + 审计契约 121→129（+8 SIMULATION_ONLY 类目）+ CI gate 骨架（父 = `1fe5a94`，3.9.7 收口 HEAD） |
 | `0d8414e` | T12–T16 主交付：simulation.py 沙盒 + governance_activation_simulation router + Simulation UI Panel + CI dry-run gate + agents/backend 测试 + audit ledger/基线 121→129 同步 |
 | `f56bb7d` | T18/T20 SSOT 收口同步（phase_3_9_8 登记 current_head/delivered_commits/tasks_completed=20）+ 本报告落盘 |
+| `dd18295` | T20 收口报告补全至 29 节（simulation/negative-path/audit/dry-run gate 全语义） |
+| `ef88cf2` | fix 收口报告路径引用 + 阶段事实对齐 |
+| `5d3a21f` | fix 防编造扫描 exit 码统一（exit 1；34 处命中均为历史 wind_pressure 夹具/文档，0 本阶段交付物命中，不阻塞）— 收口后 docs 精度修正，纳入 closure history，非新 Phase |
 
 > 注：审计契约 121→129 由本阶段 T12 有意新增 8 类 SIMULATION_ONLY 审计大类，与 3.9.7-change（108→121）独立、叠加、不冲突。
 
@@ -42,7 +51,7 @@ f56bb7de3b6780dc86850127214594710bfa6840   # T20 SSOT delta（current_head/deliv
 feat/phase3.9.8-production-activation-dry-run
 ```
 
-- 自 3.9.7 收口 HEAD `28102dc` 分出，保留真实 ancestry，不重写历史。
+- 自 `1fe5a94`（3.9.7 收口 HEAD）分出，保留真实 ancestry，不重写历史。祖先链：`1fe5a94` ← `b45da40`(3.9.7-change 收口) ← `28102dc`(前序 feat)；`28102dc` 仅是 `b45da40` 的祖先，二者同一线性链，非竞争 HEAD。
 - 全程 `git add <精确路径>`，禁 `git add -A` / push / force push / rewrite。
 - CI 分支覆盖已显式纳入本分支 + `feat/phase3.9.*` 通配（见 §16）。
 
@@ -332,7 +341,7 @@ engineering_enabled = False   # 全仓未改，红线①保持（agents/config.y
 ## 23. Fabrication Scan（防编造扫描）
 
 ```
-scripts/lint/check_fabrication.py  =>  0 本阶段交付物命中（exit 0）
+scripts/lint/check_fabrication.py  =>  exit 1（34 处命中均为历史 wind_pressure 夹具/文档；0 本阶段交付物命中，不阻塞）
 ```
 
 - 扫描命中均为 3.9.3 之前历史 `.ai/` 文档与 `wind_pressure` 接口测试夹具，**零本阶段交付物**。

@@ -2046,7 +2046,7 @@ GovernanceWorkflowRepository (require_human_actor + OrgScopeError)  ──snapsh
 ### 35.14 Phase 3.9.8 交付物与门禁（生产激活干跑、人工决策演练与不可逆边界验证层）
 
 - **身份**：BOIP AI Chief Architect + Production Activation Simulation Auditor + Human Decision Safety Verifier（**非签署 / 非批准 / 非激活 / 非部署主体**）。
-- **分支**：`feat/phase3.9.8-production-activation-dry-run`（自 3.9.7 收口 HEAD 分出，保留真实 ancestry，不重写历史）。
+- **分支**：`feat/phase3.9.8-production-activation-dry-run`（自 `1fe5a94`（3.9.7 收口 HEAD）分出；祖先链 `1fe5a94`←`b45da40`(3.9.7-change 收口)←`28102dc`(前序 feat)，保留真实 ancestry，不重写历史）。
 - **终端态**：🟠 `PRODUCTION_ACTIVATION_DRY_RUN_VALIDATED_BUILT_NO_GO`（在**隔离 sandbox** 完成完整生产激活流程的纯模拟演练，验证所有不可逆边界在 `SIMULATION_ONLY` 约束下均 fail-closed；**生产未激活、无真实 GO、无真实签署、engineering_enabled=false**）。
 - **核心交付**（已交付 `agents/enterprise/production_release/simulation.py`）：`run_production_activation_dry_run`（ephemeral `AuditService(org_id="simulation")`，`production_activated`/`real_signoff_count`/`engineering_enabled` 强制 `False`/`0`/`False`）+ `build_decision_scenario_matrix`（14 场景）+ `ProductionActivationNegativePathMatrix`（12 负路径全 `rejected`）+ `build_simulation_context`（scenario 必填、`simulation_only` 必须 `True`）+ `SimulationContaminationError` 污染守卫（静态方法 `_assert_no_real_production_object`，`_FORBIDDEN_REAL_TYPES=(HumanSignoffRegistry,)`）。
 - **审计契约**：`AuditActionCategory` 总数 **121 → 129**（+8 SIMULATION_ONLY 类目：`PRODUCTION_ACTIVATION_DRY_RUN_STARTED` / `_COMPLETED` / `SIMULATION_DECISION_EVALUATED` / `SIMULATION_EVIDENCE_BUILT` / `SIMULATION_SIGNOFF_BUILT` / `HANDOFF_DRY_RUN` / `ABORT_SIMULATED` / `ROLLBACK_SIMULATED`）；SSOT = `.ai/baselines/audit_action_category_ledger.json`（3.9.8 段 +8，validator PASS total=129）+ `.ai/AUDIT_ACTION_CATEGORY_LEDGER.md` 镜像；`phase3.8_governance_release_baseline.json` 的 `audit_category_contract.total` 已显式从 121 对齐到 129（T17 修复治理完整性缺口）。
@@ -2054,12 +2054,13 @@ GovernanceWorkflowRepository (require_human_actor + OrgScopeError)  ──snapsh
 - **前端看板**（已交付 `frontend/src/app/governance-simulation/page.tsx`）：路由 `/governance-simulation`，顶部 sticky 红色横幅 `SIMULATION ONLY` / `NOT PRODUCTION` + 三枚 RedLineChip（`engineering_enabled=false` / `production_activated=false` / `real_signoff_count=0`），仅调 `/governance/activation/simulation/*`，无真实激活入口；tsc 0 error / jest 117 passed。
 - **CI 门禁**（已交付 `.github/workflows/production-activation-simulation-gate.yml`，3 job）：`simulation-dry-run`（`scripts/run_production_activation_dry_run_gate.py`）+ `simulation-api-tests`（`backend/tests/test_governance_activation_simulation.py`）+ `simulation-frontend-tsc`（`npx tsc --noEmit`），分支覆盖 `feat/phase3.9.8-*` + `feat/phase3.9.*` 通配。
 - **干跑门禁脚本**（已交付 `scripts/run_production_activation_dry_run_gate.py`）：fail-closed 断言 `production_activated is False` / `real_signoff_count==0` / `engineering_enabled is False` / `status∈{simulation_pass,simulation_blocked}` / 负路径全 `rejected` 且 ≥10 / 场景=14 / `contamination.detected is not True`；本地运行 PASS（status=simulation_pass）。
-- **测试**（已交付 `tests/agents/test_phase3_9_8_production_activation_simulation.py`，7 例）：红线 intact / 污染 clean / 负路径全 rejected / 场景=14 / context 拒非模拟 / 污染守卫 / 审计全 simulation-only。全套回归：agents **2470 passed** / backend **380 passed** / jest **117 passed** / tsc **0 error**；治理完整性 **9/9** / 生产安全 **7/7** / 账本 **PASS(129)** / 硬编码 **0** / 防编造 **0 本阶段交付物命中**。
+- **测试**（已交付 `tests/agents/test_phase3_9_8_production_activation_simulation.py`，7 例）：红线 intact / 污染 clean / 负路径全 rejected / 场景=14 / context 拒非模拟 / 污染守卫 / 审计全 simulation-only。全套回归：agents **2470 passed** / backend **380 passed** / jest **117 passed** / tsc **0 error**；治理完整性 **9/9** / 生产安全 **7/7** / 账本 **PASS(129)** / 硬编码 **0** / 防编造 **exit 1（34 处命中均为历史 wind_pressure 夹具/文档，0 本阶段交付物命中，不阻塞）**。
 - **红线**：十条最高红线全部未触发；`engineering_enabled=false`（未改）；无 `engineering_approved`；无真实生产部署；无 AI 把模拟签署登记为真实签署；无 AI 把模拟 GO 写入真实 FinalDecisionLedger；模拟数据绝不进入真实 evidence/signoff/audit production namespace（污染守卫 + 审计 marker 双保险）。
 
 ### 35.15 状态结论与 STOP 纪律（3.9.8）
 
-- **状态：🟠 PRODUCTION_ACTIVATION_DRY_RUN_VALIDATED_BUILT_NO_GO（3.9.8 已收口，2026-08-13）**。
+- **状态：🟠 PRODUCTION_ACTIVATION_DRY_RUN_VALIDATED_BUILT_NO_GO（3.9.8 已收口，2026-08-13；2026-08-14 证据盖章复核）**。
 - **Simulation=PASS；Production=NOT ACTIVATED；Real Signoff=0/4；engineering_enabled=false**。
+- **Real Staging 明确未完成**：Phase 3.9.8 为 Production Activation Dry-Run & Human Decision Simulation Layer，**未完成 Real Staging Runtime Integration & Validation**；Real Staging 不得标记 completed。真实部署/激活由主理人 + 四角色线下完成。
 - **STOP：完成全部安全任务后停止**，不进下一 Phase（3.9.9）、不开 `engineering_enabled`、不输出 `engineering_approved`、不真实部署、不 AI 生成 GO 决策、不代替四角色签署、不把模拟数据登记为真实证据。后续仅由主理人 + 专家线下推进：真实人工四角色提交真实证据并签署 → 终端显式置 `engineering_enabled=true` → 真实激活。收口报告见 `.ai/reviews/phase3.9.8_production_activation_dry_run_simulation_closure_report.md`。
 

@@ -4422,8 +4422,9 @@
     "identity": "BOIP AI Chief Architect / Production Activation Final Review Auditor / Human Go/No-Go Readiness Custodian（非签署/批准/激活主体）",
     "branch": "feat/phase3.9.7-production-activation-final-human-review-readiness",
     "base_head": "e56fd3b5771aa58121413e1fbf8690b816fdfeaa（T12 收口终点：审计 104→108 + ledger 重建）",
-    "current_head": "28102dc43cac26f10541b786266b4d31930ddd71（T13-T17 最终收口）",
-    "final_closure_commit": "28102dc43cac26f10541b786266b4d31930ddd71",
+    "current_head": "1fe5a9447588bfafc351e8ee70b3955b32bfb353（3.9.7-final-review 收口 HEAD；28102dc 为 change-control 分支内前序 feat，非 final-review 收口 HEAD）",
+    "final_closure_commit": "1fe5a9447588bfafc351e8ee70b3955b32bfb353",
+    "closure_head_note": "28102dc 是 b45da40（3.9.7-change 收口 HEAD）的父提交，属前序 feat，非 3.9.7 收口 HEAD；1fe5a94 为 3.9.7-final-review 收口 HEAD（分支 tip）。",
     "delivered_commits": [
       "d2d8c8e feat(phase3.9.7-final-review): final human review readiness polish（T13 9 只读操作 + T14 9 端点 + final_review typo 修复 + API 契约 15→24 重建）",
       "5db1b5f feat(phase3.9.7-final-review): final human review read-only dashboard（T15 前端只读面板）",
@@ -4515,7 +4516,8 @@
     "identity": "BOIP AI Change Control Architect / Production Change Control Auditor（非执行/部署/回滚/GO/签署主体）",
     "branch": "feat/phase3.9.7-production-activation-final-human-review-readiness（同集成载体；change-control 为 additive、与本分支 final-review 正交）",
     "base_head": "e56fd3b5771aa58121413e1fbf8690b816fdfeaa（3.9.7 T12 收口终点：审计 104→108）",
-    "current_head": "28102dc43cac26f10541b786266b4d31930ddd71（集成载体 HEAD；change-control 落在 7ad04ab / 82174eb）",
+    "current_head": "b45da40eec04ae093938abe73a73dde830a7440f（change-control 收口 HEAD；28102dc 为 b45da40 之父提交，属前序 feat，非 change 收口 HEAD；change-control 实际交付 7ad04ab/82174eb）",
+    "closure_head_note": "28102dc 为 b45da40 之父提交（前序 feat），非 change 收口 HEAD；change-control 实际交付 7ad04ab/82174eb，收口于 b45da40。",
     "delivered_commits": [
       "7ad04ab feat(phase3.9.7-change): production change control plane（只读治理平面，production_change/ 19 模块 + governance_change.py 路由，无真实执行）",
       "82174eb chore(phase3.9.7-change): register phase in audit category ledger（108 -> 121，+13 CHANGE_* 类目）"
@@ -4591,10 +4593,18 @@
     "report_dated": "2026-08-13",
     "identity": "BOIP AI Chief Architect + Production Activation Simulation Auditor + Human Decision Safety Verifier（非签署/批准/激活/部署主体）",
     "branch": "feat/phase3.9.8-production-activation-dry-run",
-    "base_head": "930e147fea670349b9f5b287b07855dd62b6517d（阶段起始 HEAD）",
-    "current_head": "0d8414ee2091ecf32be2de8881885782f62ad9cc（T20 收口提交：14 files / +1368 -12）",
+    "base_head": "930e147fea670349b9f5b287b07855dd62b6517d（阶段首个 commit；父提交 = 3.9.8 分支切出点 1fe5a94）",
+    "branch_base": "1fe5a9447588bfafc351e8ee70b3955b32bfb353（3.9.8 分支切出点 = 3.9.7 收口 HEAD；祖先链 1fe5a94←b45da40(3.9.7-change 收口)←28102dc(前序 feat)）",
+    "current_head": "5d3a21f3bfc59b01763cc6d09d093c976b3b7542（3.9.8 最终收口 HEAD；收口后 docs 精度修正链 ef88cf2→5d3a21f 纳入 closure history，非新 Phase）",
+    "real_staging_completed": false,
+    "real_staging_note": "Phase 3.9.8 为 Production Activation Dry-Run & Human Decision Simulation Layer；未完成 Real Staging Runtime Integration & Validation；Real Staging 不得标记 completed。",
     "delivered_commits": [
-      "0d8414e feat(phase3.9.8): production activation dry-run & human decision simulation layer（governance_activation_simulation router + Simulation UI Panel + CI dry-run gate + agents/backend 测试 + audit ledger/基线 121→129 同步；14 files / +1368 -12）"
+      "930e147 feat(phase3.9.8): simulation sandbox scaffold（T1-T12 隔离沙盒 + 审计 121→129 + CI gate 骨架；父 = 1fe5a94）",
+      "0d8414e feat(phase3.9.8): production activation dry-run & human decision simulation layer（governance_activation_simulation router + Simulation UI Panel + CI dry-run gate + agents/backend 测试 + audit ledger/基线 121→129 同步；14 files / +1368 -12）",
+      "f56bb7d docs(phase3.9.8): SSOT 收口同步（phase_3_9_8 登记 current_head/delivered_commits/tasks_completed=21）+ 收口报告落盘",
+      "dd18295 docs(phase3.9.8): 收口报告补全至 29 节（simulation/negative-path/audit/dry-run gate 全语义）",
+      "ef88cf2 fix(phase3.9.8): 修正收口报告路径引用 + 阶段事实对齐",
+      "5d3a21f fix(phase3.9.8): 防编造扫描 exit 码统一（exit 1；34 处命中均为历史 wind_pressure 夹具/文档，0 本阶段交付物命中，不阻塞）"
     ],
     "scope_note": "纯模拟验证层：在隔离 sandbox 中演练完整生产激活流程，验证所有不可逆边界（engineering_enabled / 真实签署 / 真实 GO / 真实部署 / 真实密钥 / 真实权限 / 真实数据 / 绕过门禁 / 命名空间污染）在 SIMULATION_ONLY 约束下均 fail-closed。不触碰任何真实生产证据、不登记真实签署、不写入真实 FinalDecisionLedger、不部署。",
     "tasks_total": 21,
@@ -4606,7 +4616,7 @@
       "T14 前端 Simulation Panel frontend/src/app/governance-simulation/page.tsx（SIMULATION ONLY 横幅 + 三枚 RedLineChip，仅调模拟端点，无真实激活入口）",
       "T15 CI 干跑门禁 scripts/run_production_activation_dry_run_gate.py（fail-closed）+ .github/workflows/production-activation-simulation-gate.yml（3 job：dry-run / api-tests / frontend-tsc）",
       "T16 agents 模拟测试 tests/agents/test_phase3_9_8_production_activation_simulation.py（7 例：红线 intact / 污染 clean / 负路径全 rejected / 场景=14 / context 拒非模拟 / 污染守卫 / 审计全 simulation-only）",
-      "T17 权威验证：agents 2470 passed / backend 380 passed / jest 117 passed / tsc 0 error；完整性 9/9 / 安全 7/7 / 账本 PASS(129) / 硬编码 0 / 防编造 0 本阶段交付物命中 / 干跑门禁 PASS",
+      "T17 权威验证：agents 2470 passed / backend 380 passed / jest 117 passed / tsc 0 error；完整性 9/9 / 安全 7/7 / 账本 PASS(129) / 硬编码 0 / 防编造 exit 1（34 处命中均为历史 wind_pressure 夹具/文档，0 本阶段交付物命中，不阻塞） / 干跑门禁 PASS",
       "T18 SSOT / 基线更新：补本 phase_3_9_8 详细块（本条目）",
       "T19 红线核验：十条最高红线全未触发（见 red_lines）",
       "T20 Git 收尾（pending）：统一提交 T12-T16 全部未提交交付物，working tree 收敛为 clean，禁 add -A/force push/rewrite",
@@ -4643,7 +4653,7 @@
       "production_security_lint": "7/7",
       "audit_ledger_validator": "PASS（total=129，3.9.8 +8 SIMULATION_ONLY 类目，0 orphan/0 ghost/0 duplicate-ownership，Git provenance verified for all 11 phases）",
       "hardcoded_scan": "0 命中",
-      "fabrication_scan": "0 本阶段交付物命中（仅历史 wind_pressure 夹具，exit 0）",
+      "fabrication_scan": "exit 1（34 处命中均为历史 wind_pressure 夹具/文档，0 本阶段交付物命中，不阻塞）",
       "dry_run_gate": "PASS（status=simulation_pass，engineering_enabled=False，production_activated=False，real_signoff_count=0，scenarios=14，negative_paths=12）"
     },
     "engineering_enabled": false,
