@@ -144,6 +144,11 @@ from agents.staging_runtime.packet import (
     StagingPacketScanError,
     HUMAN_VERIFICATION_CHECKLIST,
 )
+from agents.staging_runtime.status import (
+    StagingStatusSummary,
+    current_staging_status,
+    build_staging_contract,
+)
 
 __all__ = [
     "RuntimeEnvironment",
@@ -232,4 +237,7 @@ __all__ = [
     "PacketScanVerdict",
     "StagingPacketScanError",
     "HUMAN_VERIFICATION_CHECKLIST",
+    "StagingStatusSummary",
+    "current_staging_status",
+    "build_staging_contract",
 ]

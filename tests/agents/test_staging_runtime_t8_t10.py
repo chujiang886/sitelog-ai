@@ -165,3 +165,20 @@ def test_human_checklist_present_and_covers_four_roles():
     assert "security-owner" in roles
     assert "auditor" in roles
     assert len(HUMAN_VERIFICATION_CHECKLIST) >= 5
+
+
+def test_current_staging_status_read_only(identity):
+    from agents.staging_runtime.status import current_staging_status, build_staging_contract
+
+    status = current_staging_status(identity)
+    assert status.is_production is False
+    assert status.terminal_state == TERMINAL_STATE
+    assert status.gate_passed is True
+    assert status.external_pending is True
+    assert status.human_verification_required is True
+
+    contract = build_staging_contract()
+    assert contract["forbidden_environment"] == "production"
+    assert contract["terminal_state"] == TERMINAL_STATE
+    assert contract["reads_only"] is True
+    assert "engineering_enabled 恒为 false" in contract["red_lines"]
