@@ -40,6 +40,21 @@ from agents.external_staging_provisioning.package import (
     package_hash,
 )
 from agents.external_staging_provisioning.api_contract import build_api_contract
+from agents.external_staging_provisioning.security import (
+    ExternalStagingProvisioningSecurityValidator,
+    ALLOWED_ACTIONS,
+    FORBIDDEN_ACTIONS,
+)
+from agents.external_staging_provisioning.cost_guard import (
+    StagingCostGuard,
+    DEFAULT_COST_BUDGET,
+    CostCheckResult,
+)
+from agents.external_staging_provisioning.audit import (
+    PROVISIONING_AUDIT_CATEGORIES,
+    ProvisioningAuditEvent,
+    build_provisioning_audit_event,
+)
 
 __all__ = [
     "EXTERNAL_STAGING_PROVISIONING_TERMINAL_STATE",
@@ -59,4 +74,13 @@ __all__ = [
     "build_provisioning_package",
     "package_hash",
     "build_api_contract",
+    "ExternalStagingProvisioningSecurityValidator",
+    "ALLOWED_ACTIONS",
+    "FORBIDDEN_ACTIONS",
+    "StagingCostGuard",
+    "DEFAULT_COST_BUDGET",
+    "CostCheckResult",
+    "PROVISIONING_AUDIT_CATEGORIES",
+    "ProvisioningAuditEvent",
+    "build_provisioning_audit_event",
 ]

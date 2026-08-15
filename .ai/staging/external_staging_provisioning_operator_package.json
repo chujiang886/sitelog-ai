@@ -4,7 +4,7 @@
     "contract_test_passed": true,
     "total": 8
   },
-  "baseline_commit": "2721e53e634ed372e3145add55527a380f916a5f",
+  "baseline_commit": "722e7eea04a8edf68378d1e096daf7b403cb62be",
   "bom_summary": {
     "pending": 8,
     "required": 8,
@@ -35,7 +35,7 @@
     "storage_reference": "ext-staging-object_storage",
     "telemetry_reference": "ext-staging-telemetry"
   },
-  "generated_at": "2026-08-15T10:14:16.559281+00:00",
+  "generated_at": "2026-08-15T10:27:15.901229+00:00",
   "human_pending": [],
   "iac_dry_run_summary": {
     "all_ok": true,
@@ -132,8 +132,8 @@
     "passed": true,
     "status": "pending_human_input"
   },
-  "package_generated_from_commit": "2721e53e634ed372e3145add55527a380f916a5f",
-  "package_hash": "9745ea2c4378f48e9456419a51bb74e1aee479ab7289ef9391cb6cfdfd0c4983",
+  "package_generated_from_commit": "722e7eea04a8edf68378d1e096daf7b403cb62be",
+  "package_hash": "784484c51aee1a1898a9dea40ab15100f97671e5e8a0a13615620305fdc7fd3a",
   "pending_resources": [
     "ext-staging-database",
     "ext-staging-secret_provider",
@@ -148,6 +148,6 @@
   "phase_name": "External Staging Provisioning & Operator Readiness",
   "production_activation_prohibited": true,
   "schema_version": "1.0.0",
-  "source_commit": "2721e53e634ed372e3145add55527a380f916a5f",
+  "source_commit": "722e7eea04a8edf68378d1e096daf7b403cb62be",
   "terminal_state": "EXTERNAL_STAGING_PROVISIONING_OPERATOR_READY_BUILT_NO_GO"
 }
