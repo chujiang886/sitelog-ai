@@ -5183,7 +5183,7 @@
       "主理人 + 四角色（production-owner / release-manager / security-owner / auditor）线下提供真实 External Staging 资源（DB DSN / Secret / IdP / Storage / Alert）并登记",
       "真实 External Staging 接入实证 + 跨环境隔离验证（staging 令牌 ≠ production 令牌 / 不复用 production 命名空间）",
       "四角色在人类终端签署 External Staging Provisioning Operator GO",
-      "主理人在人类终端显式置 engineering_enabled=true（仅限真实 Production 激活，不属本阶段）"
+      "主理人在人类终端显式置 engineering_enabled=true（最终 Production 治理条件全部满足后；非 3.9.12 阶段动作，排在整个 External Staging 链 + Production Readiness + Production Human GO 之后）"
     ],
     "forbidden_endpoints": [
       "/provision",
@@ -5194,6 +5194,7 @@
       "engineering_approved 输出"
     ],
     "report": ".ai/reviews/phase3.9.12_external_staging_provisioning_operator_readiness_report.md",
-    "stop": "已 STOP：不进入 3.9.13、不自动激活、不真实部署/供给、不输出 engineering_approved、不 AI 生成 GO、不代替四角色签署、不登记真实签署、不写真实密钥、不修改 engineering_enabled、不吸收 Production Handoff WIP；等主理人 + 四角色线下提供真实 External Staging 资源并验证后，由主理人在人类终端显式置 enabled=true。"
+    "stop": "已 STOP：不进入 3.9.13、不自动激活、不真实部署/供给、不输出 engineering_approved、不 AI 生成 GO、不代替四角色签署、不登记真实签署、不写真实密钥、不修改 engineering_enabled、不吸收 Production Handoff WIP；等主理人 + 四角色线下提供真实 External Staging 资源并验证后，由主理人在人类终端显式置 enabled=true。",
+    "real_terminal_state": "Operator Readiness Framework=BUILT；Real External Staging Resources=PENDING(8/8)；Real Provisioning=NOT EXECUTED；Real External Connectivity=NOT VERIFIED；Real Isolation=NOT VERIFIED；Production Activation=PROHIBITED；engineering_enabled=false。3.9.12 阶段绝不允许 engineering_enabled=true。"
   }
 }

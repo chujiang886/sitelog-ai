@@ -323,7 +323,7 @@ prefix `/api/external-staging-provisioning`：
 1. 主理人 + 四角色（production-owner / release-manager / security-owner / auditor）线下提供真实 External Staging 资源（DB DSN / Secret / IdP / Storage / Alert 等）并经由 `POST /human-input-record`（USER 专属）登记。
 2. 真实 IaC/模板实际 Provision 实证 + 跨环境隔离验证（staging 令牌 ≠ production 令牌 / 不复用 production 命名空间）。
 3. 四角色在人类终端签署 Provisioning GO。
-4. 主理人在人类终端显式置 `engineering_enabled=true`（仅限真实 Production 激活，不属本阶段）。
+4. （本阶段不含 `engineering_enabled=true`）3.9.12 仅要求完成「真实 External Staging 资源供给 → Provisioning → Resource Registration → Connectivity → Isolation → Runtime Deployment → Staging E2E → Failure/Recovery/Rollback → Human Staging Review」这一 External Staging 链；`engineering_enabled=true` 属最终 Production 治理条件满足后的主理人动作，**绝不在 3.9.12 阶段发生**（见 §47 终态分解与正确后续顺序）。
 
 ---
 
@@ -343,13 +343,13 @@ prefix `/api/external-staging-provisioning`：
 
 ## 33. git clean 说明
 
-`git status --porcelain` 仅含本阶段 17 项新增/修改 + 本报告 + 测试修复，无外国文件、无临时文件污染。注：工作树偶现来自其他分支的 sandbox reset 残留 `deployment/remediation/`（未跟踪、非本分支交付物，未纳入提交，亦未删除——非本阶段职责）。
+`git status --porcelain` 与 `git status --untracked-files=all` **均为空**（Task 1 最终盖章已执行）。原来自其他分支 sandbox reset 残留的未跟踪外国目录 `deployment/remediation/`（其中 `B_skill_capability_audit.md` 从未入任何提交）已按 provenance 隔离至 foreign branch `foreign/phase3.9.12-isolation-deployment-remediation`（commit `7c388f9`），从 3.9.12 工作树移除；preserved=true（未删历史价值 / 未吸收进 3.9.12 / 未提交到 3.9.12）。其余 12 个 `deployment/remediation/*` 文件为 `feat/phase3.9.10-production-remediation-engineering`（cb61858）已跟踪内容，历史价值保存在于该分支。
 
 ---
 
 ## 34. STOP 声明
 
-已 STOP。不进入 3.9.13、不吸收旧 WIP、不自动激活。等主理人 + 四角色线下提供真实 External Staging 资源并验证后，由主理人在人类终端显式置 `engineering_enabled=true`。
+已 STOP。不进入 3.9.13、不吸收旧 WIP、不自动激活。**`engineering_enabled=false` 全程守约，本阶段绝不允许 `engineering_enabled=true`**（正确后续顺序见 §47）。等主理人 + 四角色线下提供真实 External Staging 资源并依 §47 长链逐步验证、评审通过后，方可进入后续 Production Readiness / Production Evidence 阶段——`engineering_enabled=true` 仅可能发生于最终 Production 治理条件全部满足时，不属 3.9.12。
 
 ---
 
@@ -371,7 +371,7 @@ prefix `/api/external-staging-provisioning`：
 4. **回归**：agents 2725 / backend 390 / jest 117 / tsc 0 / provisioning 44 / backend API 10，全绿；治理 9/9、安全 7/7、审计 PASS、包校验 PASS、API 契约 PASS。
 5. **资源**：8/8 `PENDING_EXTERNAL_STAGING_RESOURCE`；0 真实密钥；9/9 隔离未达真实验证。**绝不伪造**。
 6. **红线**：`engineering_enabled=false` 全程守约；无 GO / Deploy / Provision / 代签 / 改 enabled。
-7. **下一步**：主理人 + 四角色线下提供真实 External Staging 资源并签署后，方可实际 Provision；AI 不代责。
+7. **下一步（正确顺序，不跳步）**：真实 External Staging 资源提供 → External Staging Provisioning → Resource Registration → Connectivity → Isolation → Runtime Deployment → External Staging E2E → Failure/Recovery/Rollback → Human Staging Review → 后续 Production Readiness/Production Evidence → 最终 Production Human GO。**`engineering_enabled=true` 仅可能发生于最终 Production 治理条件全部满足时，绝不在 3.9.12 阶段发生**；AI 不代责（详见 §47）。
 
 ---
 
@@ -448,7 +448,7 @@ prefix `/api/external-staging-provisioning`：
 
 ## 42. 签署与收口
 
-AI 侧收口完成（Track A）。**四角色真实签署与 `engineering_enabled=true` 属主理人 + 四角色线下动作，AI 不代执行、不代签。**
+AI 侧收口完成（Track A）。**四角色真实签署（Provisioning GO 等）属主理人 + 四角色线下动作，AI 不代执行、不代签。** `engineering_enabled=true` 不属 3.9.12 阶段（见 §47 终态分解），本阶段收口不触发亦不要求该动作。
 
 收口终态：`EXTERNAL_STAGING_PROVISIONING_OPERATOR_READY_BUILT_NO_GO`。
 
@@ -465,7 +465,7 @@ AI 侧收口完成（Track A）。**四角色真实签署与 `engineering_enable
 
 - **AI 可做**：编写就绪层软件工程；评估 Operator Gate（仅 3 态裁决）；登记经由 `POST /human-input-record` 的 USER 输入；生成确定性包与审计形态事件（actor_kind=USER 强制）。
 - **AI 不可做**：代执行 Provision / 代签 GO / 翻转 `engineering_enabled` / 宣布 Production GO / 写真实密钥 / 提供 `/provision` `/apply` `/deploy` `/rollback` `/activate` 端点 / 输出 `engineering_approved`。
-- **真人（四角色）可做**：线下提供真实 External Staging 资源、签署 Provisioning GO、在主终端置 `engineering_enabled=true`。
+- **真人（四角色）可做（3.9.12 范畴）**：线下提供真实 External Staging 资源、签署 Provisioning GO、完成 Resource Registration / Connectivity / Isolation / Runtime Deployment / Staging E2E / Failure-Recovery-Rollback / Human Staging Review。`engineering_enabled=true` 不属于 3.9.12 范畴（见 §47，仅最终 Production 治理条件满足后由主理人在人类终端显式置）。
 
 ---
 
@@ -490,5 +490,42 @@ AI 侧收口完成（Track A）。**四角色真实签署与 `engineering_enable
 - 重生成稳定：`65cc30600c8086d2417244a4c16efd8b2338af1b936538713898cf90de756e01`。
 - CI `package-generate-validate` job 校验：脚本生成哈希 == API 实时重算哈希 == 落盘 SSOT 包哈希（MATCH），任一不一致即 fail-closed。
 - 该哈希即 SSOT `phase_3_9_12_status.evidence_hash` 与 `.ai/staging/..._operator_package.json#package_hash` 的唯一权威值。
+
+**收口终态：`EXTERNAL_STAGING_PROVISIONING_OPERATOR_READY_BUILT_NO_GO`。已 STOP，不进入 3.9.13。**
+
+---
+
+## 47. 真实终态分解（Terminal State Decomposition）与正确后续顺序
+
+### 47.1 真实终态（必须如此表达）
+
+| 维度 | 真实状态 |
+|---|---|
+| Operator Readiness Framework | **BUILT**（就绪框架已建；代码 / 测试 / API / UI / CI / Runbook / 确定性包全部交付并通过 fail-closed 校验） |
+| Real External Staging Resources | **PENDING**（8/8 `PENDING_EXTERNAL_STAGING_RESOURCE`，0 真实密钥，绝未伪造） |
+| Real Provisioning | **NOT EXECUTED**（未实际供给；仅就绪层，不进 `/provision` / `/apply`） |
+| Real External Connectivity | **NOT VERIFIED**（连通性未经验证，资源缺失故无法验证） |
+| Real Isolation | **NOT VERIFIED**（跨环境隔离未达真实验证，9/9 隔离约束结构性 PENDING） |
+| Production Activation | **PROHIBITED**（生产激活禁止；`engineering_enabled=false`；禁 GO / Deploy / Provision / 代签） |
+| engineering_enabled | **false**（全程守约，config.yaml:102 未改，AI 不代置） |
+
+> 终态常量名 `EXTERNAL_STAGING_PROVISIONING_OPERATOR_READY_BUILT_NO_GO` 的语义即：真实外部预生产「供给算子就绪」层已 **BUILT**（框架就绪），但资源 / 供给 / 连通 / 隔离 / 激活分别处于 **PENDING / NOT EXECUTED / NOT VERIFIED / NOT VERIFIED / PROHIBITED**，且 `engineering_enabled=false`。
+
+### 47.2 正确后续顺序（不跳步，当前阶段绝不允许 engineering_enabled=true）
+
+真实 External Staging 资源提供
+→ External Staging Provisioning
+→ Resource Registration
+→ Connectivity
+→ Isolation
+→ Runtime Deployment
+→ External Staging E2E
+→ Failure / Recovery / Rollback
+→ Human Staging Review
+→ 后续 Production Readiness / Production Evidence
+→ 最终 Production Human GO
+→ 仅当最终生产治理条件全部满足时，方可能由主理人在人类终端显式置 `engineering_enabled=true`
+
+**当前阶段（3.9.12）绝对不允许 `engineering_enabled=true`**；该动作不属本阶段，且必须排在最终 Production Human GO 之后。AI 不代执行、不代签、不代置。
 
 **收口终态：`EXTERNAL_STAGING_PROVISIONING_OPERATOR_READY_BUILT_NO_GO`。已 STOP，不进入 3.9.13。**
