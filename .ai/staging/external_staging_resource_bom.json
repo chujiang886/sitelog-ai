@@ -1,0 +1,152 @@
+{
+  "schema_version": "1.0.0",
+  "phase": "3.9.12",
+  "phase_name": "External Staging Provisioning & Operator Readiness",
+  "generated_at": "2026-08-15",
+  "provider_decision": "tencent_cloud (RECORDED, pending human binding; provider-agnostic IaC)",
+  "terminal_state_target": "EXTERNAL_STAGING_PROVISIONING_OPERATOR_READY_BUILT_NO_GO",
+  "engineering_enabled": false,
+  "contains_real_secret": false,
+  "resource_count": 8,
+  "resource_status_uniform": "pending_external_staging_resource",
+  "notes": "BOM 仅为 provisioning 就绪清单（Track A 完成）。8 类资源的真实账号/密钥/权限/预算/域名/IdP tenant 等 Track B 输入全部 PENDING_EXTERNAL_STAGING_RESOURCE，须由主理人在人类终端、四角色真实签署后提供。AI 不创建真实资源、不写密钥。",
+  "resources": [
+    {
+      "resource_id": "ext-staging-database",
+      "resource_type": "database",
+      "required": true,
+      "owner_role": "production-owner",
+      "provisioning_tool": "terraform/opentofu (provider-agnostic, default tencent_cloud)",
+      "default_provider_service": "Tencent Cloud CDB for PostgreSQL",
+      "iac_module": "infrastructure/staging/database.tf",
+      "description": "外部预生产托管 PostgreSQL 实例，独立于生产库。",
+      "pending_input": [
+        "云账号 + 项目/VPC/子网",
+        "PostgreSQL 版本与实例规格",
+        "数据库账号与凭据轮换策略（仅引用，不存明文）",
+        "备份/保留策略"
+      ],
+      "qualification_status": "not_configured",
+      "status": "pending_external_staging_resource"
+    },
+    {
+      "resource_id": "ext-staging-secret_provider",
+      "resource_type": "secret_provider",
+      "required": true,
+      "owner_role": "security-owner",
+      "provisioning_tool": "terraform/opentofu (provider-agnostic, default tencent_cloud)",
+      "default_provider_service": "Tencent Cloud Secrets Manager (SSM)",
+      "iac_module": "infrastructure/staging/secret_provider.tf",
+      "description": "密钥/凭据后端，所有 Secret 以 CredentialReference 引用，绝不明文。",
+      "pending_input": [
+        "密钥后端开通",
+        "访问策略（最小权限）",
+        "KMS/加密密钥轮换"
+      ],
+      "qualification_status": "not_configured",
+      "status": "pending_external_staging_resource"
+    },
+    {
+      "resource_id": "ext-staging-identity_provider",
+      "resource_type": "identity_provider",
+      "required": true,
+      "owner_role": "security-owner",
+      "provisioning_tool": "terraform/opentofu + SaaS (provider-agnostic, default tencent_cloud/Authing/Keycloak)",
+      "default_provider_service": "OIDC / SSO IdP tenant",
+      "iac_module": "infrastructure/staging/identity_provider.tf",
+      "description": "外部预生产身份提供方（OIDC/SSO），独立于生产 IdP tenant。",
+      "pending_input": [
+        "IdP tenant 开通",
+        "OIDC client / 回调 URI",
+        "用户/角色目录接入策略"
+      ],
+      "qualification_status": "not_configured",
+      "status": "pending_external_staging_resource"
+    },
+    {
+      "resource_id": "ext-staging-object_storage",
+      "resource_type": "object_storage",
+      "required": true,
+      "owner_role": "production-owner",
+      "provisioning_tool": "terraform/opentofu (provider-agnostic, default tencent_cloud)",
+      "default_provider_service": "Tencent Cloud COS",
+      "iac_module": "infrastructure/staging/object_storage.tf",
+      "description": "对象存储桶，存放构建产物/静态资源/备份。",
+      "pending_input": [
+        "存储桶命名与区域",
+        "CORS / 访问策略",
+        "生命周期/保留"
+      ],
+      "qualification_status": "not_configured",
+      "status": "pending_external_staging_resource"
+    },
+    {
+      "resource_id": "ext-staging-telemetry",
+      "resource_type": "telemetry",
+      "required": true,
+      "owner_role": "release-manager",
+      "provisioning_tool": "terraform/opentofu (provider-agnostic, default tencent_cloud)",
+      "default_provider_service": "Tencent Cloud CLS / managed Prometheus",
+      "iac_module": "infrastructure/staging/telemetry.tf",
+      "description": "可观测性后端（日志/指标/追踪），独立 workspace。",
+      "pending_input": [
+        "日志集/指标 workspace",
+        "采集 agent 部署（staging 专属）",
+        "保留期"
+      ],
+      "qualification_status": "not_configured",
+      "status": "pending_external_staging_resource"
+    },
+    {
+      "resource_id": "ext-staging-alert_sandbox",
+      "resource_type": "alert_sandbox",
+      "required": true,
+      "owner_role": "release-manager",
+      "provisioning_tool": "terraform/opentofu + notification channel (provider-agnostic)",
+      "default_provider_service": "Cloud Monitor alarm + independent notification channel",
+      "iac_module": "infrastructure/staging/alert_sandbox.tf",
+      "description": "告警沙箱：独立通知通道，禁发生产 on-call。",
+      "pending_input": [
+        "告警通知端点（非生产）",
+        "路由/静默策略",
+        "演练通道验证"
+      ],
+      "qualification_status": "not_configured",
+      "status": "pending_external_staging_resource"
+    },
+    {
+      "resource_id": "ext-staging-domain_tls",
+      "resource_type": "domain_tls",
+      "required": true,
+      "owner_role": "production-owner",
+      "provisioning_tool": "terraform/opentofu (provider-agnostic, default tencent_cloud DNSPod + SSL)",
+      "default_provider_service": "Staging subdomain + TLS certificate (ACME/managed)",
+      "iac_module": "infrastructure/staging/domain_tls.tf",
+      "description": "staging 专用子域 + 证书，禁复用生产证书。",
+      "pending_input": [
+        "staging 子域名授权",
+        "证书颁发机构/自动续期",
+        "DNS 托管权"
+      ],
+      "qualification_status": "not_configured",
+      "status": "pending_external_staging_resource"
+    },
+    {
+      "resource_id": "ext-staging-deployment_target",
+      "resource_type": "deployment_target",
+      "required": true,
+      "owner_role": "production-owner",
+      "provisioning_tool": "terraform/opentofu (provider-agnostic, default tencent_cloud)",
+      "default_provider_service": "Tencent Cloud TKE + TCR",
+      "iac_module": "infrastructure/staging/deployment_target.tf",
+      "description": "容器运行时 + 镜像仓库（staging 专属集群/命名空间）。",
+      "pending_input": [
+        "容器镜像仓库命名空间",
+        "K8s/ECS 集群与节点池",
+        "镜像 digest 登记（待真实 build/push 后）"
+      ],
+      "qualification_status": "not_configured",
+      "status": "pending_external_staging_resource"
+    }
+  ]
+}
