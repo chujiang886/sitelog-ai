@@ -42,13 +42,25 @@ def _default_source_commit() -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Generate External Staging Qualification Package")
-    parser.add_argument("--source-commit", default=None)
+    parser.add_argument("--source-commit", default=None,
+                        help="evidence_source_commit：真正包含本阶段实现的 commit")
+    parser.add_argument("--baseline-commit", default=None,
+                        help="基线 commit（Phase 3.9.9 real-staging tip）")
+    parser.add_argument("--generated-from-commit", default=None,
+                        help="实际生成本包的 HEAD（R1 终态 HEAD）")
     parser.add_argument("--out", default=".ai/staging/external_staging_qualification_package.json")
     args = parser.parse_args(argv)
 
     commit = args.source_commit or _default_source_commit()
+    baseline = args.baseline_commit or commit
+    generated_from = args.generated_from_commit or commit
     identity = ExternalStagingEnvironmentIdentity()
-    pipeline = QualificationPipeline(source_commit=commit, environment_identity=identity)
+    pipeline = QualificationPipeline(
+        source_commit=commit,
+        baseline_commit=baseline,
+        package_generated_from_commit=generated_from,
+        environment_identity=identity,
+    )
     result = pipeline.run()
     package = result.package
 
@@ -59,6 +71,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(f"[OK] 生成资格包：{out_path}")
     print(f"  source_commit={package['source_commit']}")
+    print(f"  baseline_commit={package['baseline_commit']}")
+    print(f"  evidence_source_commit={package['evidence_source_commit']}")
+    print(f"  package_generated_from_commit={package['package_generated_from_commit']}")
     print(f"  gate.status={package['gate']['status']}")
     print(f"  package_hash={package['package_hash']}")
     return 0

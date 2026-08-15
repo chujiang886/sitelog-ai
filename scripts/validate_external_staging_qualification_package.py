@@ -101,6 +101,14 @@ def validate_package(payload: dict, *, expected_source_commit: str | None = None
             f"{payload.get('source_commit')}）。"
         )
 
+    # source_commit 必须与 evidence_source_commit 一致（语义不变量，Task 2）
+    if "evidence_source_commit" in payload and payload.get("source_commit") != payload.get("evidence_source_commit"):
+        errors.append(
+            f"source_commit 必须与 evidence_source_commit 一致（"
+            f"source_commit={payload.get('source_commit')}, "
+            f"evidence_source_commit={payload.get('evidence_source_commit')}）。"
+        )
+
     # package_hash 一致性（stale 检测）
     declared = payload.get("package_hash")
     computed = package_hash(payload)

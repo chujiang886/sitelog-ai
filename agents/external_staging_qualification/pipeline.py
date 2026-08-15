@@ -83,8 +83,12 @@ class QualificationPipeline:
         source_commit: str,
         environment_identity: ExternalStagingEnvironmentIdentity | None = None,
         denylist: "ProductionReferenceDenylist | None" = None,
+        baseline_commit: str | None = None,
+        package_generated_from_commit: str | None = None,
     ) -> None:
         self._source_commit = source_commit
+        self._baseline_commit = baseline_commit
+        self._generated_from_commit = package_generated_from_commit
         self._env = environment_identity or load_external_staging_identity()
         self._denylist = denylist or ProductionReferenceDenylist()
         self._gate = ExternalStagingQualificationGate()
@@ -160,6 +164,9 @@ class QualificationPipeline:
         # 9) Package
         package = build_qualification_package(
             source_commit=self._source_commit,
+            baseline_commit=self._baseline_commit,
+            evidence_source_commit=self._source_commit,
+            package_generated_from_commit=self._generated_from_commit,
             environment_identity=self._env,
             registry=registry,
             isolation=isolation,

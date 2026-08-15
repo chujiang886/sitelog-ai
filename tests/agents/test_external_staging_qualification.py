@@ -417,10 +417,13 @@ def test_validator_passes_generated_package():
     if not pkg_path.exists():
         pytest.skip("package not generated")
     script = Path("scripts/validate_external_staging_qualification_package.py")
-    rc = subprocess.run(
-        [sys.executable, str(script), str(pkg_path), "--source-commit", "2f4a983"],
-        capture_output=True, text=True, timeout=30,
-    )
+    # 自派生包内 source_commit（避免硬编码 base，待 R1 后 source_commit 指向实现 commit）
+    pkg_payload = json.loads(pkg_path.read_text(encoding="utf-8"))
+    cmd = [sys.executable, str(script), str(pkg_path)]
+    sc = pkg_payload.get("source_commit")
+    if sc:
+        cmd += ["--source-commit", sc]
+    rc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
     assert rc.returncode == 0, rc.stderr
 
 

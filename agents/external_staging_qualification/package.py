@@ -83,8 +83,27 @@ def build_qualification_package(
     telemetry_status: str = "not_configured",
     alerting_status: str = "not_configured",
     deployment_summary: dict[str, Any] | None = None,
+    baseline_commit: str | None = None,
+    evidence_source_commit: str | None = None,
+    package_generated_from_commit: str | None = None,
 ) -> dict[str, Any]:
-    """构建机器可读资格包（确定性）。"""
+    """构建机器可读资格包（确定性）。
+
+    commit 语义拆分（消除 source_commit 混用历史 base 的歧义，Task 2）：
+
+    - ``baseline_commit``：本阶段所基于的基线 commit（Phase 3.9.9 real-staging tip）。
+    - ``evidence_source_commit``：资格框架所证明的软件版本（真正包含 3.9.10 实现的
+      commit）。``source_commit`` 字段恒等于它——避免将历史 base 误当作被证明版本。
+    - ``package_generated_from_commit``：实际生成本包的 HEAD（SSOT 回填 closure 后的
+      R1 终态 HEAD）。
+
+    三者缺省时回退到 ``source_commit``，保证无显式传参的调用（测试 / CI）仍确定且兼容。
+    """
+
+    # 语义不变量：source_commit 必须指向「真正包含本阶段实现的 commit」，而非历史 base。
+    evidence_commit = evidence_source_commit or source_commit
+    baseline = baseline_commit or source_commit
+    generated_from = package_generated_from_commit or source_commit
 
     generated_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
     payload: dict[str, Any] = {
@@ -92,7 +111,10 @@ def build_qualification_package(
         "phase": PHASE,
         "phase_name": "External Staging Qualification & Evidence Integration Layer",
         "terminal_state": EXTERNAL_STAGING_QUALIFICATION_TERMINAL_STATE,
-        "source_commit": source_commit,
+        "source_commit": evidence_commit,
+        "baseline_commit": baseline,
+        "evidence_source_commit": evidence_commit,
+        "package_generated_from_commit": generated_from,
         "generated_at": generated_at,
         "environment_identity": environment_identity.to_dict(),
         "resource_registry_summary": registry.summary(),
