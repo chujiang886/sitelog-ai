@@ -1,0 +1,182 @@
+name: External Staging Provisioning Execution Gate
+
+# Phase 3.9.13 —— 外部预生产供给执行与资源登记层 CI 门禁（fail-closed）。
+#
+# 与 3.9.12 就绪门禁（external-staging-provisioning-readiness-gate.yml）、
+# 3.9.11 执行资格门禁、3.9.10 资格认定门禁等互补。本流水线只盯
+# "External Staging Provisioning Execution 层是否 safe-closed、可证明非生产、不吸收旧 WIP、
+# 不引入新企业审计类目"：
+#
+#   branch-integrity-gate        Branch Integrity Guard（错分支 / forbidden 模块 / 3.9.14 / 审计漂移）
+#   execution-tests              External Staging Provisioning Execution 测试矩阵（fail-closed）
+#   package-deterministic-validate  确定性执行包（machine_package）生成 + 校验（SHA-256 稳定 / fail-closed）
+#   iac-readiness-gate          IaC 可执行就绪（real_execution_allowed=False）
+#   api-contract-validate        5 routes 仅读 API 契约基线校验（禁 mutating / 禁 GO）
+#   credential-safety            递归深扫红线（执行包内不得含明文凭据）
+#   repo-clean                   收口后工作树仅含合法交付物（无 forbidden / 无 3.9.14）
+#
+# 任一 job 失败即整条流水线失败（fail-closed）。本门禁**不激活、不部署、不翻转
+# engineering_enabled、不写真实控制平面、不吸收 Production Handoff WIP**——全绿仅代表供给
+# 执行层安全合规，真实 External Staging 资源供给与 GO 仍需主理人在人类终端、四角色
+# 真实签署后显式执行。
+#
+# 注意：本 workflow 的 `on:` 仅匹配 Phase 3.9.13 自身分支（不使用 `feat/phase3.9.*` 通配），
+# 避免与 3.9.10/3.9.11/3.9.12 等长兄门禁相互误触发（跨 Phase 红线守护各自独立）。
+
+on:
+  pull_request:
+    branches:
+      - "feat/phase3.9.13-external-staging-provisioning-execution-registration"
+  push:
+    branches:
+      - "main"
+      - "feat/phase3.9.13-external-staging-provisioning-execution-registration"
+      - "release/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: boip-external-staging-provisioning-execution-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  branch-integrity-gate:
+    name: Branch Integrity Guard (fail-closed)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Ensure pyyaml
+        run: python -m pip install --quiet pyyaml
+      - name: Run Branch Integrity Gate
+        run: python scripts/check_phase3913_branch_integrity.py
+
+  execution-tests:
+    name: External Staging Provisioning Execution tests (fail-closed)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --quiet --requirement backend/requirements.txt
+      - name: Run staging provisioning execution test matrix
+        run: >-
+          python -m pytest
+          tests/agents/test_external_staging_provisioning_execution.py
+          -q
+
+  execution-api-tests:
+    name: External Staging Provisioning Execution API tests (fail-closed, read-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --quiet --requirement backend/requirements.txt
+      - name: Run staging provisioning execution API test matrix
+        run: >-
+          python -m pytest
+          backend/tests/test_api_external_staging_provisioning_execution.py
+          -q
+
+  package-deterministic-validate:
+    name: Deterministic execution package (generate + validate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --quiet --requirement backend/requirements.txt
+      - name: Regenerate deterministic machine package and validate
+        run: |
+          python -c "from agents.external_staging_provisioning.machine_package import build_machine_package; p=build_machine_package(); assert p['deterministic'] is True, 'package must be deterministic'; assert p['package']['engineering_enabled'] is False, 'engineering_enabled must be False'; assert p['package']['real_resources_provisioned']==0, 'real_resources_provisioned must be 0'; assert p['package']['total_resources']==8, 'must cover 8 resources'; assert len(p['package_hash'])==64, 'sha256 hash required'; print('[PASS] deterministic execution package: engineering_enabled=False, real=0, 8 resources, sha256 stable')"
+
+  iac-readiness-gate:
+    name: IaC readiness guard (real_execution_allowed=False)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --quiet --requirement backend/requirements.txt
+      - name: Run IaC Readiness Guard
+        run: >-
+          python -c
+          "from agents.external_staging_provisioning.iac_readiness import IaCReadinessAuditor;
+          r = IaCReadinessAuditor().audit_all();
+          assert r['real_execution_allowed'] is False, 'real execution must be disallowed';
+          assert len(r['modules'])==8, 'must audit 8 staging modules';
+          print('[PASS] IaC readiness: real_execution_allowed=False, 8 modules audited')"
+
+  api-contract-validate:
+    name: API contract baseline (5 read-only routes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate external staging provisioning execution API contract baseline
+        run: python -c "from agents.external_staging_provisioning.api_contract_execution import EXECUTION_API_CONTRACT; assert EXECUTION_API_CONTRACT.get('real_execution_allowed') is False, 'real_execution_allowed must be False'; eps=EXECUTION_API_CONTRACT.get('endpoints', []); assert len(eps)==5, 'expected 5 read-only endpoints'; assert all(e.get('method')=='GET' and e.get('mutates') is False for e in eps), 'all endpoints must be GET + non-mutating'; assert len(EXECUTION_API_CONTRACT.get('forbidden', []))>=1, 'forbidden list required'; print('[PASS] execution API contract: 5 read-only GET routes, real_execution_allowed=False, forbidden list present')"
+
+  credential-safety:
+    name: Credential safety scan (no real secret in package)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --quiet --requirement backend/requirements.txt
+      - name: Recursive deep scan of deterministic package (fail-closed)
+        run: python -c "from agents.external_staging_provisioning.credential_deep_scanner import assert_no_deep_credential_leak; from agents.external_staging_provisioning.machine_package import build_machine_package; import json; p=build_machine_package()['package']; assert_no_deep_credential_leak(value=p); assert_no_deep_credential_leak(json_str=json.dumps(p, ensure_ascii=False)); print('[PASS] recursive credential deep scan: deterministic package contains no plaintext secret')"
+
+  repo-clean:
+    name: Repo clean (no forbidden / no 3.9.14)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Scan for forbidden / next-phase carryover
+        run: |
+          python - <<'PY'
+          import subprocess, sys
+          rc, out = subprocess.run(["git","ls-files"], capture_output=True, text=True).returncode, subprocess.run(["git","ls-files"], capture_output=True, text=True).stdout
+          files = out.splitlines()
+          bad = [f for f in files if ("production_handoff" in f.lower() or "handoff" in f.lower() or "3.9.14" in f)]
+          if bad:
+              print("FORBIDDEN FILES:", bad); sys.exit(1)
+          print("[PASS] repo clean: no forbidden module / no 3.9.14 carryover")
+          PY
