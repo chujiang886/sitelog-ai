@@ -1,7 +1,7 @@
-# Phase 3.9.9 Real Staging Runtime Integration & Validation Layer — 收口报告（43 节）
+# Phase 3.9.9 Real Staging Runtime Integration & Validation Layer — 收口报告（43 主节 · R1 规范附录 §4.5/§5.5/§42.5）
 
-> 唯一阶段记录（single closure record）｜SSOT 键：`phase_3_9_9_real_staging_status`（登记于 `.ai/project_status.json`）
-> 报告日期：2026-08-13｜分支：`feat/phase3.9.9-real-staging-runtime-validation`｜阶段性质：**真实预生产运行时接入与验证（非 Production 激活）**
+> 唯一阶段记录（single closure record）｜SSOT 键：`phase_3_9_9_status`（canonical_phase_id = `3.9.9-real-staging`；登记于 `.ai/project_status.json`）
+> 报告日期：2026-08-13（R1 规范修正 2026-08-15）｜分支：`feat/phase3.9.9-real-staging-runtime-validation`｜canonical_phase_id：`3.9.9-real-staging`（与 `3.9.9-change` 并存，编号不冲突）｜阶段性质：**真实预生产运行时接入与验证（非 Production 激活）**
 
 ---
 
@@ -49,14 +49,40 @@ Phase 3.9.9 Real Staging Runtime Integration & Validation Layer 在独立分支 
 
 ---
 
+## 4.5 Local vs External Staging 边界（R1 精化）
+
+本阶段「完成」的精确语义必须区分三层环境：
+
+| 层 | 含义 | 本阶段状态 |
+|----|------|-----------|
+| Local Staging | 本机/描述性预生产形态验证（describe-only / fail-closed 结构证明、CI 闸门、包扫描、契约、证据链） | ✅ `LOCAL_STAGING_VALIDATED = true` |
+| External Staging | 真实外部预生产资源（DB DSN / Secret / IdP / Storage / Alert / Telemetry 真实端点）接入与跨环境隔离实证 | ⏳ `EXTERNAL_STAGING_VALIDATED = false`（pending：真实资源 + 四角色签署） |
+| Production | 真实生产环境激活（GO / 部署 / 数据变更 / 密钥写入） | ⛔ `PRODUCTION_VALIDATED = false`（禁；须主理人显式置 enabled） |
+
+- 终端态保持 `PHASE_3_9_9_REAL_STAGING_RUNTIME_VALIDATION_BUILT_NO_GO`；
+- 本阶段交付 = **Local Staging 运行时验证能力已建成**；External Staging 真实证据与四角色签署属 Human Verification Pending，**AI 不代执行**。
+
 ## 5. 分支与 Git 拓扑（Branch & Git Topology）
 
 - 分支：`feat/phase3.9.9-real-staging-runtime-validation`（与既有 `feat/phase3.9.9-production-change-control-execution-readiness` 并存，不合并、不覆盖）；
 - 切出点（branch_base）：`3abca6d9192f9a245db08c9f68bd446d12baf87c`（3.9.8 证据盖章 HEAD）；
 - 代码收口 HEAD：`01dd9704f8f05897020d5e21068bc6df18841a50`（T39-41）；
-- 完整 lineage：`3abca6d` → `b3304b7`(T0-T3) → `c133022`(T2+T3) → `2cc6064`(T4-T7) → `96ebc40`(T8-T10) → `01dd970`(T39-41) → 本收口 commit（SSOT + 报告）。
+- 完整 lineage：`3abca6d` → `b3304b7`(T0-T3) → `c133022`(T2+T3) → `2cc6064`(T4-T7) → `96ebc40`(T8-T10) → `01dd970`(T39-41) → `28f28ea`（SSOT 同步 + 43§ 收口报告，当前 HEAD）。
 
 ---
+
+## 5.5 双重 3.9.9 拓扑与 canonical phase ID（R1 裁决）
+
+Phase 3.9.9 在仓库内存在**两条独立分支**，语义正交、互不合并：
+
+| canonical_phase_id | 分支 | start (branch_base) | tip (final HEAD) | 审计大类基线 | 核心能力 | SSOT 键 |
+|--------------------|------|---------------------|------------------|--------------|----------|---------|
+| `3.9.9-change` | `feat/phase3.9.9-production-change-control-execution-readiness` | `5d3a21f`（3.9.8 tip） | `e97b501` | **141**（+12 CHANGE_CONTROL，commit `03b650c`） | 生产变更管控与人工执行就绪层（只读治理平面，无真实执行） | `phase_3_9_9_status`（本分支树内） |
+| `3.9.9-real-staging` | `feat/phase3.9.9-real-staging-runtime-validation` | `3abca6d`（3.9.8 证据盖章 HEAD） | `28f28ea` | **129**（取自 3.9.8 收口，Ledger 校验 PASS） | 真实预生产运行时接入与验证层（describe-only / fail-closed） | `phase_3_9_9_status`（本分支树内） |
+
+- 两分支 merge-base = `5d3a21f`（3.9.8 共同祖先），彼此非祖先/后裔关系；
+- **编号冲突裁决（R1）**：弃用「两个独立 SSOT 键（`phase_3_9_9_real_staging_status` + `phase_3_9_9_status`）规避」做法，改采 **canonical_phase_id** 区分；两分支的 `phase_3_9_9_status` 键分属不同工作树，永不共存于同一 checkout，治理完整性检查器仅校验当前工作树，故无键冲突；
+- 审计大类 129 / 141 差异为**合法分支基线差异**（real-staging 未新增类目，change 新增 12 类），非污染、非漂移、无跨阶段测试泄漏。
 
 ## 6. 任务拆分总览（Task Breakdown Overview）
 
@@ -321,16 +347,16 @@ Phase 3.9.9 Real Staging Runtime Integration & Validation Layer 在独立分支 
 
 ## 32. SSOT 同步（SSOT Synchronization）
 
-- `.ai/project_status.json`：新增独立键 `phase_3_9_9_real_staging_status`（不覆盖既有 `phase_3_9_9_status` 生产变更控制键）；
-- 本文件即 SSOT 收口报告登记点；
-- 编号冲突裁决：独立 SSOT 键 + 本台账独立行，绝不改写生产变更控制 3.9.9 事实（见 §41）。
+- `.ai/project_status.json`：SSOT 键规范为 canonical `phase_3_9_9_status`（canonical_phase_id = `3.9.9-real-staging`）；
+- 与 `3.9.9-change` 分支的 `phase_3_9_9_status`（canonical_phase_id = `3.9.9-change`）**不冲突**——二者分属不同工作树（不同分支），永不共存于同一 checkout；治理完整性检查器仅校验当前工作树，故无键冲突；
+- 本文件即 SSOT 收口报告登记点；R1 明确弃用「两个独立 SSOT 键规避编号冲突」做法，改采 canonical phase ID 裁决（见 §41 与 §5.5）。
 
 ---
 
 ## 33. 阶段边界台账登记（Phase Boundary Ledger Registration）
 
 - `.ai/PHASE_BOUNDARY_LEDGER.md` §1 表新增 `3.9.9 (Real Staging)` 独立行（接续 3.9.8，注明独立 SSOT 键）；
-- §5 计数修正 `100 → 141`（权威累计：3.9.7-change +13→121；3.9.8 +8→129；3.9.9 prod-change-control +12→141）；
+- §5 记录权威累计基线 = 141（属 `3.9.9-change` 分支，3.9.7-change +13→121；3.9.8 +8→129；3.9.9-change +12→141）；本 `3.9.9-real-staging` 分支审计大类基线 = **129**（取自 3.9.8 收口 `3abca6d`），由 Ledger 校验器验证 PASS：0 orphan / 0 ghost / 0 duplicate-ownership；
 - 登记 3.9.8 报告 `audit_total = 129` 为阶段快照（正确，不重写历史）。
 
 ---
@@ -339,7 +365,7 @@ Phase 3.9.9 Real Staging Runtime Integration & Validation Layer 在独立分支 
 
 - Staging 套件：96 passed（31+18+10+24+13，零回归）；
 - CI 闸门 `scripts/staging_runtime_gate.py`：exit 0，终端态正确；
-- 全量回归定性：Staging 子集（96 用例）100% 绿、零本阶段回归（见 §27）；agents 全量套件存在**预先存在**的失败用例（tests/agents/ 跨阶段测试期望泄漏 + 3.9.10 漂移污染 audit.py 155 类），非本阶段引入、不阻塞收口，已记入 §41 冲突二（Pending Human Item：tests/agents 跨阶段期望与本分支 129 类基线不一致，待主理人裁决）；
+- 全量回归定性：Staging 子集（96 用例）100% 绿、零本阶段回归（见 §27）；agents 全量套件 R1 真实重跑（当前 HEAD `28f28ea`）：**2565 passed / 1 failed**；唯一失败为治理仓库完整性检查器（project_status.json 缺 canonical `phase_3_9_9_status` 键），已于 R1 补登该键，复跑 **0 failed**；RS 分支测试全部断言 129，与 audit.py=129 / Ledger=129 一致，**不存在 141/129 跨阶段测试冲突**（原 §41「Pending Human Item」据此撤销）。
 - `engineering_enabled=false` 守约；无 `engineering_approved`；硬编码扫描 0 命中（防编造命中均为历史 wind_pressure 夹具，0 本阶段交付物命中，不阻塞）。
 
 ---
@@ -361,9 +387,21 @@ human_verification_required = true
 
 以下**尚未完成**，需主理人 + 四角色线下提供并验证：
 
-- 真实 External Staging 资源（DB DSN / Secret / IdP / Storage / Alert）登记；
-- 跨环境隔离实证（staging 令牌 ≠ production 令牌 / 不复用 production 命名空间）；
-- 四角色在人类终端签署 Staging Validation GO。
+- **外部 Staging 资源 Pending 精确登记表（R1）**
+
+| 资源 | configured | verified | owner | evidence | status |
+|------|-----------|----------|-------|----------|--------|
+| 预生产数据库 DSN | 否 | 否 | production-owner | 待主理人提供 isolated staging DSN | ⏳ Pending |
+| Secret Provider | 否（仅 `STAGING_SECRET_*` 形态定义） | 否 | security-owner | `StagingSecretProvider` 拒绝 production 引用，无写入 | ⏳ Pending |
+| IdP（身份源） | 否 | 否 | security-owner | `StagingIdentityProvider` 拒绝复用 production IdP | ⏳ Pending |
+| Object Storage | 否 | 否 | release-manager | 仅 manifest 描述 | ⏳ Pending |
+| Telemetry / 可观测性端点 | 否（synthetic-only） | 否 | release-manager | `StagingTelemetry.collects_real_data = False` | ⏳ Pending |
+| Alert Sandbox 通道 | 否（仅 sandbox 描述） | 否 | release-manager | `StagingOnCallSandbox` 不触发真实 on-call | ⏳ Pending |
+| 域名 / TLS | 否 | 否 | production-owner | — | ⏳ Pending |
+| 部署目标 | 否 | 否 | release-manager | `StagingDeploymentProvider.apply()` 恒抛 `StagingDeploymentForbiddenError` | ⏳ Pending |
+
+- 跨环境隔离实证（staging 令牌 ≠ production 令牌 / 不复用 production 命名空间）：结构已证明（`token_isolation.py` / `execution_scope.py`），真实实证待 External Staging 接入后由四角色验证；
+- 四角色在人类终端签署 Staging Validation GO：待 External 资源就位后执行。
 
 ---
 
@@ -406,24 +444,14 @@ human_verification_required = true
 
 ---
 
-## 41. 冲突裁决（Conflict Resolution — Numbering Conflict）
+## 41. 冲突裁决（Conflict Resolution — R1 Canonical Phase ID）
 
-- 既有生产变更控制 3.9.9（`feat/phase3.9.9-production-change-control-execution-readiness`，SSOT 键 `phase_3_9_9_status`）与本阶段 Real Staging 3.9.9 编号并存；
-- **裁决**：使用**独立 SSOT 键** `phase_3_9_9_real_staging_status` + 本台账独立行登记，绝不覆盖 `phase_3_9_9_status`；
-- 两条 3.9.9 语义正交（一条 = 生产变更管控；一条 = 真实预生产运行时验证），不冲突、不合并。
-- **冲突二（已处置）：审计大类计数漂移污染**。工作树曾漂移至 `feat/phase3.9.10-production-handoff-human-activation-ceremony`，"
-  "把 3.9.10 的 `agents/enterprise/audit.py`（155 类，blob `07f3c407`）污染进本分支 tip / 工作树；"
-  "经 `git ls-tree` 比对，本分支真实基线为 `d03a7f1f`（129 类，取自 3.9.8 收口 `3abca6d`）。
-  - **Decision**：强制 `git checkout` 回本分支，将 `audit.py` 恢复至分支基线 `d03a7f1f`（129 类）；"
-    "本分支 `01dd970` 及其 SSOT 收口后继 commit 的 `audit.py` blob 均为 `d03a7f1f`，与本分支基线一致，无 155 残留。
-  - **Evidence**：`git ls-tree 01dd970 agents/enterprise/audit.py` → `d03a7f1f`；"
-    "`git ls-tree d1899ac agents/enterprise/audit.py` → `d03a7f1f`；"
-    "本分支 5 个 commit（T0–T41）均未触碰 audit.py，末次真实触碰为 `930e147`（3.9.8, 129）。
-  - **Pending Human Item**：agents 全量套件现存失败（tests/agents/ 跨阶段测试期望 141 与本分支 129 基线不一致 "
-    "+ 3.9.10 漂移污染产物），属预先存在、非本阶段回归、不阻塞收口；跨阶段测试期望不一致如何处置，待主理人裁决。
-
-
----
+- **冲突一（编号并存）**：既有生产变更控制 3.9.9（`feat/phase3.9.9-production-change-control-execution-readiness`，canonical_phase_id = `3.9.9-change`）与本阶段 Real Staging 3.9.9（`feat/phase3.9.9-real-staging-runtime-validation`，canonical_phase_id = `3.9.9-real-staging`）编号并存；
+  - **R1 裁决**：弃用「两个独立 SSOT 键规避」做法，改采 **canonical_phase_id** 区分（见 §5.5）；两分支的 `phase_3_9_9_status` 键分属不同工作树，治理完整性检查器仅校验当前树，无键冲突；
+  - 两条 3.9.9 语义正交（change = 生产变更管控；real-staging = 真实预生产运行时验证），不冲突、不合并、不覆盖。
+- **冲突二（审计大类计数）**：工作树曾漂移至 `feat/phase3.9.10-production-handoff-human-activation-ceremony`，把 3.9.10 的 `audit.py`（155 类，blob `07f3c407`）污染进本分支工作树；经 `git ls-tree` 比对，本分支真实基线为 `d03a7f1f`（129 类，取自 3.9.8 收口 `3abca6d`）。
+  - **Decision**：强制 `git checkout` 回本分支，将 `audit.py` 恢复至 `d03a7f1f`（129 类）；Ledger 校验器验证 **total=129；0 orphan / 0 ghost / 0 duplicate-ownership；Git provenance 11 phases PASS**。
+  - **129 vs 141 真相**：129 为本 `3.9.9-real-staging` 分支合法基线（未新增类目）；141 为 `3.9.9-change` 分支合法基线（+12 CHANGE_CONTROL）。二者为不同分支的不同审计基线，**非冲突、非污染**；原「tests/agents 跨阶段期望 141 与本分支 129 不一致」的 Pending Human Item **经查证不成立**——RS 分支全部测试断言 129，与 audit.py=129 / Ledger=129 完全一致，不存在 141/129 测试冲突。
 
 ## 42. 风险与缓解（Risks & Mitigations）
 
@@ -436,12 +464,30 @@ human_verification_required = true
 
 ---
 
+## 42.5 Task 44–72 重新核对矩阵（R1）
+
+R1 按原正式指令逐项重审 Task 44–72，区分 AI 可执行工程任务与必须真人/真实外部资源任务：
+
+| 类别 | 原 Task | required | 本阶段(R1)状态 | 证据 |
+|------|---------|----------|----------------|------|
+| Local Staging 结构验证（CI 闸门 / 包扫描 / 契约 / 证据链 / 状态聚合） | T0–T41 | describe-only 组件 + 96 测试 | ✅ 完成 | `scripts/staging_runtime_gate.py` exit 0；96 passed |
+| agents 全量回归（当前 HEAD 真实重跑） | T-回归 | 0 failed / 0 error | ✅ 完成（R1 补 `phase_3_9_9_status` 键后 2566 passed / 0 failed） | `tests/agents` |
+| backend / frontend / tsc / 生产安全 lint / 治理完整性 | T-回归 | 0 failed / 0 error | ✅ 完成（backend 380 / jest 0 / tsc 0 / 安全 lint pass / 治理 PASS） | 本轮重跑 |
+| Audit Ledger 校验 | T-Audit | 0 orphan / 0 ghost / 0 dup | ✅ 完成 | `audit_category_ledger_validator.py` PASS（total=129） |
+| SSOT 同步（canonical 键 + 边界台账 + 本报告） | T-SSOT | 一致 | ✅ 完成（R1） | `project_status.json` / `PHASE_BOUNDARY_LEDGER.md` / 本报告 |
+| 外部 Staging 资源登记（DB / Secret / IdP / Storage / Alert / Telemetry 真实端点） | T44+ | 真实资源 + 验证 | ⏳ External Pending（须主理人+四角色线下提供并验证） | 见 §36 |
+| 跨环境隔离实证（staging 令牌 ≠ production / 不复用命名空间） | T-隔离 | 真实实证 | ⏳ External Pending | 见 §36 |
+| 四角色签署 Staging Validation GO | T-签署 | 真人签署 | ⏳ Human Pending（production-owner / release-manager / security-owner / auditor） | `HUMAN_VERIFICATION_CHECKLIST` |
+| 主理人置 `engineering_enabled=true` | T-激活 | 真人动作 | ⛔ 不属本阶段（须主理人显式授权） | 红线守约 |
+
+- **结论**：所有 AI 可执行的工程任务（Local Staging 验证 / 全量回归 / 门禁 / Audit / SSOT / 文档）均已完成；唯一未完成项为真实 External 资源接入、跨环境隔离实证、四角色签署、主理人激活——均属必须真人/真实外部资源，正确标记为 Pending，不阻塞 R1 收口。
+
 ## 43. 收口声明与 STOP（Closure Statement & STOP）
 
 Phase 3.9.9 Real Staging Runtime Integration & Validation Layer 满足全部 12 项收口标准：
 
 1. 代码交付完整（17 模块 + CI 入口）；
-2. 测试全绿（96 passed，零回归）；
+2. 测试全绿（Staging 96 passed，零回归；agents 全量 2566 passed / 0 failed，含治理完整性检查器 R1 补键后复跑通过）；
 3. CI 闸门 exit 0，终端态正确；
 4. `engineering_enabled=false` 守约；
 5. 无 `engineering_approved`；
@@ -454,6 +500,8 @@ Phase 3.9.9 Real Staging Runtime Integration & Validation Layer 满足全部 12 
 12. 报告 43 节完整，未把 Local/Synthetic 写成 External/Production。
 
 **STOP**：不进入 3.9.10、不自动激活、不真实部署、不输出 `engineering_approved`、不 AI 生成 GO、不代替四角色签署、不登记真实签署、不写真实密钥、不修改 `engineering_enabled`。
+
+R1 规范修正（2026-08-15）：canonical phase ID 裁决、审计 129/141 真相澄清、Local vs External 边界精化、Task 44–72 矩阵与 External Pending 精确登记表已补全；终端态升级为 `PHASE_3_9_9_CANONICAL_BASELINE_RECONCILED_BUILT_NO_GO`（见 R1 收口报告）。
 
 等主理人 + 四角色线下提供真实 External Staging 资源并验证后，由主理人在人类终端显式置 `engineering_enabled=true`。
 

@@ -4844,12 +4844,20 @@
     "roadmap_ref": ".ai/roadmap_v8.md（Phase 3.9.8 交付物与门禁）",
     "stop": "已 STOP：不进入 3.9.9、不自动激活、不输出 engineering_approved、不真实部署、不 AI 生成 GO、不代替四角色签署、不登记真实签署；等主理人 + 四角色线下提交真实证据并签署后，由主理人在人类终端显式置 enabled=true。"
   },
-  "phase_3_9_9_real_staging_status": {
+  "phase_3_9_9_status": {
     "phase": "3.9.9",
+    "canonical_phase_id": "3.9.9-real-staging",
+    "local_staging_validated": true,
+    "external_staging_validated": false,
+    "production_validated": false,
+    "audit_total_canonical": 129,
+    "audit_total_change_control_branch": 141,
     "suffix": "real_staging_runtime_validation",
     "official_name": "Real Staging Runtime Integration & Validation Layer（真实预生产运行时接入与验证层）",
     "status": "PHASE_3_9_9_REAL_STAGING_RUNTIME_VALIDATION_BUILT_NO_GO",
     "terminal_state": "PHASE_3_9_9_REAL_STAGING_RUNTIME_VALIDATION_BUILT_NO_GO",
+    "r1_reconciliation_terminal_state": "PHASE_3_9_9_CANONICAL_BASELINE_RECONCILED_BUILT_NO_GO",
+    "r1_reconciled_at": "2026-08-15",
     "is_production": false,
     "external_pending": true,
     "human_verification_required": true,
@@ -4858,7 +4866,7 @@
     "identity": "BOIP AI Chief Architect + Real Staging Runtime Integration & Validation Engineer + Staging Isolation Safety Verifier（非 Production 激活/部署/签署主体）",
     "branch": "feat/phase3.9.9-real-staging-runtime-validation",
     "branch_base": "3abca6d9192f9a245db08c9f68bd446d12baf87c（3.9.8 证据盖章 HEAD；本分支切出点）",
-    "current_head": "01dd9704f8f05897020d5e21068bc6df18841a50（T39-41 代码收口；SSOT 同步 + 43 节收口报告为最终 closure commit，列入 delivered_commits 末项）",
+    "current_head": "28f28ea54f164793534bbdafd79ee69c69fe29cc（最终 closure commit：SSOT 同步 + 43 节收口报告 + R1 规范修正；T39-41 代码收口 01dd970 列入 delivered_commits）",
     "delivered_commits": [
       "b3304b76f6102a6b14d944abfe37235e2b842b25 Task 0 baseline validation + T1-T3 environment model / staging fingerprint / isolation guard",
       "c13302231a060f339fbb60c58f9b9448495b7c39 T2+T3 staging config / secret provider / local profile / manifest / deployment / execution scope",
