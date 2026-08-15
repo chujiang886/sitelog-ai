@@ -15,7 +15,8 @@
 | 分支 | `feat/phase3.9.12-external-staging-provisioning-operator-readiness` |
 | Phase base | `6b61e80`（per SSOT `phase_3_9_12_status.phase_base`） |
 | Implementation closure commit | `1ecb7ba196bf47936ecd8e560df29685a924a17f` |
-| SSOT sync commit / final HEAD | `98fa73d29fcbb4232fe373a6c331da0805f285a2` |
+| SSOT sync commit | `98fa73d29fcbb4232fe373a6c331da0805f285a2` |
+| Closure report commit / final HEAD / current HEAD | `3c52a6b4e3021766687804788f06902f88b93564` |
 | 终端态 | `EXTERNAL_STAGING_PROVISIONING_OPERATOR_READY_BUILT_NO_GO` |
 | Operator Gate 态 | `pending_human_input`（独立 3 态之一） |
 | 审计账本总数（canonical） | 129（Phase 3.9.12 引入 0 新类目入企业枚举；自包含 12 类待 fold-in） |
@@ -44,7 +45,7 @@ Track B（真人/真实外部资源）依旧缺失：8 项 External Staging 资�
 - **不是 3.9.10/3.9.11 的吸收或覆盖**：3.9.12 是「供给算子就绪」层，复用其契约与包生成范式，不重造第二套。
 - **Operator Gate 独立 3 态**（与 3.9.10/3.9.11 的 4 态 GateStatus 正交，禁 GO/APPROVED/PRODUCTION_READY）。
 - **StagingProvisioningExecutionMode 仅 PLAN/VALIDATE/DRY_RUN/HUMAN_AUTHORIZED_APPLY**（禁 AUTO/PRODUCTION）。
-- 锚点链 `6b61e80`（phase_base）→ `1ecb7ba`（implementation_closure_commit）→ `98fa73d`（ssot_sync_commit / final_head）互为直系演进，本阶段在其演进线上。
+- 锚点链 `6b61e80`（phase_base）→ `1ecb7ba`（implementation_closure_commit）→ `98fa73d`（ssot_sync_commit）→ `3c52a6b`（closure report commit）互为直系演进，本阶段在其演进线上。
 - 永久隔离旧 WIP「Production Handoff & Human Activation Ceremony」（仅存 stash 隔离区）：禁 pop / merge / cherry-pick / 吸收 / 删除 / 重写。
 
 ---
@@ -55,7 +56,8 @@ Track B（真人/真实外部资源）依旧缺失：8 项 External Staging 资�
 |---|---|---|
 | `6b61e80` | Phase 3.9.12 合法演进起点（phase_base，严格锁定） | ANCESTOR-OK |
 | `1ecb7ba196bf47936ecd8e560df29685a924a17f` | implementation_closure_commit（44 fail-closed 测试 + 11 模块 + 3 脚本 + 确定性算子包） | ANCESTOR-OK |
-| `98fa73d29fcbb4232fe373a6c331da0805f285a2` | ssot_sync_commit / final HEAD（SSOT 块 + Phase Boundary Ledger 行；backend `_build_package` 对齐确定性哈希） | ANCESTOR-OK |
+| `98fa73d29fcbb4232fe373a6c331da0805f285a2` | ssot_sync_commit（SSOT 块 + Phase Boundary Ledger 行；backend `_build_package` 对齐确定性哈希） | ANCESTOR-OK |
+| `3c52a6b4e3021766687804788f06902f88b93564` | closure report commit（46 节收口报告 + 阶段无关分支完整性测试修复） | ANCESTOR-OK |
 
 `scripts/check_phase3912_branch_integrity.py` → 4×[PASS]（分支名 / forbidden 模块 / 3.9.13 残留 / 审计 129）。
 
@@ -335,7 +337,7 @@ prefix `/api/external-staging-provisioning`：
 
 - 精确 `git add` 各路径（禁 `git add -A`）。
 - 不机械删历史、不 `git reset --hard`、不覆盖已有 Phase 编号。
-- 收口提交见 SSOT `current_head`（`98fa73d`）。
+- 收口提交见 SSOT `current_head`（`3c52a6b`）。
 
 ---
 
