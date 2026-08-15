@@ -1,0 +1,142 @@
+{
+  "schema_version": "1.0.0",
+  "phase": "3.9.12",
+  "phase_name": "External Staging Provisioning & Operator Readiness",
+  "generated_at": "2026-08-15",
+  "terminal_state_target": "EXTERNAL_STAGING_PROVISIONING_OPERATOR_READY_BUILT_NO_GO",
+  "engineering_enabled": false,
+  "contains_real_secret": false,
+  "notes": "本表仅为人工输入清单（Track B）。所有状态统一 PENDING，AI 不代填/不伪造/不预估真实账号密钥配额；凭据仅以引用登记。",
+  "human_input_status_uniform": "pending",
+  "resource_inputs": [
+    {
+      "resource_id": "ext-staging-database",
+      "resource_type": "database",
+      "owner_role": "production-owner",
+      "iac_module": "infrastructure/staging/database.tf",
+      "required_inputs": [
+        "云账号 + 项目/VPC/子网",
+        "PostgreSQL 版本与实例规格",
+        "数据库账号与凭据（仅引用，不存明文）+ 轮换策略",
+        "备份/保留策略"
+      ],
+      "status": "pending"
+    },
+    {
+      "resource_id": "ext-staging-secret_provider",
+      "resource_type": "secret_provider",
+      "owner_role": "security-owner",
+      "iac_module": "infrastructure/staging/secret_provider.tf",
+      "required_inputs": [
+        "密钥后端开通（如腾讯云 SSM）",
+        "访问策略（最小权限）",
+        "KMS/加密密钥与轮换配置"
+      ],
+      "status": "pending"
+    },
+    {
+      "resource_id": "ext-staging-identity_provider",
+      "resource_type": "identity_provider",
+      "owner_role": "security-owner",
+      "iac_module": "infrastructure/staging/identity_provider.tf",
+      "required_inputs": [
+        "独立 IdP tenant 开通（OIDC/SSO，禁与生产共享）",
+        "OIDC client / 回调 URI（仅 staging 子域）",
+        "client_secret 引用（不存明文）"
+      ],
+      "status": "pending"
+    },
+    {
+      "resource_id": "ext-staging-object_storage",
+      "resource_type": "object_storage",
+      "owner_role": "production-owner",
+      "iac_module": "infrastructure/staging/object_storage.tf",
+      "required_inputs": [
+        "独立存储桶（COS）开通",
+        "桶策略与 CORS（仅 staging 子域）",
+        "访问密钥引用（不存明文）"
+      ],
+      "status": "pending"
+    },
+    {
+      "resource_id": "ext-staging-telemetry",
+      "resource_type": "telemetry",
+      "owner_role": "release-manager",
+      "iac_module": "infrastructure/staging/telemetry.tf",
+      "required_inputs": [
+        "独立日志/指标 workspace（CLS/Prometheus）",
+        "retention 策略（建议 15 天）",
+        "采集端与 staging 环境绑定"
+      ],
+      "status": "pending"
+    },
+    {
+      "resource_id": "ext-staging-alert_sandbox",
+      "resource_type": "alert_sandbox",
+      "owner_role": "release-manager",
+      "iac_module": "infrastructure/staging/alert_sandbox.tf",
+      "required_inputs": [
+        "独立告警通知组（禁发 production on-call）",
+        "forbid_prod_notify=true 校验",
+        "告警路由与静默策略"
+      ],
+      "status": "pending"
+    },
+    {
+      "resource_id": "ext-staging-domain_tls",
+      "resource_type": "domain_tls",
+      "owner_role": "production-owner",
+      "iac_module": "infrastructure/staging/domain_tls.tf",
+      "required_inputs": [
+        "独立 staging 子域（如 staging.example.com）",
+        "证书（SAN 不含 production 域名）",
+        "DNS 托管与证书轮换"
+      ],
+      "status": "pending"
+    },
+    {
+      "resource_id": "ext-staging-deployment_target",
+      "resource_type": "deployment_target",
+      "owner_role": "production-owner",
+      "iac_module": "infrastructure/staging/deployment_target.tf",
+      "required_inputs": [
+        "独立集群（TKE）开通",
+        "独立镜像仓库（TCR）",
+        "集群访问凭证引用（不存明文）+ 镜像同步策略"
+      ],
+      "status": "pending"
+    }
+  ],
+  "cross_resource_inputs": [
+    {
+      "category": "cloud_account_permissions",
+      "description": "真实云账号、项目、RAM/子账号、最小权限策略；不写入任何密钥明文",
+      "owner_role": "production-owner / security-owner",
+      "status": "pending"
+    },
+    {
+      "category": "cost_budget_guard",
+      "description": "设定 cost_budget（默认 ¥6000 示意上限）；超预算阻断 apply",
+      "owner_role": "production-owner",
+      "status": "pending"
+    },
+    {
+      "category": "four_role_signoff",
+      "description": "production-owner / release-manager / security-owner / auditor 线下提交证据并签署",
+      "owner_role": "四角色",
+      "status": "pending"
+    },
+    {
+      "category": "principal_authorization",
+      "description": "主理人在人类终端将 engineering_enabled 置 true（唯一 AI 不代执行之动作）",
+      "owner_role": "主理人",
+      "status": "pending"
+    },
+    {
+      "category": "provider_binding_confirm",
+      "description": "确认最终 provider 并覆写 var.provider（当前 RECORDED 腾讯云首选，非真实绑定）",
+      "owner_role": "production-owner",
+      "status": "pending"
+    }
+  ]
+}
