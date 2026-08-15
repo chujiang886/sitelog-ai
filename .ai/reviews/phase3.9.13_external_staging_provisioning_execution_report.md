@@ -265,16 +265,21 @@ Phase 3.9.13 **不修改**企业级 `AuditActionCategory` 枚举与冻结账本�
 
 | 维度 | 数字 |
 |---|---|
-| 3.9.13 agents 套件 | 29 passed |
-| 3.9.13 backend API 套件 | 5 passed |
+| agents 全量回归（`tests/agents`，Final HEAD `0cf98c5` 真实重跑） | 2754 passed / 0 failed / 0 error / 0 skipped / 0 xfailed |
+| backend 全量回归（`backend/tests`，Final HEAD `0cf98c5` 真实重跑） | 395 passed / 0 failed / 0 error |
+| 前端 jest（`node_modules/.bin/jest --config frontend/jest.config.js`） | 117 passed / 0 failed（7 suites） |
+| 前端 tsc（`cd frontend && npx tsc --noEmit`） | 0 error |
+| 3.9.13 agents 专项套件 | 29 passed |
+| 3.9.13 backend API 专项套件 | 5 passed |
 | 跨 Phase 聚焦回归（3.9.12+3.9.13 agents+backend API） | 88 passed（无回归） |
-| 包确定性 | PASS（hash=`fa11d6b9…`） |
+| 包确定性 | PASS（hash=`fa11d6b95268123fae53386cd92d11e9643954f0e4616d521d5664ce47c6c721`，engineering_enabled=False，real=0，8 resources） |
 | 分支完整性（3.9.13 脚本） | 4×PASS |
-| 审计账本 | total=129 PASS |
-| API 契约 | 5 routes PASS，全 GET，无 mutating |
-| 递归凭据深扫 | fail-closed PASS |
+| 审计账本 | total=129 PASS（0 orphan/ghost/dup） |
+| API 契约 | 5 routes PASS，全 GET，无 mutating，real_execution_allowed=False |
+| 递归凭据深扫 | fail-closed PASS（无明文凭据） |
+| 治理/安全门禁 | 13/14 全绿；anti-fabrication 为既定非阻断基线（exit1，命中全为历史 wind_pressure，0 本阶段命中） |
 
-> 注：agents 全量（基线 2477）/ backend 全量（基线 385）基线在本分支上保持（3.9.13 为纯新增文件，未改既有模块/`__init__`，聚焦跨 Phase 回归 88 passed 已验证无 break）。完整全量重跑见 CI（push 后门禁自动执行）。
+> 注：以上数字均为 Final HEAD `0cf98c5` 本会话内真实重跑结果，**不依赖 push 后 CI、不引用历史 2477/385 基线**。完整 14 项门禁明细见 Final Verification Stamp 报告。
 
 ---
 
@@ -356,7 +361,7 @@ Phase 3.9.13 **不修改**企业级 `AuditActionCategory` 枚举与冻结账本�
 - Track B 全缺：8/8 资源 Pending，0/8 证据链含真实密钥，9/9 隔离未达真实验证。
 - 成本数字为 0（plan-only，非真实报价）。
 - 审计 0 新增入企业枚举，待阶段边界收敛时统一 fold-in（129 → 后续）。
-- 完整 agents/backend 全量套件未在本会话本地重跑（基线 2477/385 保持，聚焦跨 Phase 回归 88 passed 已验证无 break）；push 后 CI 门禁自动跑全量。
+- 完整 agents/backend 全量套件已在本会话 Final HEAD `0cf98c5` 真实重跑（agents 2754 passed / backend 395 passed / jest 117 passed / tsc 0 error，全绿），详见 §26；不依赖 push 后 CI 再跑全量。
 
 ---
 
