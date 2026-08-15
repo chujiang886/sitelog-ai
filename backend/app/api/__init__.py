@@ -31,6 +31,9 @@ from app.api.external_staging_execution import (
 from app.api.external_staging_provisioning import (
     router as external_staging_provisioning_router,
 )
+from app.api.external_staging_provisioning_execution import (
+    router as external_staging_provisioning_execution_router,
+)
 
 __all__ = [
     "agents_router",
@@ -56,4 +59,5 @@ __all__ = [
     "external_staging_qualification_router",
     "external_staging_execution_router",
     "external_staging_provisioning_router",
+    "external_staging_provisioning_execution_router",
 ]

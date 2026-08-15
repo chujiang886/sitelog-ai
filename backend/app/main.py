@@ -29,6 +29,7 @@ from app.api import (
     external_staging_qualification_router,
     external_staging_execution_router,
     external_staging_provisioning_router,
+    external_staging_provisioning_execution_router,
 )
 from app.core.config import get_settings
 from app.core.logging import configure_logging
@@ -70,5 +71,6 @@ app.include_router(governance_telemetry_router)
 app.include_router(external_staging_qualification_router)
 app.include_router(external_staging_execution_router)
 app.include_router(external_staging_provisioning_router)
+app.include_router(external_staging_provisioning_execution_router)
 register_cors(app)
 register_exception_handlers(app)
