@@ -1,10 +1,14 @@
 # Phase 3.9.10 收口报告 —— External Staging Qualification & Evidence Integration Layer
 
-> 终端态：`EXTERNAL_STAGING_QUALIFICATION_BUILT_NO_GO`
+> 终端态（R1）：`PHASE_3_9_10_FINAL_EVIDENCE_STAMPED_BUILT_NO_GO`
 > 分支：`feat/phase3.9.10-external-staging-qualification`
-> 施工起点 base：`2f4a9838bcfc7105bc561f74fb2658906801e011`
+> phase_base（施工起点）：`2f4a9838bcfc7105bc561f74fb2658906801e011`
+> closure_commit（3.9.10 实现收口）：`34b0491126a626584f85333382d5a6ea39d485f2`
+> final_head（R1 终态 HEAD / SSOT 回填 closure hash）：`cb64105c6bb006cb136a736079c8a14c65d6fa3e`
+> 资格包 source_commit（evidence_source_commit）：`34b0491126a626584f85333382d5a6ea39d485f2`
+> 资格包 package_hash：`b4e9180bced8a6237e532b5ceec3015cf5c36dc775b59207ab2d74406b2608a1`
 > 审计 canonical baseline：129（本阶段 0 新增类目）
-> 收口时间：2026-08-15
+> 收口时间：2026-08-15（R1 盖章：2026-08-15）
 
 ---
 
@@ -15,7 +19,7 @@
 - 关联基线文档：`.ai/progress/phase3.9.10_starting_baseline_validation.md`（T0）、`.ai/progress/phase3.9.10_existing_wip_forensics.md`（T1）
 
 ## 2. 执行摘要
-Phase 3.9.10 在已 BUILT_NO_GO 的 3.9.9 之上，构建了「外部预生产（External Staging）资格认定与证据集成层」。本阶段**不接入、不部署、不激活**任何真实外部预生产环境，仅交付一套 fail-closed 的资格认定框架、确定性证据包、CI 闸门与人工动作入口。所有 51 项任务已完成，全量回归 0 failed，审计类目 0 新增。终端态为 BUILT_NO_GO，等待主理人 + 四角色线下证据与签署。
+Phase 3.9.10 在已 BUILT_NO_GO 的 3.9.9 之上，构建了「外部预生产（External Staging）资格认定与证据集成层」。本阶段**不接入、不部署、不激活**任何真实外部预生产环境，仅交付一套 fail-closed 的资格认定框架（framework_built=true）、确定性证据包、CI 闸门与人工动作入口。工程（framework engineering）51 项强制交付全部完成；但 External Staging 资源供给（0/8 配置、0/8 验证）、跨环境隔离验证（0/9）、运行时配置（0/13）、四角色签署与人工验证均 NOT completed（Human Verification Pending），**禁止暗示 External Staging 已真实完成资格验证**。全量回归 0 failed，审计类目 0 新增。终端态为 BUILT_NO_GO（R1：FINAL_EVIDENCE_STAMPED），等待主理人 + 四角色线下证据与签署。
 
 ## 3. 阶段定位与边界
 - 本阶段属于「生产变更管控与人工执行就绪」之后的**外部预生产资格认定**层。
@@ -23,9 +27,11 @@ Phase 3.9.10 在已 BUILT_NO_GO 的 3.9.9 之上，构建了「外部预生产�
 - `engineering_enabled=false` 全程保持，AI 不代执行任何生产激活/部署/密钥动作。
 
 ## 4. 施工起点锚定（Branch Integrity Guard）
-- 当前 HEAD：`2f4a9838bcfc7105bc561f74fb2658906801e011`（= base，未漂移）
+- phase_base（施工起点）：`2f4a9838bcfc7105bc561f74fb2658906801e011`（= 3.9.9 Real Staging 收口线之后合法演进起点，base 严格锁定）
+- closure_commit（3.9.10 实现收口）：`34b0491126a626584f85333382d5a6ea39d485f2`
+- final_head（R1 终态 HEAD）：`cb64105c6bb006cb136a736079c8a14c65d6fa3e`（SSOT 回填 closure hash）
 - 当前分支：`feat/phase3.9.10-external-staging-qualification`（符合预期）
-- `agents/config.yaml:102` → `engineering_enabled: false`（已核验，未改动）
+- `agents/config.yaml:102` → `engineering_enabled: false`（已核验，未改动，R1 严禁置 true）
 - 每关键写操作前均重新锚定分支/HEAD，未发生自动 drift。
 
 ## 5. T0 基线核验详情
@@ -86,7 +92,7 @@ Phase 3.9.10 在已 BUILT_NO_GO 的 3.9.9 之上，构建了「外部预生产�
 核心导出：`ExternalStagingEnvironmentIdentity`、`QualificationPipeline`、`package_hash`。
 
 ## 13. 资格包生成器（Task 23）
-`scripts/generate_external_staging_qualification_package.py`：确定性生成 `.ai/staging/external_staging_qualification_package.json`，用法 `--source-commit` / `--out`。默认取 `git rev-parse HEAD` 完整 SHA 作为 source_commit。
+`scripts/generate_external_staging_qualification_package.py`：确定性生成 `.ai/staging/external_staging_qualification_package.json`。R1 起 `source_commit` 语义收敛为「资格框架所证明的软件版本（evidence_source_commit，= 真正包含 3.9.10 实现的 commit `34b0491`）」，并显式拆分 `--baseline-commit`（base `2f4a983`）/ `--generated-from-commit`（R1 终态 HEAD `cb64105`）/ `--source-commit`（= evidence `34b0491`）三参数，禁止混用。默认取 `git rev-parse HEAD` 作为三者的回退值。
 
 ## 14. 资格包校验器（Task 24）
 `scripts/validate_external_staging_qualification_package.py <package.json>`：fail-closed 校验——
@@ -112,7 +118,7 @@ Phase 3.9.10 在已 BUILT_NO_GO 的 3.9.9 之上，构建了「外部预生产�
 
 ## 19. 测试套件
 `tests/agents/test_external_staging_qualification.py`：**50 个 test_**，覆盖环境身份、资格流水线、Gate、证据、隔离、确定性包、校验器、分支完整性等。
-**当前（收口时）重跑结果：50 passed**（backend/.venv，0.44s）。
+**当前（R1 final-head 重跑）结果：50 passed**（backend/.venv，0.32s）。R1 另重跑 Branch Integrity / Package Validator / Audit Ledger Validator（total=129，0 orphan/ghost/dup）/ Production Security Lint（7/7）/ Repository Integrity（9/9），全 PASS；`engineering_enabled=False` 已确认。完整 agents 套件 regression 0 failed（implementation-head 回归，本阶段改动为加法向后兼容）。
 
 ## 20. CI 工作流（Task 38）
 `.github/workflows/external-staging-qualification-gate.yml`：8 job——
@@ -253,14 +259,18 @@ branch=`feat/phase3.9.10-external-staging-qualification`、base=`2f4a983`、curr
 ## 44. 测试与校验汇总
 | 项 | 结果 |
 |---|---|
-| 阶段专属测试（50 tests） | 50 passed（收口时重跑） |
-| 分支完整性守卫 | PASS |
-| 包校验（validate） | PASS |
-| 全量回归 agents | 2616 passed |
-| 全量回归 backend | 380 passed |
-| 全量回归 jest | 117 passed |
+| 阶段专属测试（50 tests） | 50 passed（R1 final-head 重跑） |
+| 分支完整性守卫 | PASS（R1 final-head 重跑） |
+| 包校验（validate） | PASS（source_commit=34b0491，R1 final-head 重跑） |
+| Audit Ledger Validator | PASS（total=129，0 orphan/ghost/dup，R1 final-head 重跑） |
+| Production Security Lint | 7/7 PASS（R1 final-head 重跑） |
+| Repository Integrity | 9/9 PASS（R1 final-head 重跑） |
+| engineering_enabled | False（R1 确认，严禁置 true） |
+| 全量回归 agents | 2616 passed（implementation-head 回归基线） |
+| 全量回归 backend | 380 passed（implementation-head 回归基线） |
+| 全量回归 jest | 117 passed（implementation-head 回归基线） |
 | tsc | 0 error |
-| 确定性包 | DETERMINISTIC_OK（8d091f8a…） |
+| 确定性包 | DETERMINISTIC_OK（b4e9180b…，R1 重跑两次一致） |
 | Audit 类目总数 | 129（0 新增） |
 
 ## 45. 风险与缓解
@@ -270,8 +280,8 @@ branch=`feat/phase3.9.10-external-staging-qualification`、base=`2f4a983`、curr
 - **虚假状态**：summary 高估 → 收口时全部重核验（HEAD/分支/包/测试/守卫）
 
 ## 46. 验收标准
-- [x] 全部 51 任务完成
-- [x] 确定性包生成 + 校验 PASS
+- [x] 工程（framework engineering）51 任务完成；External 资源供给 / 人工验证 任务 NOT completed（Human Pending）
+- [x] 确定性包生成 + 校验 PASS（source_commit=34b0491，hash=b4e9180b…）
 - [x] 50 测试 + 全量回归 0 failed
 - [x] 分支完整性 PASS、Audit=129
 - [x] SSOT 三处更新
@@ -283,5 +293,57 @@ branch=`feat/phase3.9.10-external-staging-qualification`、base=`2f4a983`、curr
 - AI Chief Architect（执行）：✅ 阶段交付完成，STOP 等待审核
 - 主理人（轩哥）：⏳ 待审
 - 四角色签署：⏳ 待真实证据与线下签署
-- 终端态：`EXTERNAL_STAGING_QUALIFICATION_BUILT_NO_GO`
+- 终端态（R1）：`PHASE_3_9_10_FINAL_EVIDENCE_STAMPED_BUILT_NO_GO`
 - 收口提交 hash：`34b0491126a626584f85333382d5a6ea39d485f2`（提交后回填本报告 §30/§31/§43 占位）
+
+---
+
+## R1. Final Evidence Stamp（R1 收口补充 —— 最终证据盖章与资格验证语义收敛）
+
+> 本 § 为 R1 在 Phase 3.9.10 已收口基础上追加的「最终证据盖章」层，仅做证据与语义收敛，不新增业务功能、不进入 3.9.11、不 Production Handoff、不 engineering_enabled=true、不真实 Production 动作。
+
+### R1.1 提交三元组（Git 为唯一事实源）
+| 角色 | commit | 说明 |
+|---|---|---|
+| phase_base | `2f4a9838bcfc7105bc561f74fb2658906801e011` | 3.9.9 Real Staging 收口线之后合法演进起点，base 严格锁定 |
+| closure_commit | `34b0491126a626584f85333382d5a6ea39d485f2` | 3.9.10 实现收口：T0/T1 + Tasks + 50 测试 + CI 闸门 + 47§ 收口报告 |
+| final_head | `cb64105c6bb006cb136a736079c8a14c65d6fa3e` | R1 终态 HEAD：SSOT 回填 closure hash（不新增业务功能） |
+
+祖先链已核验：`2f4a983` → `34b0491` → `cb64105`（`34b0491^`=2f4a983，`cb64105` 祖先含 34b0491）。
+
+### R1.2 资格包 Source Commit 语义
+- `source_commit` = `evidence_source_commit` = `34b0491126a626584f85333382d5a6ea39d485f2`（资格框架所证明的软件版本，真正包含 3.9.10 实现的 commit）。
+- `baseline_commit` = `2f4a9838…`（base，不混用）。
+- `package_generated_from_commit` = `cb64105c6…`（R1 终态 HEAD）。
+- 确定性：generate→validate→generate 两次哈希一致（`b4e9180b…`）。
+
+### R1.3 Task 完成度语义（拆分，禁止笼统「51 完成」）
+| 维度 | 完成数 | 说明 |
+|---|---|---|
+| engineering_tasks_completed | 51 | framework engineering 强制交付全部完成 |
+| external_resource_tasks_completed | 0 | External Staging 资源供给 0/8 配置、0/8 验证 |
+| human_verification_tasks_completed | 0 | 四角色签署 + 人工验证 NOT completed（Human Pending） |
+
+### R1.4 External Staging 状态模型（真实状态）
+| 字段 | 值 |
+|---|---|
+| framework_built | true |
+| external_staging_configured | false |
+| external_staging_validated | false |
+| production_validated | false |
+| resources_configured / verified | 0/8 / 0/8 |
+| isolation_verified | 0/9 |
+| runtime_configured | 0/13 |
+| gate | pending_external_staging_resource |
+| contains_real_secret | false |
+| production_activation_prohibited | true |
+| engineering_enabled | false |
+
+### R1.5 engineering_enabled 人类边界（正确顺序，R1 严禁置 true）
+External Staging 资源供给 → External Qualification → 跨环境隔离验证 → External Runtime Validation → External Staging E2E → Failure/Recovery/Rollback 资格 → 证据评审 → Production Readiness / Production Evidence → Human GO/NO-GO → 仅当最终生产治理条件全部满足时，主理人方可能在人类终端显式置 engineering_enabled=true。R1 阶段绝不允许 engineering_enabled=true，亦不吸收 Production Handoff。
+
+### R1.6 Final-Head 验证器重跑（PASS）
+External Staging 50 tests / Branch Integrity / Package Validator / Audit Ledger Validator（129，0 orphan/ghost/dup）/ Production Security Lint（7/7）/ Repository Integrity（9/9）/ engineering_enabled=False —— 全 PASS。完整 agents 套件 regression 0 failed（implementation-head 回归，本阶段改动加法向后兼容）。
+
+### R1.7 收口结论
+终端态：`PHASE_3_9_10_FINAL_EVIDENCE_STAMPED_BUILT_NO_GO`。STOP：不进入 3.9.11、不 Production Handoff、不真实 Production 动作；等待主理人 + 四角色线下真实证据与签署。
