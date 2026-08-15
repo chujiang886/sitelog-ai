@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0.0",
+  "phase": "3.9.11",
+  "environment": "external_staging",
+  "production": false,
+  "production_activation_prohibited": true,
+  "engineering_enabled": false,
+  "no_execution_endpoint": true,
+  "allowed_actions": [
+    "read",
+    "human_record"
+  ],
+  "forbidden_actions": [
+    "execute",
+    "deploy",
+    "activate",
+    "rollback_execute",
+    "production_write",
+    "secret_write"
+  ],
+  "total_routes": 7,
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/external-staging-execution/status",
+      "scope": "external_staging",
+      "action": "read",
+      "performs_execution": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/external-staging-execution/plan",
+      "scope": "external_staging",
+      "action": "read",
+      "performs_execution": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/external-staging-execution/gate",
+      "scope": "external_staging",
+      "action": "read",
+      "performs_execution": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/external-staging-execution/evidence",
+      "scope": "external_staging",
+      "action": "read",
+      "performs_execution": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/external-staging-execution/package",
+      "scope": "external_staging",
+      "action": "read",
+      "performs_execution": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/external-staging-execution/resources",
+      "scope": "external_staging",
+      "action": "read",
+      "performs_execution": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/external-staging-execution/human-record",
+      "scope": "external_staging",
+      "action": "human_record",
+      "performs_execution": false
+    }
+  ]
+}

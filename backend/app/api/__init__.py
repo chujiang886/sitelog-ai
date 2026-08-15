@@ -22,6 +22,12 @@ from app.api.rag import router as rag_router
 from app.api.report import router as report_router
 from app.api.uploads import router as uploads_router
 from app.api.vision import router as vision_router
+from app.api.external_staging_qualification import (
+    router as external_staging_qualification_router,
+)
+from app.api.external_staging_execution import (
+    router as external_staging_execution_router,
+)
 
 __all__ = [
     "agents_router",
@@ -44,4 +50,6 @@ __all__ = [
     "report_router",
     "uploads_router",
     "vision_router",
+    "external_staging_qualification_router",
+    "external_staging_execution_router",
 ]

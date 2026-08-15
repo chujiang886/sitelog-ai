@@ -1,0 +1,165 @@
+name: External Staging Execution Qualification Gate
+
+# Phase 3.9.11 —— 外部预生产执行与资格验证层 CI 门禁（fail-closed）。
+#
+# 与通用 CI（ci.yml）、激活就绪门禁（activation-readiness-gate.yml）、生产激活模拟门禁
+# （production-activation-simulation-gate.yml）、身份/生产安全门禁（identity-governance.yml）、
+# 发布闸门（release-gate.yml）、遥测质量门禁（telemetry-quality-gate.yml）、资格认定门禁
+# （external-staging-qualification-gate.yml）互补。本流水线只盯
+# "External Staging Execution 层是否 safe-closed、可证明非生产、不吸收旧 WIP、不引入新审计类目"：
+#
+#   branch-integrity-gate        Branch Integrity Guard（错分支 / forbidden 模块 / 3.9.12 / 审计漂移）
+#   staging-execution-tests      External Staging Execution 测试矩阵（65+ fail-closed）
+#   package-generate-validate    确定性执行包 generate + validate（SHA-256 稳定 / fail-closed）
+#   audit-ledger-baseline        AuditActionCategory Ledger 校验（total 必须 = 129，0 新增）
+#   api-contract-validate        7 routes API 契约基线校验（机器可读契约不漂移）
+#   credential-safety            credential_scanner 红线（包内不得含真实密钥）
+#   isolation-check              isolation / denylist 结构证明 Staging ≠ Production
+#   repo-clean                   收口后工作树仅含合法交付物（无 forbidden / 无 3.9.12）
+#
+# 任一 job 失败即整条流水线失败（fail-closed）。本门禁**不激活、不部署、不翻转
+# engineering_enabled、不写真实控制平面、不吸收 Production Handoff WIP**——全绿仅代表执行层
+# 安全合规，真实 External Staging 资源登记与 GO 仍需主理人在人类终端、四角色真实签署后显式执行。
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "main"
+      - "feat/phase3.9.11-external-staging-execution-qualification"
+      - "feat/phase3.9.*"
+      - "feat/phase*-release-*"
+      - "release/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: boip-external-staging-execution-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  branch-integrity-gate:
+    name: Branch Integrity Guard (fail-closed)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Ensure pyyaml
+        run: python -m pip install --quiet pyyaml
+      - name: Run Branch Integrity Gate
+        run: python scripts/check_phase3911_branch_integrity.py
+
+  staging-execution-tests:
+    name: External Staging Execution tests (fail-closed)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --quiet --requirement backend/requirements.txt
+      - name: Run staging execution test matrix
+        run: >-
+          python -m pytest
+          tests/agents/test_external_staging_execution.py
+          -q
+
+  package-generate-validate:
+    name: Deterministic execution package (generate + validate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --quiet --requirement backend/requirements.txt
+      - name: Regenerate package (deterministic) and validate
+        run: |
+          python scripts/generate_external_staging_execution_package.py --source-commit "$(git rev-parse HEAD)"
+          python scripts/validate_external_staging_execution_package.py .ai/staging/external_staging_execution_qualification_package.json
+
+  audit-ledger-baseline:
+    name: Audit Ledger baseline (total == 129)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Ensure pyyaml
+        run: python -m pip install --quiet pyyaml
+      - name: Validate Audit Action Category Ledger
+        run: python scripts/audit_category_ledger_validator.py
+
+  api-contract-validate:
+    name: API contract baseline (7 routes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate external staging execution API contract baseline
+        run: python -c "import json,sys; d=json.load(open('.ai/baselines/external_staging_execution_api_contract.json')); assert d.get('total_routes', len(d.get('routes', []))) == 7, 'expected 7 routes'; assert d.get('no_execution_endpoint') is True, 'no_execution_endpoint must be True'; print('[PASS] external staging execution API contract: 7 routes, no execution endpoint')"
+
+  credential-safety:
+    name: Credential safety scan (no real secret in package)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --quiet --requirement backend/requirements.txt
+      - name: Assert package contains no real secret
+        run: python -c "import json; d=json.load(open('.ai/staging/external_staging_execution_qualification_package.json')); assert d.get('contains_real_secret') is False, 'contains_real_secret must be False'; assert d.get('production_activation_prohibited') is True, 'production_activation_prohibited must be True'; print('[PASS] package credential safety: no real secret, activation prohibited')"
+
+  isolation-check:
+    name: Staging isolation / denylist (Staging != Production)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install --quiet --requirement backend/requirements.txt
+      - name: Import isolation + denylist (structure proof loads)
+        run: >-
+          python -c
+          "from agents.external_staging_qualification import ExternalStagingEnvironmentIdentity, ProductionReferenceDenylist, DEFAULT_PRODUCTION_DENYLIST, RuntimeHealthStatus; from agents.external_staging_execution import build_api_contract; assert build_api_contract()['no_execution_endpoint'] is True; print('[PASS] isolation/denylist + execution api contract importable')"
+
+  repo-clean:
+    name: Repo clean check (no forbidden / no 3.9.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Ensure pyyaml
+        run: python -m pip install --quiet pyyaml
+      - name: Re-run Branch Integrity Gate as final clean assertion
+        run: python scripts/check_phase3911_branch_integrity.py

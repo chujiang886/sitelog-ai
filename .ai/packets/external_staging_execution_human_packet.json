@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0.0",
+  "phase": "3.9.11",
+  "canonical_phase_id": "phase_3_9_11_external_staging_execution_qualification",
+  "official_name": "External Staging Execution & Qualification Layer",
+  "terminal_state": "EXTERNAL_STAGING_EXECUTION_QUALIFICATION_BUILT_NO_GO",
+  "is_production": false,
+  "gate_status": "pending_external_staging_resource",
+  "production_activation_prohibited": true,
+  "contains_real_secret": false,
+  "engineering_enabled": false,
+  "pending_resources": [
+    "ext-staging-database",
+    "ext-staging-secret_provider",
+    "ext-staging-identity_provider",
+    "ext-staging-object_storage",
+    "ext-staging-telemetry",
+    "ext-staging-alert_sandbox",
+    "ext-staging-domain_tls",
+    "ext-staging-deployment_target"
+  ],
+  "human_pending": [
+    "external_resource_provisioning",
+    "four_role_signoff"
+  ],
+  "package_hash": "7ac2f200bee0b957452020c23915957259b491261bb41d7ca00f8060ae2b1d1d",
+  "human_review_actions": [
+    "主理人 + 四角色（production-owner / release-manager / security-owner / auditor）线下提供真实 External Staging 资源并登记",
+    "真实 External Staging 接入实证 + 跨环境隔离验证（staging 令牌 != production 令牌 / 不复用 production 命名空间）",
+    "执行计划 10 步真实跑通（deploy/runtime/isolation/e2e/failure/recovery/rollback）",
+    "四角色在人类终端签署 External Staging Execution GO",
+    "主理人在人类终端显式置 engineering_enabled=true（仅限真实 Production 激活，不属本阶段）"
+  ],
+  "forbidden_endpoints": [
+    "/execute",
+    "/deploy",
+    "/rollback",
+    "/activate",
+    "engineering_approved 输出"
+  ],
+  "source_commit": "2b0f306b898dcd04226720eb83a744ec8fc9df6b",
+  "baseline_commit": "2f4a9838bcfc7105bc561f74fb2658906801e011",
+  "note": "本包为机器执行包的人类可读摘要；不含真实执行证据（Track B 资源未提供）。AI 不代执行、不代签署。"
+}
