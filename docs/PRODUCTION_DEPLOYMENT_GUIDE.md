@@ -775,6 +775,36 @@ ORDER BY created_at DESC;
 
 ---
 
+## 18. 外部预生产资格认定与证据集成层（Phase 3.9.10）
+
+> 完整治理纪律见姊妹文档 `EXTERNAL_STAGING_QUALIFICATION_GUIDE.md`、人工清单 `.ai/runbooks/staging/HUMAN_EXTERNAL_STAGING_QUALIFICATION_CHECKLIST.md`、运维 runbook `.ai/runbooks/staging/EXTERNAL_STAGING_OPERATIONS_RUNBOOK.md`、收口报告 `.ai/reviews/phase3.9.10_external_staging_qualification_evidence_integration_report.md`。本节只给部署方最关键结论。
+
+### 18.1 它做什么、不做什么
+
+- **做**：对「外部预生产（External Staging）资源」做**资格认定（Qualification）**——在 resource-less 时结构性证明 External Staging 资源不可达 Production；构建**确定性资格包**（`package_hash` 相同事实→相同 SHA-256，`contains_real_secret=false`、`production_activation_prohibited=true`、`engineering_enabled=false`）；提供 Gate 4 态裁决（`BLOCKED` / `PENDING_EXTERNAL_STAGING_RESOURCE` / `PENDING_HUMAN_VERIFICATION` / `READY_FOR_EXTERNAL_STAGING_HUMAN_REVIEW`，**禁** `APPROVED` / `PRODUCTION_READY` / `GO`）；提供后端 8 只读 API 端点与前端资格看板 `/external-staging-qualification`；CI 多 job 门禁（Branch Integrity / 50 fail-closed 测试 / 包生成+校验 / 审计基线 / API 契约 / 凭证安全 / 隔离 / 仓库清洁）。
+- **不做**：**不激活** `engineering_enabled`（保持 `false`）；**不部署**；**不迁移**；**不回滚**；**不宣布 GO / APPROVED / PRODUCTION_READY**；**不替代**四角色或主理人的人工责任；**不吸收**旧 WIP「Production Handoff & Human Activation Ceremony」（其 provenance 隔离于 `stash@{4}` / `stash@{5}`，不 pop / 不 merge / 不 cherry-pick / 不拷贝进本阶段）；**不提供**任何 `/execute` / `/deploy` / `/rollback` / `/apply` / `/migrate` / `/activate` 端点（红线①–⑩）。
+
+### 18.2 关键 fail-closed 不变量
+
+- 终端态恒为 `PHASE_3_9_10_EXTERNAL_STAGING_QUALIFICATION_EVIDENCE_INTEGRATION_BUILT_NO_GO`（模块常量，不可被运行时改写）。
+- `ExternalStagingConnectivityProbe` 在 `env.production=True` 时抛 `ExternalStagingProbeError`（ValueError 子类）；`ExternalStagingQualificationGate` 状态机**无** `APPROVED` / `PRODUCTION_READY` / `GO` 态。
+- `build_qualification_package()` 为 keyword-only，哈希主体剔除 `package_hash` / `generated_at` 非事实元数据，保证**确定性**（同事实→同 SHA-256）。
+- `ProductionReferenceDenylist` / `DEFAULT_PRODUCTION_DENYLIST` 结构级拒绝复用 Production 资源（DB / Secret / IdP / Storage / Alert）。
+- Branch Integrity Guard（`scripts/check_phase39x_branch_integrity.py`）fail-closed 校验：当前分支必须为 `feat/phase3.9.10-external-staging-qualification`；git 视图不得含 `production_handoff` / `handoff`；不得出现 `3.9.11` 路径残留；AuditActionCategory `total` 必须 = 129（本阶段 0 新增）。
+- 审计 0 新增，基线仍 `129`（与 `.ai/baselines/audit_action_category_ledger.json` 一致）。
+
+### 18.3 人工动作入口（唯一合法出口）
+
+- 只读看板：`GET /external-staging/identity | checklist | contract | gate | package | evidence | runbook | status`（8 路由，全部只读）。
+- 真实 External Staging 资源登记（须主理人 + 四角色在人类终端线下提供 DB DSN / Secret / IdP / Storage / Alert 并登记）**不属本阶段自动能力**；资格包 `gate.status` 在 resource-less 时恒为 `PENDING_EXTERNAL_STAGING_RESOURCE`。
+- **真激活执行**是用户在**人类终端**手工执行的唯一动作；主理人在人类终端显式置 `engineering_enabled=true`，AI 不代执行。
+
+### 18.4 收口状态
+
+本层状态 **EXTERNAL_STAGING_QUALIFICATION_EVIDENCE_INTEGRATION_BUILT_NO_GO**：外部预生产资格认定与证据集成层已建成并通过红线验证，但**无真实 External Staging 资源登记、无真实生产激活**。详见 `.ai/reviews/phase3.9.10_external_staging_qualification_evidence_integration_report.md` 与 `.ai/roadmap_v8.md`。
+
+---
+
 ## 附录 A：变更记录
 
 | 版本 | 变更 |
@@ -784,3 +814,4 @@ ORDER BY created_at DESC;
 | Phase 3.9.3 | 新增 §14 生产可观测性、SRE 与事故响应准备层：11 组件健康模型（UNKNOWN 不回退 HEALTHY）、SLI/SLO（未验证 PENDING_VERIFICATION）、错误预算只计算、告警去重关联、SEV0–3 事故模型（8 态无 AUTO_*）、append-only 时间线、Runbook 只引用、发布/安全信号关联（auto_rollback=false / threshold_verified=false）、337 项 fail-closed 禁名、只读 API + 人工 ACK/RESOLVE/CLOSE 端点（auto_state_transition=false）、前端 `/governance-observability` 页（无 Auto Fix/Rollback/Resolve/Close/AI Approve）、7 个 OBSERVABILITY_* 审计类（总数 90） |
 | Phase 3.9.7-change | 新增 §17 生产变更管控层：19 模块只读装配 + 真实 USER 登记（production_change/），执行模式无 AI_AUTOMATIC、状态机无 AUTO_* 态、受控变更包 simulated_only 恒 True、模拟只静态推演；388 项 fail-closed 禁名（_RedLineForbiddenMixin 结构级拦截）；27 路由（13 GET 只读 + 13 POST USER 登记 + /signoff + /decision，无 /execute /deploy /rollback /apply /migrate /activate）；前端 `/governance-change` 只读看板（无 Deploy/Execute/Rollback Now）；13 个 CHANGE_* 审计类（总数 121）；门禁脚本 check_production_change_control_gate.py + 人工清单 PRODUCTION_CHANGE_HUMAN_CHECKLIST.md |
 | Phase 3.9.4 | 新增 §15 生产遥测接入适配与合成运维验证层：`TelemetryProvider` 端口（ABC + 5 抽象方法）+ Synthetic/Prometheus/OTel 适配器（未配置真实源→空/`NOT_CONFIGURED`，绝不降级伪装 Synthetic）、`TelemetryNormalizer` 复用 production_observability 模型、`TelemetryAggregator`（仅合成源→`synthetic_only` 不判 operational）、`TelemetryProviderRegistry`（真实源不 fallback）、`TelemetryAlertRouter`（合成源仅 `SIMULATED_DELIVERY`，禁真实外发）、SyntheticFaultScenario 合成演练（incident 恒 open、`auto_*=false`）、102 项 fail-closed 禁名、只读 API `governance_telemetry.py`（9 路由，生产环境合成演练 403，USER 强制）+ 前端 SYNTHETIC/PRODUCTION 徽章与演练 UI、4 个 TELEMETRY_* 审计类（总数 100）、CI `telemetry-quality-gate.yml`（4 job） |
+| Phase 3.9.10 | 新增 §18 外部预生产资格认定与证据集成层：16 文件包 `agents/external_staging_qualification/`（models/gate/denylist/probes/package/credential_scanner/isolation）+ 后端 8 只读 API `external_staging_qualification.py`（无 /activate /deploy）+ 前端资格看板 `/external-staging-qualification`；确定性资格包（`package_hash` 同事实→同 SHA-256，`contains_real_secret=false`、`production_activation_prohibited=true`）；Gate 4 态（禁 APPROVED/PRODUCTION_READY/GO）；`ProductionReferenceDenylist` 结构级拒绝复用 Production 资源；Branch Integrity CI Gate（`scripts/check_phase39x_branch_integrity.py`）+ `external-staging-qualification-gate.yml`（8 job fail-closed）；50 fail-closed 测试矩阵；旧 WIP「Production Handoff」隔离于 stash 不吸收；审计 0 新增（总数 129） |

@@ -1,0 +1,80 @@
+{
+  "phase": "3.9.10",
+  "layer": "External Staging Qualification",
+  "schema_version": "1.0.0",
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/external-staging/qualification/resources",
+      "role": "read_only",
+      "actor": "any",
+      "environment": "external_staging",
+      "write_effect": false,
+      "production_forbidden": true
+    },
+    {
+      "method": "GET",
+      "path": "/external-staging/qualification/status",
+      "role": "read_only",
+      "actor": "any",
+      "environment": "external_staging",
+      "write_effect": false,
+      "production_forbidden": true
+    },
+    {
+      "method": "GET",
+      "path": "/external-staging/qualification/connectivity",
+      "role": "read_only",
+      "actor": "any",
+      "environment": "external_staging",
+      "write_effect": false,
+      "production_forbidden": true
+    },
+    {
+      "method": "GET",
+      "path": "/external-staging/qualification/isolation",
+      "role": "read_only",
+      "actor": "any",
+      "environment": "external_staging",
+      "write_effect": false,
+      "production_forbidden": true
+    },
+    {
+      "method": "GET",
+      "path": "/external-staging/qualification/runtime-health",
+      "role": "read_only",
+      "actor": "any",
+      "environment": "external_staging",
+      "write_effect": false,
+      "production_forbidden": true
+    },
+    {
+      "method": "GET",
+      "path": "/external-staging/qualification/evidence",
+      "role": "read_only",
+      "actor": "any",
+      "environment": "external_staging",
+      "write_effect": false,
+      "production_forbidden": true
+    },
+    {
+      "method": "GET",
+      "path": "/external-staging/qualification/gate",
+      "role": "read_only",
+      "actor": "any",
+      "environment": "external_staging",
+      "write_effect": false,
+      "production_forbidden": true
+    },
+    {
+      "method": "GET",
+      "path": "/external-staging/qualification/package",
+      "role": "read_only",
+      "actor": "any",
+      "environment": "external_staging",
+      "write_effect": false,
+      "production_forbidden": true
+    }
+  ],
+  "route_count": 8
+}
