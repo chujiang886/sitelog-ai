@@ -34,6 +34,9 @@ if str(_BOIP_ROOT) not in sys.path:
     sys.path.insert(0, str(_BOIP_ROOT))
 
 from agents.config_loader import load_engineering_enabled  # noqa: E402
+from agents.external_staging_qualification.models import (  # noqa: E402
+    ExternalStagingEnvironmentIdentity,
+)
 from agents.external_staging_provisioning import (  # noqa: E402
     build_provisioning_package,
     ProvisioningBom,
@@ -75,11 +78,20 @@ def _build_package() -> dict[str, Any]:
 
     src = _source_commit()
     bom = ProvisioningBom.build_default()
-    env_identity = {"environment": "external_staging", "production": False}
+    env_identity = ExternalStagingEnvironmentIdentity(
+        organization_id="ext-staging-org",
+        domain_reference="staging.example.com",
+        deployment_target_reference="ext-staging-deployment_target",
+        database_reference="ext-staging-database",
+        idp_reference="ext-staging-identity_provider",
+        storage_reference="ext-staging-object_storage",
+        telemetry_reference="ext-staging-telemetry",
+        alert_reference="ext-staging-alert_sandbox",
+    )
     iac = IacDryRunGuard().evaluate()
     gate = ExternalStagingProvisioningOperatorGate().evaluate(
         bom=bom,
-        environment_identity=env_identity,
+        environment_identity=env_identity.to_dict(),
         iac_dry_run_ok=iac.all_ok,
         adapter_contract_ok=True,
         engineering_enabled=load_engineering_enabled(),
@@ -92,7 +104,6 @@ def _build_package() -> dict[str, Any]:
         gate=gate,
         iac_dry_run_summary=iac.to_dict(),
         pending_resources=tuple(e.resource_id for e in bom.entries),
-        human_pending=("external_resource_provisioning", "four_role_signoff"),
         baseline_commit=src,
         package_generated_from_commit=src,
     )
