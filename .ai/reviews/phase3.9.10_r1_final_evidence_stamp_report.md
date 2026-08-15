@@ -15,7 +15,7 @@
 | Phase | 3.9.10（External Staging Qualification & Evidence Integration Layer） |
 | 子版本 | R1（Final Evidence Stamp & Qualification Semantics Reconciliation） |
 | 分支 | `feat/phase3.9.10-external-staging-qualification` |
-| 当前 HEAD | `056860ac0ed38de84f0a8259e6f65db910046d4d`（R1-T2 代码+包提交） |
+| 当前 HEAD | `0be2f62d6900779e6609f7c233ba33187bd5cff3`（R1 最终收口提交；r1_code_package_commit 056860ac 为其直系祖先） |
 | 终态 | `PHASE_3_9_10_FINAL_EVIDENCE_STAMPED_BUILT_NO_GO` |
 | 是否激活 | 否（engineering_enabled=false） |
 | 是否进入 3.9.11 | 否（R1 禁止） |
@@ -42,31 +42,35 @@ Phase 3.9.10 在 3.9.9（Real Staging Runtime Validation）已 BUILT_NO_GO 基�
 - 当前分支：`feat/phase3.9.10-external-staging-qualification`（已核验，无 Branch Integrity 漂移）。
 - 旧 WIP「Production Handoff & Human Activation Ceremony」隔离于 `stash@{4}`/`stash@{5}`，不吸收、不删除、不重写（遵循历史冲突处理规则：不破坏历史）。
 
-### 5. 提交三元组锚定（Commit Triad）
+### 5. 提交锚定（五元语义区分，Git 为唯一事实源）
 
-以 Git 为唯一事实源锚定，三者为**真实、互异、可追溯**的 commit，不得都写成 current HEAD：
+以 Git 为唯一事实源锚定五个**真实、互异、可追溯**的 commit，明确区分 baseline / implementation-closure / pre-r1-anchor / r1-code-package / final-head，不得把 cb64105 描述为 Final HEAD：
 
 | 锚点 | commit | 含义 |
 |---|---|---|
-| phase_base | `2f4a9838bcfc7105bc561f74fb2658906801e011` | 3.9.9 Real Staging 收口线之后合法演进起点，base 严格锁定 |
-| closure_commit | `34b0491126a626584f85333382d5a6ea39d485f2` | 3.9.10 实现收口：T0/T1 + Tasks + 50 测试 + CI 闸门 + 47§ 收口报告 |
-| final_head | `cb64105c6bb006cb136a736079c8a14c65d6fa3e` | R1 终态锚点 HEAD：SSOT 回填 closure hash（R1 启动时的 HEAD） |
-| current_head | `056860ac0ed38de84f0a8259e6f65db910046d4d` | R1-T2 代码+包提交，为 final_head 的直系后代，当前真实 HEAD |
+| phase_base / baseline_commit | `2f4a9838bcfc7105bc561f74fb2658906801e011` | 3.9.9 Real Staging 收口线之后合法演进起点，base 严格锁定（资格包 baseline_commit 同源） |
+| implementation_closure_commit | `34b0491126a626584f85333382d5a6ea39d485f2` | 3.9.10 实现收口：T0/T1 + Tasks + 50 测试 + CI 闸门 + 47§ 收口报告 |
+| pre_r1_anchor | `cb64105c6bb006cb136a736079c8a14c65d6fa3e` | R1 启动前 HEAD（SSOT 回填 closure hash）；**明确 NOT Final HEAD**，仅为 R1 工作的前锚点 |
+| r1_code_package_commit | `056860ac0ed38de84f0a8259e6f65db910046d4d` | R1-T2 代码+包提交：资格包 commit 语义拆分 + 确定性重生成 |
+| final_head / current_head | `0be2f62d6900779e6609f7c233ba33187bd5cff3` | R1 最终收口提交（SSOT/doc 语义校正终态）；pre_r1_anchor 为其直系祖先，不新增业务功能 / 不进 3.9.11 / 不 engineering_enabled=true |
 
 ### 6. Git 祖先链（Ancestry）
 
 已核验祖先关系（Git 为事实源）：
 
 ```
-2f4a983 (3.9.9-R1 final closure, base)
-  └─ 34b0491 (3.9.10 closure: External Staging Qualification & Evidence Integration)
-       └─ cb64105 (3.9.10 SSOT backfill: closure hash 34b0491 回填)
-            └─ 056860a (R1-T2: 资格包 commit 语义拆分 + 确定性重生成)  ← current HEAD
+2f4a983 (3.9.9-R1 final closure, base = phase_base / baseline_commit)
+  └─ 34b0491 (3.9.10 closure: External Staging Qualification & Evidence Integration = implementation_closure_commit)
+       └─ cb64105 (3.9.10 SSOT backfill: closure hash 34b0491 回填 = pre_r1_anchor, NOT Final HEAD)
+            └─ 056860a (R1-T2: 资格包 commit 语义拆分 + 确定性重生成 = r1_code_package_commit)
+                 └─ 0be2f62 (R1 最终收口提交 = final_head / current_head)  ← Final HEAD
 ```
 
 - `git merge-base --is-ancestor 2f4a983 HEAD` → OK
 - `git merge-base --is-ancestor 34b0491 HEAD` → OK
-- 所有锚点均为 current HEAD 的真实祖先，Branch Integrity 校验通过。
+- `git merge-base --is-ancestor cb64105 HEAD` → OK（pre_r1_anchor，为 final_head 的直系祖先）
+- `git merge-base --is-ancestor 056860ac HEAD` → OK（r1_code_package_commit，为 final_head 的直系祖先）
+- 所有锚点均为 final_head / current HEAD 的真实祖先，Branch Integrity 校验通过。
 
 ### 7. 资格包 Source Commit 语义（Package Source Semantics）
 
