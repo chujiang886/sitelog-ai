@@ -1,0 +1,153 @@
+{
+  "adapter_contract_summary": {
+    "all_honest_pending": true,
+    "contract_test_passed": true,
+    "total": 8
+  },
+  "baseline_commit": "2721e53e634ed372e3145add55527a380f916a5f",
+  "bom_summary": {
+    "pending": 8,
+    "required": 8,
+    "resource_ids": [
+      "ext-staging-database",
+      "ext-staging-secret_provider",
+      "ext-staging-identity_provider",
+      "ext-staging-object_storage",
+      "ext-staging-telemetry",
+      "ext-staging-alert_sandbox",
+      "ext-staging-domain_tls",
+      "ext-staging-deployment_target"
+    ],
+    "total": 8
+  },
+  "contains_real_secret": false,
+  "engineering_enabled": false,
+  "environment_identity": {
+    "alert_reference": "ext-staging-alert_sandbox",
+    "database_reference": "ext-staging-database",
+    "deployment_target_reference": "ext-staging-deployment_target",
+    "domain_reference": "staging.example.com",
+    "environment": "external_staging",
+    "fingerprint": "",
+    "idp_reference": "ext-staging-identity_provider",
+    "organization_id": "ext-staging-org",
+    "production": false,
+    "storage_reference": "ext-staging-object_storage",
+    "telemetry_reference": "ext-staging-telemetry"
+  },
+  "generated_at": "2026-08-15T10:14:16.559281+00:00",
+  "human_pending": [],
+  "iac_dry_run_summary": {
+    "all_ok": true,
+    "count_zero_modules": [
+      "infrastructure/staging/database.tf",
+      "infrastructure/staging/deployment_target.tf",
+      "infrastructure/staging/object_storage.tf",
+      "infrastructure/staging/secret_provider.tf"
+    ],
+    "credential_leak_hits": [],
+    "default_provider": "tencentcloud",
+    "iac_dir": "/Users/chujiangai/WorkBuddy仓库/初匠Ai应用开发/BOIP/infrastructure/staging",
+    "provider_ok": true,
+    "scanned_files": [
+      "alert_sandbox.tf",
+      "database.tf",
+      "deployment_target.tf",
+      "domain_tls.tf",
+      "identity_provider.tf",
+      "main.tf",
+      "network.tf",
+      "object_storage.tf",
+      "secret_provider.tf",
+      "telemetry.tf",
+      "variables.tf",
+      "versions.tf"
+    ]
+  },
+  "operator_gate": {
+    "checks": [
+      {
+        "detail": "供给 BOM 资源数=8（应为 8）。",
+        "name": "provisioning_bom_complete",
+        "passed": true,
+        "severity": "block"
+      },
+      {
+        "detail": "8 资源全部诚实 PENDING（Track B 待真人）。",
+        "name": "bom_all_pending",
+        "passed": true,
+        "severity": "block"
+      },
+      {
+        "detail": "供给 BOM / 环境身份无明文凭据泄漏。",
+        "name": "credential_reference_safety",
+        "passed": true,
+        "severity": "block"
+      },
+      {
+        "detail": "IaC 干跑校验通过（无明文/占位齐备/默认 provider 合规）。",
+        "name": "iac_dry_run",
+        "passed": true,
+        "severity": "block"
+      },
+      {
+        "detail": "8 资源 Adapter 契约测试全通过（诚实 PENDING）。",
+        "name": "adapter_contract_tests",
+        "passed": true,
+        "severity": "block"
+      },
+      {
+        "detail": "环境身份 production=false。",
+        "name": "environment_not_production",
+        "passed": true,
+        "severity": "block"
+      },
+      {
+        "detail": "engineering_enabled=false（最高红线守约）。",
+        "name": "engineering_enabled_false",
+        "passed": true,
+        "severity": "block"
+      },
+      {
+        "detail": "安全扫描通过。",
+        "name": "security",
+        "passed": true,
+        "severity": "block"
+      },
+      {
+        "detail": "全量回归 0 failed。",
+        "name": "full_regression",
+        "passed": true,
+        "severity": "block"
+      },
+      {
+        "detail": "工作树清洁。",
+        "name": "repository_clean",
+        "passed": true,
+        "severity": "block"
+      }
+    ],
+    "evidence_hash": "",
+    "is_ready_for_human_review": false,
+    "passed": true,
+    "status": "pending_human_input"
+  },
+  "package_generated_from_commit": "2721e53e634ed372e3145add55527a380f916a5f",
+  "package_hash": "9745ea2c4378f48e9456419a51bb74e1aee479ab7289ef9391cb6cfdfd0c4983",
+  "pending_resources": [
+    "ext-staging-database",
+    "ext-staging-secret_provider",
+    "ext-staging-identity_provider",
+    "ext-staging-object_storage",
+    "ext-staging-telemetry",
+    "ext-staging-alert_sandbox",
+    "ext-staging-domain_tls",
+    "ext-staging-deployment_target"
+  ],
+  "phase": "3.9.12",
+  "phase_name": "External Staging Provisioning & Operator Readiness",
+  "production_activation_prohibited": true,
+  "schema_version": "1.0.0",
+  "source_commit": "2721e53e634ed372e3145add55527a380f916a5f",
+  "terminal_state": "EXTERNAL_STAGING_PROVISIONING_OPERATOR_READY_BUILT_NO_GO"
+}
