@@ -168,10 +168,10 @@ Gate 状态仅允许：`BLOCKED` / `PENDING_EXTERNAL_STAGING_RESOURCE` / `PENDIN
 
 ## 30. SSOT 更新 ① —— Phase Boundary Ledger
 `.ai/PHASE_BOUNDARY_LEDGER.md` §1 表格追加 3.9.10 行：
-branch=`feat/phase3.9.10-external-staging-qualification`、base=`2f4a983`、current_head=`<CLOSURE_COMMIT>`（提交后回填）、status=`PHASE_3_9_10_EXTERNAL_STAGING_QUALIFICATION_EVIDENCE_INTEGRATION_BUILT_NO_GO`、审计 0 新增。
+branch=`feat/phase3.9.10-external-staging-qualification`、base=`2f4a983`、current_head=`34b0491126a626584f85333382d5a6ea39d485f2`（提交后回填）、status=`PHASE_3_9_10_EXTERNAL_STAGING_QUALIFICATION_EVIDENCE_INTEGRATION_BUILT_NO_GO`、审计 0 新增。
 
 ## 31. SSOT 更新 ② —— project_status.json
-末尾新增 `phase_3_9_10_status` 键（建模于 `phase_3_9_9_status` 结构）：含 canonical_phase_id、audit_total_canonical=129、tasks_total=51、tasks_completed=51、core_modules 列表、`engineering_enabled=false`、stop 声明「不进入 3.9.11」。current_head 用 `<CLOSURE_COMMIT>` 占位，提交后回填。
+末尾新增 `phase_3_9_10_status` 键（建模于 `phase_3_9_9_status` 结构）：含 canonical_phase_id、audit_total_canonical=129、tasks_total=51、tasks_completed=51、core_modules 列表、`engineering_enabled=false`、stop 声明「不进入 3.9.11」。current_head 用 `34b0491126a626584f85333382d5a6ea39d485f2` 占位，提交后回填。
 
 ## 32. SSOT 更新 ③ —— 部署指南 §18
 `docs/PRODUCTION_DEPLOYMENT_GUIDE.md` 附录 A 前插入 §18（External Staging Qualification，含 18.1 做什么/不做什么、18.2 fail-closed 不变量、18.3 人工动作入口、18.4 收口状态）；附录 A 变更记录表追加 `Phase 3.9.10` 行。
@@ -284,4 +284,4 @@ branch=`feat/phase3.9.10-external-staging-qualification`、base=`2f4a983`、curr
 - 主理人（轩哥）：⏳ 待审
 - 四角色签署：⏳ 待真实证据与线下签署
 - 终端态：`EXTERNAL_STAGING_QUALIFICATION_BUILT_NO_GO`
-- 收口提交 hash：`<CLOSURE_COMMIT>`（提交后回填本报告 §30/§31/§43 占位）
+- 收口提交 hash：`34b0491126a626584f85333382d5a6ea39d485f2`（提交后回填本报告 §30/§31/§43 占位）
