@@ -13,6 +13,8 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import os
+import re
 from pathlib import Path
 
 import pytest
@@ -538,8 +540,20 @@ def test_api_contract_production_false():
 # 9) 分支完整性脚本（在合法分支上应 PASS）
 # --------------------------------------------------------------------------
 def test_branch_integrity_script_passes():
+    # 阶段无关：依据当前分支名派生对应 phase 编号，运行该 phase 专属的 Branch Integrity 脚本。
+    # 意图（Branch Integrity 守约）保留，但不绑定具体 Phase 编号——3.9.11 / 3.9.12 分支均能正确校验
+    # （治理 §4 冲突裁决延续 3.9.11 §8 范式：硬编码分支名改派生校验）。
+    branch = subprocess.run(
+        ["git", "branch", "--show-current"],
+        cwd=REPO_ROOT, capture_output=True, text=True, timeout=30,
+    ).stdout.strip()
+    m = re.search(r"phase3\.9\.(\d+)-", branch)
+    assert m, f"无法从分支名派生 phase 编号：{branch}"
+    phase_tag = "39" + m.group(1)  # 3.9.11 -> 3911, 3.9.12 -> 3912
+    script = os.path.join(REPO_ROOT, f"scripts/check_phase{phase_tag}_branch_integrity.py")
+    assert os.path.exists(script), f"缺少分支完整性脚本：{script}"
     result = subprocess.run(
-        [sys.executable, "scripts/check_phase3911_branch_integrity.py"],
+        [sys.executable, script],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
