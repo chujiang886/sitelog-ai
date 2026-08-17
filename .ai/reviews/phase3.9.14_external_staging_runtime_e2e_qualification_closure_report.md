@@ -526,6 +526,6 @@ Failure/Recovery/Rollback 仅允许 3 项**本地安全**步骤；Production 回
 
 - **AI（小沃）**：Phase 3.9.14 Track A 全部工程交付完成，Final Gate 6 态全绿，BUILT_NO_GO 收口，立即 STOP。
 - **主理人（轩哥）**：待线下审核 + 四角色签署 + 真实资源供给后，方可在人类终端显式置 enabled=true。
-- **closure commit**：（见 `.ai/project_status.json` `phase_3_9_14_status.closure_report_commit` / `.ai/PHASE_BOUNDARY_LEDGER.md` §1 末行，收口提交哈希在 T51 指派后回填）
-- **final_head**：（同 closure_report_commit，Phase 3.9.14 指定 Final HEAD）
+- **closure commit**：`565d073d5a80a78231aa09674ba4983275c0b863`（见 `.ai/project_status.json` `phase_3_9_14_status.closure_report_commit` / `.ai/PHASE_BOUNDARY_LEDGER.md` §1 末行）
+- **final_head**：`565d073d5a80a78231aa09674ba4983275c0b863`（同 closure_report_commit，Phase 3.9.14 指定 Final HEAD）
 - **STOP ✅**：不进入 3.9.15 / 不进入 Production Handoff / 不自动激活。
