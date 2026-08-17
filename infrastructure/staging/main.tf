@@ -23,6 +23,6 @@ provider "tencentcloud" {
 # 统一标签定位（供各资源 .tf 引用）
 locals {
   staging_tags = merge(var.tags, {
-    provider = var.provider
+    provider = var.cloud_provider
   })
 }

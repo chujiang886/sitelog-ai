@@ -4,8 +4,8 @@
 locals {
   alert_sandbox_plan = {
     notification_group = "boip-external-staging-alerts" # 非生产 IM/邮箱
-    routes            = ["staging-only"]
-    silence_policy    = "staging-business-hours"
+    routes             = ["staging-only"]
+    silence_policy     = "staging-business-hours"
     forbid_prod_notify = true
   }
 }

@@ -2,13 +2,13 @@
 # 来源：T3 Provider ADR、T5 BOM、T6 成本模型、T16 IaC 策略 ADR
 # 红线：本文件绝不含真实密钥/Token/私钥；所有凭据经 secret_provider 以引用表达。
 
-variable "provider" {
+variable "cloud_provider" {
   description = "IaC 供给方；默认 tencentcloud（T3 ADR 首选）。可覆写 aws / alibabacloud。"
   type        = string
   default     = "tencentcloud"
   validation {
-    condition     = contains(["tencentcloud", "aws", "alibabacloud"], var.provider)
-    error_message = "provider 必须是 tencentcloud / aws / alibabacloud 之一。"
+    condition     = contains(["tencentcloud", "aws", "alibabacloud"], var.cloud_provider)
+    error_message = "cloud_provider 必须是 tencentcloud / aws / alibabacloud 之一。"
   }
 }
 
@@ -70,4 +70,32 @@ variable "tags" {
     phase   = "3.9.12"
     managed = "boip-external-staging"
   }
+}
+
+# ---- Phase 3.9.14 解耦变量：跨资源引用一律经变量注入，避免引用 count=0 资源属性 ----
+# 红线：以下默认值均为 PENDING 占位；真实值由真人于 Track B 经 -var 或 tfvars 注入。
+# AI 不代填真实 VPC/子网/桶名；count=0 骨架下 `tofu plan`（默认）产出 0 资源变更。
+
+variable "vpc_id" {
+  description = "Staging VPC ID（Track B PENDING；Phase 3.9.14 仅占位，AI 不代开真实 VPC）。"
+  type        = string
+  default     = "PENDING_EXTERNAL_STAGING_RESOURCE"
+}
+
+variable "private_subnet_id" {
+  description = "Staging 私有子网 ID（Track B PENDING）。"
+  type        = string
+  default     = "PENDING_EXTERNAL_STAGING_RESOURCE"
+}
+
+variable "data_subnet_id" {
+  description = "Staging 数据子网 ID（Track B PENDING）。"
+  type        = string
+  default     = "PENDING_EXTERNAL_STAGING_RESOURCE"
+}
+
+variable "bucket_name" {
+  description = "Staging 对象存储桶名（Track B PENDING）。"
+  type        = string
+  default     = "PENDING_EXTERNAL_STAGING_RESOURCE"
 }

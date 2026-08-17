@@ -4,11 +4,11 @@
 
 locals {
   idp_plan = {
-    tenant        = "boip-external-staging"
-    protocol      = "OIDC"
-    redirect_uris = ["https://${var.staging_subdomain}/auth/callback"]
+    tenant            = "boip-external-staging"
+    protocol          = "OIDC"
+    redirect_uris     = ["https://${var.staging_subdomain}/auth/callback"]
     client_secret_ref = "ext-staging-identity_provider" # 经 secret_provider 引用, 不存明文
-    isolation     = "independent-from-production-tenant"
+    isolation         = "independent-from-production-tenant"
   }
 }
 

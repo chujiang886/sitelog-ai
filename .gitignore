@@ -69,3 +69,15 @@ release_candidate_record.json
 
 # 本地 AI 工作台数据（会话记忆等，属个人环境，不属项目资产）
 .workbuddy/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# IaC / Terraform 运行时产物（Phase 3.9.14：由真人 `tofu/terraform` 本地运行生成，
+# 删除后可重跑复现，不入库；绝不入库任何真实密钥/state）
+# ─────────────────────────────────────────────────────────────────────────────
+.terraform/
+.terraform.lock.hcl
+*.tfplan
+*.tfstate
+*.tfstate.backup
+crash.log
+infrastructure/staging/staging.plan

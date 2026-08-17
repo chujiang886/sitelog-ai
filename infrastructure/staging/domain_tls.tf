@@ -3,10 +3,10 @@
 
 locals {
   domain_tls_plan = {
-    subdomain   = var.staging_subdomain
-    cert_san    = [var.staging_subdomain]
-    auto_renew  = true
-    isolation   = "independent-cert-no-production-san"
+    subdomain  = var.staging_subdomain
+    cert_san   = [var.staging_subdomain]
+    auto_renew = true
+    isolation  = "independent-cert-no-production-san"
   }
 }
 
