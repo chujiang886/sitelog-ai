@@ -251,11 +251,21 @@ def run_plan_dry(staging_dir: str | Path, toolchain: ToolchainInfo, timeout: int
 _EXECUTE_CACHE: dict[str, IaCExecutionReport] = {}
 
 
-def execute(staging_dir: str | Path = "infrastructure/staging") -> IaCExecutionReport:
-    key = str(Path(staging_dir).resolve())
+def execute(staging_dir: str | Path | None = None) -> IaCExecutionReport:
+    # 锚定到仓库根，避免 cwd 为 backend/ 时相对路径失效（后端测试从 backend/ 运行）。
+    repo_root = Path(__file__).resolve().parents[2]
+    if staging_dir is None:
+        staging_dir = repo_root / "infrastructure" / "staging"
+    else:
+        staging_dir = Path(staging_dir)
+        if not staging_dir.is_absolute():
+            # 所有调用方传入 "infrastructure/staging" 相对路径；统一锚定到仓库根，
+            # 与 cwd 无关（后端测试 cwd=backend/、agent 测试 cwd=repo root 均正确）。
+            staging_dir = repo_root / staging_dir
+    key = str(staging_dir.resolve())
     if key in _EXECUTE_CACHE:
         return _EXECUTE_CACHE[key]
-    staging = Path(staging_dir)
+    staging = staging_dir
     tc = discover_toolchain()
     fmt_valid, fmt_out = run_fmt_check(staging, tc)
     all_zero, scan = scan_all_count_zero(staging)

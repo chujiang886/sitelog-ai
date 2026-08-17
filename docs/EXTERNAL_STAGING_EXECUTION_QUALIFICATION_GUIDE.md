@@ -97,3 +97,34 @@ Object Storage / Telemetry / Alert Sandbox / Domain + TLS / Deployment Target）
 - 不真实部署 / 迁移 / 回滚 / 写 Secret / 改权限 / 改数据；
 - 不把 Staging 说成 Production；不自动关 Incident / 不 skip 掩盖失败 / 不删断言换绿 / 不伪造结果；
 - 终端态恒为 `EXTERNAL_STAGING_EXECUTION_QUALIFICATION_BUILT_NO_GO`。
+
+## 9. Phase 3.9.14 扩展：External Staging Runtime Deployment & End-to-End Qualification（运行时部署与端到端资格）
+
+Phase 3.9.14 在 3.9.13（供给执行与资源登记）之上，补完「运行时部署可运行路径」与「External Staging E2E 资格可运行路径」两层，**不重造 staging runtime 核心**（复用 `agents/staging_runtime/` 成熟 fail-closed 基础层）。本阶段焦点严格限定在三条剩余主线：
+
+1. **IaC 可执行性（IaC Executability）**：`agents/external_staging_runtime/iac_executor.py` 包裹 OpenTofu/Terraform 工具链，真实运行 `validate` / `fmt -check` / `plan -out`（plan-only，从不 `apply`），判定 9 个 `infrastructure/staging/*.tf` 模块在离线（无 provider 下载）条件下「工具链可用 + HCL 语法有效 + 全 count=0 骨架」三要件成立 → `iac_executable=True`。GitHub 限流导致的 provider 下载失败属 Track B 环境限制，非代码缺陷。
+2. **Runtime Deployment 可运行路径**：`runtime_manifest` / `qualification` / `runtime_health` / `e2e_harness` / `failure_recovery` 五层在「resource-less（8/8 Pending）」下结构性不可达 Production，全部 `PLAN_ONLY` / `FORBIDDEN_PRODUCTION_ACTIONS`；13 项运行时资格校验 `code_verified=13/13`、`runtime_executed=0`。
+3. **External Staging E2E 资格可运行路径**：`EndToEndQualificationHarness.build_plan()` 产出 6 步 `PLAN_ONLY_STRUCTURAL_OK` 计划，`terminal_state=PHASE_3_9_14_EXTERNAL_STAGING_RUNTIME_E2E_QUALIFICATION_BUILT_NO_GO`；`FailureRecoveryRollbackPlan` 的 `production_rollback_forbidden=True`，仅 3 项本地安全步骤（local_snapshot / local_manifest_record / local_health_check）允许。
+
+### 9.1 收口态（Closure Terminal State）
+
+- `PHASE_3_9_14_EXTERNAL_STAGING_RUNTIME_E2E_QUALIFICATION_BUILT_NO_GO`
+- `engineering_enabled=false` 全程；`is_production=False`；`real_apply_allowed=False`；`real_execution_allowed=False`。
+- 8 真实 External Staging 资源 `PENDING(8/8)`（AI 不代开）；9 跨环境隔离 `NOT VERIFIED`；13 运行时资格 `code_verified=13/13 / runtime_executed=0`；E2E 计划 `PLAN_ONLY`；Failure-Recovery `production_rollback_forbidden=True`。
+- 确定性执行包 SHA-256（见 `build_machine_package()#package_hash`，剔除 `generated_at` 时间戳保证确定性）= `d632d6610e20c48ec72a2a7a04dbd17aee8c76ccdb436541960147fc5d4b9839`；`contains_real_secret=False` / `production_activation_prohibited=True` / `real_resources_provisioned=0`。
+- 双钥匙：`MachineSafetyKey`（机器生成，`engineering_enabled=false`）+ `HumanAuthorizationKey`（须 `actor_kind=USER`，AI 不得 mint）；Apply Gate 独立 4 态（`PENDING_HUMAN_AUTHORIZATION` / `AUTHORIZED_AWAITING_APPLY` / `BLOCKED` / `DENIED`），`is_go_or_approved` 恒 False。
+- 审计账本权威值 `total=129`（本阶段引入 0 新企业类目）。
+
+### 9.2 交付物清单（Deliverables）
+
+- `agents/external_staging_runtime/`：复用 `agents/staging_runtime/` 基础层 + 新增 `machine_package.py` / `api_contract.py` / `credential_deep_scanner.py` / `readonly_api.py` / `dashboard.py` / `self_audit.py`。
+- `scripts/check_phase3914_branch_integrity.py`：Branch Integrity Guard（仅安全 git 操作，exit 0=PASS）。
+- `.github/workflows/external-staging-runtime-e2e-qualification-gate.yml`：6 job CI 闸门（branch-integrity-gate / runtime-e2e-tests / package-deterministic-validate / api-contract-validate / credential-safety / repo-clean）。
+- `backend/app/api/external_staging_runtime_e2e.py`：7 只读 GET 端点（/status /isolation /qualification /health /e2e /change-control /evidence）。
+- `.ai/reviews/phase3.9.14_human_checklist.md`：六节 A-F 人类清单（A 节 AI 收口证据 / B-F 节 Track B 真人待办）。
+- `.ai/runbooks/external_staging_runtime_e2e_qualification_runbook.md` + 本 §9 + `.ai/progress/phase3.9.14_test_matrix.md`。
+
+### 9.3 禁止项（Forbidden）
+
+- 禁 AI mint `HumanAuthorizationKey`（须 `actor_kind=USER`）；禁置 `engineering_enabled=true`；禁伪造真实 External Staging 证据（local/synthetic/dry-run 不得冒充 External real evidence）。
+- 禁进 3.9.15；禁进 Production Handoff；禁向主理人提普通工程决策（AI 自主按授权完成 Track A）。
