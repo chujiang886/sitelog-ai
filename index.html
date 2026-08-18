@@ -278,6 +278,7 @@
       .pdf-callout .pdf-editable-box { font-size: 13pt !important; line-height: 2 !important; }
       .pdf-sop-grid { grid-template-columns: repeat(4, 1fr) !important; gap: 6px !important; }
       .sop-photo-card img { height: 90px !important; }
+      .sop-upload-zone, .sop-remove-btn, .sop-grid-top-row { display: none !important; }
     }
 
     /* ===== Drag & Drop ===== */
@@ -425,6 +426,33 @@
       text-align: center; color: #999; font-size: 13px; padding: 24px 12px;
       font-style: italic;
     }
+
+    /* SOP 手动上传区 */
+    .sop-upload-zone {
+      border: 2px dashed #C5D0C8; border-radius: 10px; padding: 28px 16px;
+      text-align: center; cursor: pointer; transition: all 0.2s;
+      background: #F9FAF9;
+    }
+    .sop-upload-zone:hover { border-color: #1F3D2A; background: #F0F5F1; }
+    .sop-drag-over { border-color: #1F3D2A !important; background: #E8F0EA !important; transform: scale(1.01); }
+    .sop-upload-icon { font-size: 32px; margin-bottom: 6px; }
+    .sop-upload-text { font-size: 14px; color: #1F3D2A; font-weight: 600; }
+    .sop-upload-hint { font-size: 12px; color: #888; margin-top: 4px; }
+    .sop-upload-small {
+      display: inline-block; padding: 6px 16px; font-size: 13px; border-radius: 8px;
+      border: 2px dashed #C5D0C8; cursor: pointer; transition: all 0.2s; background: #FAFAF8;
+    }
+    .sop-upload-small:hover { border-color: #1F3D2A; color: #1F3D2A; }
+    .sop-grid-top-row { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+    .sop-photo-card { position: relative; }
+    .sop-remove-btn {
+      position: absolute; top: 4px; right: 4px; z-index: 2;
+      width: 22px; height: 22px; border-radius: 50%; border: none;
+      background: rgba(220,38,38,0.85); color: #fff; font-size: 14px;
+      line-height: 22px; text-align: center; cursor: pointer;
+      opacity: 0; transition: opacity 0.15s;
+    }
+    .sop-photo-card:hover .sop-remove-btn { opacity: 1; }
 
     /* Callout 框（其他声明类仍保留） */
     .pdf-callout {
@@ -854,6 +882,7 @@
         apiProvider: 'qwen',
         templateType: '框架施工',
         images: [],
+        sopImages: [],          // 班组离场 SOP 手动上传照片（关水/关电/关门/清场）
         reportHtml: '',
         reportTitle: '',
         pdfFilename: '',
@@ -1860,26 +1889,82 @@
         syncSopGallery() {
           const gallery = document.getElementById('sop-gallery');
           if (!gallery) return;
-          // 筛选"离场自检"分类的照片（关水/关电/关门/清场/离场）
-          const sopImages = this.images.filter(img =>
-            /离场|关水|关电|关门|清场|合规|留底|关阀/.test(img.category || '') ||
-            /离场|关水|关电|关门|清场/.test(img.title || '')
-          );
-          if (sopImages.length === 0) {
-            gallery.innerHTML = '<div class="sop-empty">（上传离场自检照片后自动展示：关水 / 关电 / 关门 / 清场）</div>';
+          // 手动上传模式：从 sopImages 渲染，不再自动筛选
+          if (this.sopImages.length === 0) {
+            gallery.innerHTML = `
+              <div class="sop-upload-zone" @click="$refs.sopFileInput.click()"
+                   @drop.prevent="handleSopDrop($event)"
+                   @dragover.prevent="$el.classList.add('sop-drag-over')"
+                   @dragleave="$el.classList.remove('sop-drag-over')">
+                <div class="sop-upload-icon">📤</div>
+                <p class="sop-upload-text">点击或拖拽上传离场自检照片</p>
+                <p class="sop-upload-hint">关水 · 关电 · 关门 · 清场</p>
+                <input type="file" x-ref="sopFileInput" @change="handleSopFileSelect($event)"
+                       accept="image/*" multiple class="hidden">
+              </div>`;
+            // 重新绑定 Alpine 事件（innerHTML 后需手动 init）
+            Alpine.initTree(gallery);
             return;
           }
           let cards = '';
-          sopImages.forEach(img => {
+          this.sopImages.forEach(img => {
             cards += `
               <div class="sop-photo-card">
+                <button class="sop-remove-btn" @click="removeSopImage('${img.id}')" title="删除">×</button>
                 <img src="${img.dataUrl}" alt="${this.escapeHtml(img.title || '离场自检')}" loading="lazy">
                 <div class="sop-photo-caption">${this.escapeHtml(img.title || '离场自检')}</div>
               </div>`;
           });
           gallery.innerHTML =
             '<div class="pdf-sop-gallery-title">📸 离场自检 · 关水 / 关电 / 关门 / 清场</div>' +
+            '<div class="sop-grid-top-row">' +
+            '<div class="sop-upload-zone sop-upload-small" @click="$refs.sopFileInput.click()"'
+            + ' @drop.prevent="handleSopDrop($event)"'
+            + ' @dragover.prevent="$el.classList.add(\'sop-drag-over\')"'
+            + ' @dragleave="$el.classList.remove(\'sop-drag-over\')">+ 添加照片</div>'
+            + '<input type="file" x-ref="sopFileInput" @change="handleSopFileSelect($event)"'
+            + ' accept="image/*" multiple class="hidden">'
+            + '</div>' +
             '<div class="pdf-sop-grid">' + cards + '</div>';
+          Alpine.initTree(gallery);
+        },
+
+        async handleSopFileSelect(event) {
+          const files = Array.from(event.target.files);
+          event.target.value = '';
+          await this.processSopFiles(files);
+        },
+
+        async handleSopDrop(event) {
+          const el = event.target.closest('.sop-upload-zone');
+          if (el) el.classList.remove('sop-drag-over');
+          const files = Array.from(event.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+          await this.processSopFiles(files);
+        },
+
+        async processSopFiles(files) {
+          if (files.length === 0) return;
+          for (const file of files) {
+            if (file.size > 10 * 1024 * 1024) {
+              this.showToast(`⚠️ ${file.name} 超过 10MB，已跳过`, 'error');
+              continue;
+            }
+            const dataUrl = await this.fileToDataUrl(file);
+            this.sopImages.push({
+              id: Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+              file: file,
+              dataUrl: dataUrl,
+              title: file.name.replace(/\.[^.]+$/, ''),  // 用文件名作标题
+              time: new Date().toLocaleString('zh-CN', { hour12: false })
+            });
+          }
+          this.showToast(`✅ SOP 已添加 ${files.length} 张照片`);
+          this.syncSopGallery();
+        },
+
+        removeSopImage(id) {
+          this.sopImages = this.sopImages.filter(i => i.id !== id);
+          this.syncSopGallery();
         },
 
         // ===== PDF 导出（方案2：html2pdf.js 直接下载）=====
@@ -2161,7 +2246,7 @@
             <span class="pdf-section-line"></span>
           </div>
           <div class="pdf-sop-gallery" id="sop-gallery">
-            <div class="sop-empty">（上传离场自检照片后自动展示：关水 / 关电 / 关门 / 清场）</div>
+            <!-- syncSopGallery() 动态渲染 -->
           </div>
         </section>
 
@@ -2387,7 +2472,7 @@
             <span class="pdf-section-line"></span>
           </div>
           <div class="pdf-sop-gallery" id="sop-gallery">
-            <div class="sop-empty">（上传离场自检照片后自动展示：关水 / 关电 / 关门 / 清场）</div>
+            <!-- syncSopGallery() 动态渲染 -->
           </div>
         </section>
 
