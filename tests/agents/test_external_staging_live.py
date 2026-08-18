@@ -1,17 +1,22 @@
 """Phase 3.9.15 External Staging Real Resource Live Qualification — fail-closed tests.
 
-These tests assert the SOFTWARE guarantees of the live-qualification engine:
+Tests the SOFTWARE guarantees actually committed in this branch:
 
 - The terminal state is BUILT_NO_GO and contains no forbidden GO/APPROVED/PRODUCTION_READY.
 - The 8-resource aggregator honestly reports 0/8 by default (no forgery).
-- The 8-resource state machine rejects illegal jumps and never reaches QUALIFIED without
-  the full allowed path.
+- The 8-resource state machine rejects illegal jumps and requires the full adjacent path.
 - Dual-key authorization: AI cannot mint a Human Authorization Key; staging apply is never
   a GO; production apply is BLOCKED.
 - The deterministic package hash is reproducible and passes the fail-closed validator, and
   an 8/8 claim without real deploy + real E2E evidence is rejected (anti-fabrication).
+- NEW 3.9.15 provider-acquisition capability: init classification, acquisition feasibility,
+  and report flags (real_apply_allowed is ALWAYS False; no forged init/validate/plan PASS).
 
 No real provisioning, credential, or production action is performed by these tests.
+
+NOTE: isolation / runtime-live / provider-account / deployment *state* classes already live
+in the reused 3.9.14 ``staging_runtime`` core; this branch does NOT re-implement them, so
+they are intentionally not imported here.
 """
 
 from __future__ import annotations
@@ -27,21 +32,22 @@ from agents.external_staging_live import (
     ExternalStagingResource,
     HumanAuthorizationKey,
     IllegalStateTransitionError,
-    IsolationMatrix,
-    IsolationDimension,
     MachineSafetyKey,
     PartialAggregator,
-    ProviderAccountVerificationStatus,
     ResourceLiveState,
     ResourceLiveStateMachine,
-    RuntimeDeploymentRecord,
-    RuntimeDeploymentStatus,
-    RuntimeLiveMatrix,
     build_live_package,
     evaluate_live_apply_gate,
     validate_package,
 )
 from agents.external_staging_live.change_control import EnterpriseRedLineViolationError
+from agents.external_staging_live.provider_acquisition import (
+    ProviderAcquisitionReport,
+    ProviderInitClassification,
+    assess_acquisition_feasibility,
+    build_report,
+    classify_init,
+)
 
 
 # --- terminal state ----------------------------------------------------------
@@ -69,16 +75,13 @@ def test_state_machine_rejects_illegal_jump():
     m = ResourceLiveStateMachine(resource=ExternalStagingResource.DATABASE)
     with pytest.raises(IllegalStateTransitionError):
         m.transition(ResourceLiveState.QUALIFIED_EXTERNAL_STAGING)  # skip to success
-    # a single legal step is allowed
     m.transition(ResourceLiveState.ACQUISITION_LOCKED)
     assert m.state == ResourceLiveState.ACQUISITION_LOCKED
 
 
-def test_state_machine_cannot_reach_qualified_by_default():
+def test_state_machine_requires_full_adjacent_path_to_qualify():
     m = ResourceLiveStateMachine(resource=ExternalStagingResource.SECRET_PROVIDER)
     assert not m.is_qualified
-    # simulate the full allowed path would still require human + dual-key at runtime,
-    # but structurally each transition must be adjacent.
     for nxt in (
         ResourceLiveState.ACQUISITION_LOCKED,
         ResourceLiveState.CREDENTIAL_CACHED,
@@ -136,50 +139,17 @@ def test_apply_gate_never_returns_go_and_blocks_production():
     assert vp2.state.value == "PENDING_HUMAN_AUTHORIZATION"
 
 
-# --- provider account / deployment defaults ----------------------------------
-def test_provider_account_unverified_by_default():
-    from agents.external_staging_live import ProviderAccountVerification
-
-    v = ProviderAccountVerification(resource=ExternalStagingResource.DATABASE)
-    assert v.status == ProviderAccountVerificationStatus.UNVERIFIED
-    assert v.account_id is None
-
-
-def test_runtime_deployment_not_deployed_by_default():
-    d = RuntimeDeploymentRecord()
-    assert d.status == RuntimeDeploymentStatus.NOT_DEPLOYED
-    assert d.real_apply_executed is False
-
-
-# --- isolation / runtime live matrices ---------------------------------------
-def test_isolation_matrix_defaults_not_verified():
-    iso = IsolationMatrix()
-    assert iso.verified_count() == 0
-    assert iso.all_verified() is False
-    iso.verify(IsolationDimension.NETWORK_SEGMENT, {"by": "xuange"})
-    assert iso.verified_count() == 1
-    assert iso.all_verified() is False
-
-
-def test_runtime_live_matrix_defaults_not_passed():
-    rtl = RuntimeLiveMatrix()
-    assert rtl.passed_count() == 0
-    assert rtl.all_passed() is False
-
-
 # --- deterministic package + validator (anti-fabrication) --------------------
 def _build_default_package():
     agg = PartialAggregator()
-    iso = IsolationMatrix()
-    rtl = RuntimeLiveMatrix()
     return build_live_package(
         phase="3.9.15",
         terminal_state=LIVE_TERMINAL_STATE,
         provider_init_result="FAIL",
         provider_init_evidence={"error": "github egress black-holed", "rc": 1},
         resource_states=agg.snapshot(),
-        isolation_snapshot=iso.snapshot(),
-        runtime_live_snapshot=rtl.snapshot(),
+        isolation_snapshot={},
+        runtime_live_snapshot={},
         deployment_status="NOT_DEPLOYED",
         e2e_status="NOT_EXECUTED",
         failure_state="NONE",
@@ -199,14 +169,14 @@ def test_package_hash_is_deterministic_and_valid():
 
 def test_package_validator_rejects_forged_eight_of_eight():
     p = _build_default_package()
-    # forge an 8/8 claim without real deploy + real E2E
-    from agents.external_staging_live import LiveQualificationPackage
+    from agents.external_staging_live import LiveQualificationPackage, deterministic_hash
 
-    forged = LiveQualificationPackage(**{**p.__dict__, "resource_states": {r.value: "QUALIFIED_EXTERNAL_STAGING" for r in ALL_RESOURCES}})
-    # recompute hash so the tamper check passes, but the honesty check must still fail
-    from agents.external_staging_live import deterministic_hash
-
-    d = forged.__dict__.copy(); d.pop("built_at", None); d.pop("package_hash", None)
+    forged = LiveQualificationPackage(
+        **{**p.__dict__, "resource_states": {r.value: "QUALIFIED_EXTERNAL_STAGING" for r in ALL_RESOURCES}}
+    )
+    d = forged.__dict__.copy()
+    d.pop("built_at", None)
+    d.pop("package_hash", None)
     forged.package_hash = deterministic_hash(d)
     with pytest.raises(Exception):
         validate_package(forged)
@@ -217,3 +187,45 @@ def test_package_validator_rejects_secret_leakage():
     p.provider_init_evidence = {"api_secret": "AKID-REAL-SECRET-VALUE-1234567890abcdef"}
     with pytest.raises(Exception):
         validate_package(p)
+
+
+# --- NEW 3.9.15 provider acquisition capability -----------------------------
+def test_classify_init_acquired():
+    c = classify_init(0, "", 200, 200)
+    assert c == ProviderInitClassification.ACQUIRED
+
+
+def test_classify_init_blocked():
+    c = classify_init(1, "could not query provider registry ... CONNECT tunnel failed ... 502", None, 200)
+    assert c == ProviderInitClassification.BINARY_EGRESS_BLOCKED
+
+
+def test_classify_init_intermittent():
+    c = classify_init(1, "Client.Timeout exceeded while awaiting headers ... request canceled", 200, 200)
+    assert c == ProviderInitClassification.BINARY_EGRESS_INTERMITTENT
+
+
+def test_report_real_apply_always_false_even_when_live_succeeds():
+    rep = ProviderAcquisitionReport()
+    rep.terraform_init_live = True
+    rep.terraform_validate_live = True
+    rep.terraform_plan_live = True
+    assert rep.real_apply_allowed is False
+    assert rep.terminal_state == LIVE_TERMINAL_STATE
+    assert "GO" not in rep.terminal_state or "BUILT_NO_GO" in rep.terminal_state
+
+
+def test_assess_feasibility_offline_blocks_without_forge():
+    f = assess_acquisition_feasibility()
+    assert f.verdict == "TRACK_B_ENVIRONMENT_BLOCKED_PROVIDER_BINARY_EGRESS"
+    assert f.native_egress is False
+
+
+def test_build_report_offline_is_fail_closed():
+    rep = build_report(live=False)
+    assert rep.terraform_init_live is False
+    assert rep.terraform_validate_live is False
+    assert rep.terraform_plan_live is False
+    assert rep.real_apply_allowed is False
+    assert rep.feasibility is not None
+    assert rep.feasibility.verdict == "TRACK_B_ENVIRONMENT_BLOCKED_PROVIDER_BINARY_EGRESS"

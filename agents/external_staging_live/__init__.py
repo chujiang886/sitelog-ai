@@ -3,6 +3,11 @@
 Fail-closed live-qualification engine. All real provisioning is out of scope for AI;
 this package only models state, records honest evidence, and enforces dual-key
 authorization. Real resource 8/8 is NOT a software-phase closure criterion.
+
+Only modules that are COMMITTED in this branch are imported here. Runtime Gate,
+Resource Registry, Human Authorization, Deployment Provider and Isolation Guard are
+reused from ``agents/staging_runtime/`` and ``agents/external_staging_runtime/`` (3.9.14)
+and are intentionally NOT re-implemented in this package.
 """
 from __future__ import annotations
 
@@ -32,11 +37,11 @@ from .constants import (
     TERMINAL_SUCCESS,
     ALLOWED_TRANSITIONS,
 )
-from .connectivity import ConnectivityCheck, ConnectivityStatus
-from .evidence_chain import EvidenceChain, EvidenceEntry
-from .failure_recovery import FailureRecoveryRecord, FailureRecoveryState
-from .human_input import HumanInputIntake
-from .isolation import IsolationMatrix, IsolationStatus
+from .partial_aggregator import PartialAggregator
+from .resource_state_machine import (
+    IllegalStateTransitionError,
+    ResourceLiveStateMachine,
+)
 from .live_package import (
     LiveQualificationPackage,
     build_live_package,
@@ -55,18 +60,17 @@ from .apply_gate import (
     LiveApplyGateVerdict,
     evaluate_live_apply_gate,
 )
-from .partial_aggregator import PartialAggregator
-from .provider_account_verification import (
-    ProviderAccountVerification,
-    ProviderAccountVerificationStatus,
+from .provider_acquisition import (
+    AcquisitionFeasibility,
+    LivePlanEvidence,
+    ProviderAcquisitionReport,
+    ProviderInitClassification,
+    ProviderInitEvidence,
+    ValidateEvidence,
+    assess_acquisition_feasibility,
+    build_report,
+    classify_init,
 )
-from .real_e2e import RealE2ERecord, RealE2EStatus
-from .resource_state_machine import (
-    IllegalStateTransitionError,
-    ResourceLiveStateMachine,
-)
-from .runtime_deployment import RuntimeDeploymentRecord, RuntimeDeploymentStatus
-from .runtime_live import RuntimeLiveMatrix, RuntimeLiveStatus
 
 __all__ = [
     "PHASE",
@@ -86,17 +90,6 @@ __all__ = [
     "ResourceLiveStateMachine",
     "IllegalStateTransitionError",
     "PartialAggregator",
-    "ProviderAccountVerification",
-    "ProviderAccountVerificationStatus",
-    "HumanInputIntake",
-    "ConnectivityCheck",
-    "ConnectivityStatus",
-    "IsolationMatrix",
-    "IsolationStatus",
-    "RuntimeDeploymentRecord",
-    "RuntimeDeploymentStatus",
-    "RuntimeLiveMatrix",
-    "RuntimeLiveStatus",
     "LiveQualificationPackage",
     "build_live_package",
     "deterministic_hash",
@@ -110,12 +103,6 @@ __all__ = [
     "LiveApplyGateState",
     "LiveApplyGateVerdict",
     "evaluate_live_apply_gate",
-    "RealE2ERecord",
-    "RealE2EStatus",
-    "FailureRecoveryRecord",
-    "FailureRecoveryState",
-    "EvidenceChain",
-    "EvidenceEntry",
     "MachineSafetyKey",
     "HumanAuthorizationKey",
     "DualKeyAuthorization",
@@ -124,4 +111,13 @@ __all__ = [
     "EnterpriseRedLineViolationError",
     "AuditActorKind",
     "require_human_actor",
+    "ProviderInitEvidence",
+    "ProviderInitClassification",
+    "ValidateEvidence",
+    "LivePlanEvidence",
+    "AcquisitionFeasibility",
+    "ProviderAcquisitionReport",
+    "classify_init",
+    "assess_acquisition_feasibility",
+    "build_report",
 ]
