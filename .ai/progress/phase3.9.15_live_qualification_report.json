@@ -1,0 +1,211 @@
+{
+  "phase": "3.9.15",
+  "terminal_state": "PHASE_3_9_15_EXTERNAL_STAGING_REAL_RESOURCE_LIVE_QUALIFICATION_BUILT_NO_GO",
+  "built_no_go": true,
+  "real_apply_allowed": false,
+  "provider_acquisition": {
+    "phase": "3.9.15",
+    "staging_dir": "/Users/chujiangai/WorkBuddy仓库/初匠Ai应用开发/BOIP/infrastructure/staging",
+    "toolchain": {
+      "binary": "/Users/chujiangai/.workbuddy/binaries/iac/bin/terraform",
+      "flavour": "terraform",
+      "version": "1.9.8",
+      "available": true
+    },
+    "init": {
+      "command": "terraform init -no-color",
+      "timestamp": "2026-08-18T09:41:47Z",
+      "rc": 0,
+      "stdout_excerpt": "Initializing the backend...\nInitializing provider plugins...\n- Reusing previous version of tencentcloudstack/tencentcloud from the dependency lock file\n- Using previously-installed tencentcloudstack/tencentcloud v1.83.23\n\nTerraform has been successfully initialized!\n\nYou may now begin working with Terraform. Try running \"terraform plan\" to see\nany changes that are required for your infrastructure. All Terraform commands\nshould now work.\n\nIf you ever set or change modules or backend configuration for Terraform,\nrerun this command to reinitialize your working directory. If you forget, other\ncommands will detect it and remind you to do so if necessary.\n",
+      "stderr_excerpt": "",
+      "registry_probe_http": 200,
+      "github_probe_http": 200,
+      "duration_s": 1.94,
+      "classification": "PROVIDER_ACQUIRED"
+    },
+    "validate": {
+      "command": "terraform validate -no-color",
+      "timestamp": "2026-08-18T09:41:47Z",
+      "rc": 1,
+      "passed": false,
+      "stdout_excerpt": "",
+      "stderr_excerpt": "\nError: Unsupported argument\n\n  on deployment_target.tf line 9, in resource \"tencentcloud_kubernetes_cluster\" \"staging\":\n   9:   subnet_ids      = [var.private_subnet_id]\n\nAn argument named \"subnet_ids\" is not expected here.\n\nError: Missing required argument\n\n  on deployment_target.tf line 14, in resource \"tencentcloud_tcr_instance\" \"staging\":\n  14: resource \"tencentcloud_tcr_instance\" \"staging\" {\n\nThe argument \"instance_type\" is required, but no definition was found.\n\nError: Missing required argument\n\n  on deployment_target.tf line 14, in resource \"tencentcloud_tcr_instance\" \"staging\":\n  14: resource \"tencentcloud_tcr_instance\" \"staging\" {\n\nThe argument \"name\" is required, but no definition was found.\n\nError: Unsupported argument\n\n  on deployment_target.tf line 16, in resource \"tencentcloud_tcr_instance\" \"staging\":\n  16:   instance_name = \"boipstagingtcr\"\n\nAn argument named \"instance_name\" is not expected here.\n\nError: Invalid resource type\n\n  on object_storage.tf line 13, in resource \"tencentcloud_cos_bucket_cors\" \"staging\":\n  13: resource \"tencentcloud_cos_bucket_cors\" \"staging\" {\n\nThe provider tencentcloudstack/tencentcloud does not support resource type\n\"tencentcloud_cos_bucket_cors\".\n\nError: Invalid resource type\n\n  on secret_provider.tf line 5, in resource \"tencentcloud_ssm\" \"staging\":\n   5: resource \"tencentcloud_ssm\" \"staging\" {\n\nThe provider tencentcloudstack/tencentcloud does not support resource type\n\"tencentcloud_ssm\".\n"
+    },
+    "plan": {
+      "command": "terraform plan -input=false -out=staging.plan",
+      "timestamp": "2026-08-18T09:41:47Z",
+      "rc": 1,
+      "plan_add": null,
+      "plan_change": null,
+      "plan_destroy": null,
+      "note": "plan-only; apply is forbidden by governance (real_apply_allowed=False).",
+      "stderr_excerpt": "\nError: Unsupported argument\n\n  on deployment_target.tf line 9, in resource \"tencentcloud_kubernetes_cluster\" \"staging\":\n   9:   subnet_ids      = [var.private_subnet_id]\n\nAn argument named \"subnet_ids\" is not expected here.\n\nError: Missing required argument\n\n  on deployment_target.tf line 14, in resource \"tencentcloud_tcr_instance\" \"staging\":\n  14: resource \"tencentcloud_tcr_instance\" \"staging\" {\n\nThe argument \"name\" is required, but no definition was found.\n\nError: Missing required argument\n\n  on deployment_target.tf line 14, in resource \"tencentcloud_tcr_instance\" \"staging\":\n  14: resource \"tencentcloud_tcr_instance\" \"staging\" {\n\nThe argument \"instance_type\" is required, but no definition was found.\n\nError: Unsupported argument\n\n  on deployment_target.tf line 16, in resource \"tencentcloud_tcr_instance\" \"staging\":\n  16:   instance_name = \"boipstagingtcr\"\n\nAn argument named \"instance_name\" is not expected here.\n\nError: Invalid resource type\n\n  on object_storage.tf line 13, in resource \"tencentcloud_cos_bucket_cors\" \"staging\":\n  13: resource \"tencentcloud_cos_bucket_cors\" \"staging\" {\n\nThe provider tencentcloudstack/tencentcloud does not support resource type\n\"tencentcloud_cos_bucket_cors\".\n\nError: Invalid resource type\n\n  on secret_provider.tf line 5, in resource \"tencentcloud_ssm\" \"staging\":\n   5: resource \"tencentcloud_ssm\" \"staging\" {\n\nThe provider tencentcloudstack/tencentcloud does not support resource type\n\"tencentcloud_ssm\".\n"
+    },
+    "feasibility": null,
+    "terraform_init_live": true,
+    "terraform_validate_live": false,
+    "terraform_plan_live": false,
+    "real_apply_allowed": false,
+    "terminal_state": "PHASE_3_9_15_EXTERNAL_STAGING_REAL_RESOURCE_LIVE_QUALIFICATION_BUILT_NO_GO",
+    "verdict": "PROVIDER_ACQUIRED_INIT_ONLY_VALIDATE_PLAN_FAILED"
+  },
+  "resource_states": {
+    "database": "PENDING_EXTERNAL_STAGING_RESOURCE",
+    "secret_provider": "PENDING_EXTERNAL_STAGING_RESOURCE",
+    "identity_provider": "PENDING_EXTERNAL_STAGING_RESOURCE",
+    "object_storage": "PENDING_EXTERNAL_STAGING_RESOURCE",
+    "telemetry": "PENDING_EXTERNAL_STAGING_RESOURCE",
+    "alert_sandbox": "PENDING_EXTERNAL_STAGING_RESOURCE",
+    "domain_tls": "PENDING_EXTERNAL_STAGING_RESOURCE",
+    "deployment_target": "PENDING_EXTERNAL_STAGING_RESOURCE"
+  },
+  "resource_blockers": {
+    "database": [
+      "missing evidence 'acquisition_locked' blocks transition to ACQUISITION_LOCKED"
+    ],
+    "secret_provider": [
+      "missing evidence 'acquisition_locked' blocks transition to ACQUISITION_LOCKED"
+    ],
+    "identity_provider": [
+      "missing evidence 'acquisition_locked' blocks transition to ACQUISITION_LOCKED"
+    ],
+    "object_storage": [
+      "missing evidence 'acquisition_locked' blocks transition to ACQUISITION_LOCKED"
+    ],
+    "telemetry": [
+      "missing evidence 'acquisition_locked' blocks transition to ACQUISITION_LOCKED"
+    ],
+    "alert_sandbox": [
+      "missing evidence 'acquisition_locked' blocks transition to ACQUISITION_LOCKED"
+    ],
+    "domain_tls": [
+      "missing evidence 'acquisition_locked' blocks transition to ACQUISITION_LOCKED"
+    ],
+    "deployment_target": [
+      "missing evidence 'acquisition_locked' blocks transition to ACQUISITION_LOCKED"
+    ]
+  },
+  "qualified_count": 0,
+  "resource_total": 8,
+  "isolation_snapshot": {
+    "network_segment": "NOT_VERIFIED",
+    "iam_scope": "NOT_VERIFIED",
+    "secret_scope": "NOT_VERIFIED",
+    "data_residency": "NOT_VERIFIED",
+    "runtime_namespace": "NOT_VERIFIED",
+    "traffic_egress": "NOT_VERIFIED",
+    "audit_boundary": "NOT_VERIFIED",
+    "cost_budget": "NOT_VERIFIED",
+    "access_tenancy": "NOT_VERIFIED"
+  },
+  "runtime_live_snapshot": {
+    "api_health": "NOT_EXECUTED",
+    "db_connectivity": "NOT_EXECUTED",
+    "secret_resolution": "NOT_EXECUTED",
+    "idp_handshake": "NOT_EXECUTED",
+    "object_store_rw": "NOT_EXECUTED",
+    "telemetry_emit": "NOT_EXECUTED",
+    "alert_route": "NOT_EXECUTED",
+    "tls_termination": "NOT_EXECUTED",
+    "deploy_target_ready": "NOT_EXECUTED",
+    "autoheal": "NOT_EXECUTED",
+    "observability": "NOT_EXECUTED",
+    "config_drift": "NOT_EXECUTED",
+    "gateway_routing": "NOT_EXECUTED"
+  },
+  "plan_safety": {
+    "verdict": "SAFE",
+    "has_high": false,
+    "findings_count": 0
+  },
+  "change_control": {
+    "apply_gate_state": "pending_human_authorization",
+    "four_role_signoff_required": true,
+    "human_actor_required": true,
+    "dual_key_authorized": false,
+    "is_production": false,
+    "real_apply_allowed": false,
+    "terminal_state": "PHASE_3_9_15_EXTERNAL_STAGING_REAL_RESOURCE_LIVE_QUALIFICATION_BUILT_NO_GO",
+    "is_go_or_approved": false,
+    "detail": "未满足双钥匙（缺 Human Authorization Key 或 actor 非 USER）；apply 恒禁止。"
+  },
+  "apply_gate": {
+    "state": "PENDING_HUMAN_AUTHORIZATION",
+    "is_go_or_approved": false,
+    "is_production": false,
+    "dual_key_authorized": false,
+    "detail": "Awaiting dual-key (machine safety + human USER authorization)."
+  },
+  "package": {
+    "phase": "3.9.15",
+    "terminal_state": "PHASE_3_9_15_EXTERNAL_STAGING_REAL_RESOURCE_LIVE_QUALIFICATION_BUILT_NO_GO",
+    "provider_init_result": "PASS",
+    "provider_init_evidence": {
+      "terraform_init_live": true,
+      "terraform_validate_live": false,
+      "terraform_plan_live": false,
+      "verdict": "PROVIDER_ACQUIRED_INIT_ONLY_VALIDATE_PLAN_FAILED",
+      "init_command": "terraform init -no-color",
+      "init_rc": 0,
+      "init_classification": "PROVIDER_ACQUIRED",
+      "init_registry_probe_http": 200,
+      "init_github_probe_http": 200,
+      "validate_rc": 1,
+      "validate_passed": false,
+      "plan_rc": 1,
+      "feasibility": null
+    },
+    "resource_states": {
+      "database": "PENDING_EXTERNAL_STAGING_RESOURCE",
+      "secret_provider": "PENDING_EXTERNAL_STAGING_RESOURCE",
+      "identity_provider": "PENDING_EXTERNAL_STAGING_RESOURCE",
+      "object_storage": "PENDING_EXTERNAL_STAGING_RESOURCE",
+      "telemetry": "PENDING_EXTERNAL_STAGING_RESOURCE",
+      "alert_sandbox": "PENDING_EXTERNAL_STAGING_RESOURCE",
+      "domain_tls": "PENDING_EXTERNAL_STAGING_RESOURCE",
+      "deployment_target": "PENDING_EXTERNAL_STAGING_RESOURCE"
+    },
+    "isolation_snapshot": {
+      "network_segment": "NOT_VERIFIED",
+      "iam_scope": "NOT_VERIFIED",
+      "secret_scope": "NOT_VERIFIED",
+      "data_residency": "NOT_VERIFIED",
+      "runtime_namespace": "NOT_VERIFIED",
+      "traffic_egress": "NOT_VERIFIED",
+      "audit_boundary": "NOT_VERIFIED",
+      "cost_budget": "NOT_VERIFIED",
+      "access_tenancy": "NOT_VERIFIED"
+    },
+    "runtime_live_snapshot": {
+      "api_health": "NOT_EXECUTED",
+      "db_connectivity": "NOT_EXECUTED",
+      "secret_resolution": "NOT_EXECUTED",
+      "idp_handshake": "NOT_EXECUTED",
+      "object_store_rw": "NOT_EXECUTED",
+      "telemetry_emit": "NOT_EXECUTED",
+      "alert_route": "NOT_EXECUTED",
+      "tls_termination": "NOT_EXECUTED",
+      "deploy_target_ready": "NOT_EXECUTED",
+      "autoheal": "NOT_EXECUTED",
+      "observability": "NOT_EXECUTED",
+      "config_drift": "NOT_EXECUTED",
+      "gateway_routing": "NOT_EXECUTED"
+    },
+    "deployment_status": "NOT_DEPLOYED",
+    "e2e_status": "NOT_EXECUTED",
+    "failure_state": "NONE",
+    "evidence_digest": "424a5ced50a77882bb1aa893dedef5fd24a3011b8fb96cb64778e3128a80d19d",
+    "real_resources_qualified": 0,
+    "real_resources_total": 8,
+    "built_at": "2026-08-18T09:41:47.903881+00:00",
+    "package_hash": "c18a9f729f2da23040dec00b8d33c19337005d9f6d34d7022b529d624355e657"
+  },
+  "package_validation": {
+    "valid": true,
+    "terminal_state": "PHASE_3_9_15_EXTERNAL_STAGING_REAL_RESOURCE_LIVE_QUALIFICATION_BUILT_NO_GO",
+    "hash": "c18a9f729f2da23040dec00b8d33c19337005d9f6d34d7022b529d624355e657",
+    "real_resources_qualified": 0,
+    "real_resources_total": 8
+  },
+  "generated_at": "2026-08-18T09:41:47.903967+00:00"
+}
