@@ -7,6 +7,11 @@
  *   3. POST /api/uploads → 拿到 image_id；
  *   4. 自动 POST /api/vision/analyze 拉取 Vision 结果；
  *   5. 渲染 VisionResultCard。
+ *
+ * ## 身份来源（产品接通后的关键修正）
+ * 早期版本用 localStorage 假造 tenantId，导致归属错乱。现在统一从登录会话
+ * 取真实主体：``org_id`` 即租户 UUID，作为 ``X-Tenant-Id`` 传给上传与 Vision
+ * 端点（二者都要求合法 UUID）。未登录时禁用提交并提示先登录。
  */
 
 "use client";
@@ -21,31 +26,14 @@ import {
   UploadValidationError,
   uploadImage,
 } from "@/lib/upload";
+import {
+  getIdentityProvider,
+  IdentityUnauthenticatedError,
+} from "@/lib/identity";
 import type {
   UploadResponseData,
   VisionResult,
 } from "@/types/vision";
-
-const TENANT_STORAGE_KEY = "boip.upload.tenantId";
-
-function readOrCreateTenantId(): string {
-  if (typeof window === "undefined") return "";
-  const existing = window.localStorage.getItem(TENANT_STORAGE_KEY);
-  if (existing) return existing;
-  const fresh =
-    typeof globalThis.crypto?.randomUUID === "function"
-      ? globalThis.crypto.randomUUID()
-      : `xxxxxxxx-xxxx-4xxx-yxxx-${Date.now().toString(16)}`.replace(
-          /[xy]/g,
-          (ch) => {
-            const rand = Math.floor(Math.random() * 16);
-            const value = ch === "y" ? (rand & 0x3) | 0x8 : rand;
-            return value.toString(16);
-          },
-        );
-  window.localStorage.setItem(TENANT_STORAGE_KEY, fresh);
-  return fresh;
-}
 
 type VisionStatus = "Pending" | "Processing" | "Done" | "Failed";
 
@@ -62,8 +50,30 @@ export default function UploadPage(): JSX.Element {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 取真实登录身份：org_id → tenantId（用于 X-Tenant-Id 头）。
   useEffect(() => {
-    setTenantId(readOrCreateTenantId());
+    let cancelled = false;
+    void (async () => {
+      try {
+        const me = await getIdentityProvider().getIdentity();
+        if (cancelled) return;
+        if (!me.orgId) {
+          setError("登录身份缺少租户标识，请重新登录后再上传。");
+          return;
+        }
+        setTenantId(me.orgId);
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof IdentityUnauthenticatedError) {
+          setError("请先登录后再上传图纸。");
+          return;
+        }
+        setError("无法获取登录身份，请重新登录。");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {

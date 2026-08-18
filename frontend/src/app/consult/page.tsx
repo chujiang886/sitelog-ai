@@ -9,6 +9,12 @@
  *
  * 三 Agent 无 LLM key 时返回 pending 占位，UI 通过跳转后结果页的
  * pending_verification 横幅优雅展示「待人工核实」。
+ *
+ * ## 身份来源（产品接通后的关键修正）
+ * 早期版本用 localStorage 假造 tenantId / userId，导致"谁在操作"无法归属。
+ * 现在统一从登录会话取真实主体：``org_id`` → tenantId，``actor_id`` → userId
+ * （二者均为后端用户的 UUID，满足业务端点的 UUID 校验）。未登录 / 凭据失效
+ * 一律跳登录页，绝不退化成匿名假身份。
  */
 
 "use client";
@@ -30,6 +36,10 @@ import {
   createConversation,
   getConversation,
 } from "@/lib/chat";
+import {
+  getIdentityProvider,
+  IdentityUnauthenticatedError,
+} from "@/lib/identity";
 import type {
   ChatMessageData,
   IntentSnapshot,
@@ -52,36 +62,9 @@ interface LocalMessage {
   createdAt: string | null;
 }
 
-const TENANT_STORAGE_KEY = "boip.consult.tenantId";
-const USER_STORAGE_KEY = "boip.consult.userId";
 const CONVERSATION_STORAGE_KEY = "boip.consult.conversationId";
 
-function generateUuidV4(): string {
-  if (
-    typeof globalThis.crypto !== "undefined" &&
-    typeof globalThis.crypto.randomUUID === "function"
-  ) {
-    return globalThis.crypto.randomUUID();
-  }
-  // Fallback for environments without crypto.randomUUID (older Node test
-  // runners). Sufficient for local-only stub IDs.
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (ch) => {
-    const rand = Math.floor(Math.random() * 16);
-    const value = ch === "y" ? (rand & 0x3) | 0x8 : rand;
-    return value.toString(16);
-  });
-}
-
-function readOrCreateStubId(key: string): string {
-  if (typeof window === "undefined") {
-    return generateUuidV4();
-  }
-  const existing = window.localStorage.getItem(key);
-  if (existing) return existing;
-  const fresh = generateUuidV4();
-  window.localStorage.setItem(key, fresh);
-  return fresh;
-}
+// 租户 / 用户身份改由登录会话提供（见下方 useEffect），不再用 localStorage 假 ID。
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
@@ -148,9 +131,36 @@ export default function ConsultPage(): JSX.Element {
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
+  // 取真实登录身份：org_id → tenantId，actor_id → userId。
+  // 未登录 / 凭据失效 → 跳登录页；产品链路要求真实身份。
   useEffect(() => {
-    setTenantId(readOrCreateStubId(TENANT_STORAGE_KEY));
-    setUserId(readOrCreateStubId(USER_STORAGE_KEY));
+    let cancelled = false;
+    void (async () => {
+      try {
+        const me = await getIdentityProvider().getIdentity();
+        if (cancelled) return;
+        if (!me.orgId || !me.actorId) {
+          setError("登录身份缺少租户 / 用户标识，请重新登录。");
+          return;
+        }
+        setTenantId(me.orgId);
+        setUserId(me.actorId);
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof IdentityUnauthenticatedError) {
+          router.replace("/login");
+          return;
+        }
+        setError("无法获取登录身份，请重新登录。");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  // 会话 ID 仅用于续接本地会话，仍存 localStorage；但租户 / 用户来自登录态。
+  useEffect(() => {
     const stored = window.localStorage.getItem(CONVERSATION_STORAGE_KEY);
     if (stored && isUuid(stored)) {
       setConversationId(stored);

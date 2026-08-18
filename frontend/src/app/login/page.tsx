@@ -120,7 +120,7 @@ export default function LoginPage(): JSX.Element {
       <p className="text-sm font-medium text-boip-primary-main">身份验证</p>
       <h1 className="mt-2 text-3xl font-semibold text-slate-900">登录</h1>
       <p className="mt-2 text-sm text-slate-500">
-        治理动作必须归属到真实责任人。登录后你的每一次确认都会以本人名义写入审计。
+        登录后你的每一次操作都会以本人名义归属到真实责任人，并写入审计。
       </p>
 
       {identity === null ? (
@@ -192,13 +192,21 @@ export default function LoginPage(): JSX.Element {
             </p>
           )}
 
-          <div className="flex gap-3 pt-1">
+          <div className="flex flex-wrap gap-3 pt-1">
             <Link
-              href="/governance-dashboard"
+              href="/"
               className="rounded-md bg-boip-primary-main px-4 py-2 text-sm font-medium text-white"
             >
-              进入治理驾驶舱
+              进入工作台
             </Link>
+            {hasGovernanceAccess ? (
+              <Link
+                href="/governance-dashboard"
+                className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
+              >
+                治理后台
+              </Link>
+            ) : null}
             <button
               type="button"
               onClick={() => void signOut()}
