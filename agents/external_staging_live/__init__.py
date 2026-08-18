@@ -42,6 +42,13 @@ from .live_package import (
     build_live_package,
     deterministic_hash,
 )
+from .plan_safety import (
+    PlanSafetyScanner,
+    SafetyFinding,
+    SEV_HIGH,
+    SEV_MED,
+    SEV_LOW,
+)
 from .package_validator import PackageValidationError, validate_package
 from .apply_gate import (
     LiveApplyGateState,
@@ -93,6 +100,11 @@ __all__ = [
     "LiveQualificationPackage",
     "build_live_package",
     "deterministic_hash",
+    "PlanSafetyScanner",
+    "SafetyFinding",
+    "SEV_HIGH",
+    "SEV_MED",
+    "SEV_LOW",
     "PackageValidationError",
     "validate_package",
     "LiveApplyGateState",
