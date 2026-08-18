@@ -1003,6 +1003,8 @@
           this.images = [];
           this.reportHtml = this.getTemplateHtml();
           this.reportTitle = this.templateType + '归档';
+          // x-html 渲染后再填充 SOP 手动上传区（否则初始为空白）
+          this.$nextTick(() => this.syncSopGallery());
         },
 
         getTemplateHtml() {
@@ -1803,6 +1805,7 @@
           if (!container) return;
           // 封面项目信息（归档人/施工部位/日期）与图片无关，先同步，避免无图时提前 return 不更新
           this.syncCoverMeta();
+          this.syncSopGallery(); // SOP 区独立于主图，必须每次都渲染（即使无主图）
           this.captureDomEdits(); // 先回写用户编辑，避免重建丢失
           this.ensureTitles();   // 最终安全网：确保没有空 title/desc 渲染出去
 
@@ -1889,28 +1892,32 @@
         syncSopGallery() {
           const gallery = document.getElementById('sop-gallery');
           if (!gallery) return;
-          // 手动上传模式：从 sopImages 渲染，不再自动筛选
+          const self = this;
+          // ── 纯 DOM 事件绑定（不走 Alpine 指令，避免 x-html/innerHTML 不初始化指令的坑）──
+          const bindZone = (zone, input) => {
+            if (!zone || !input) return;
+            zone.addEventListener('click', () => input.click());
+            zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('sop-drag-over'); });
+            zone.addEventListener('dragleave', () => zone.classList.remove('sop-drag-over'));
+            zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('sop-drag-over'); self.handleSopDrop(e); });
+            input.addEventListener('change', e => self.handleSopFileSelect(e));
+          };
           if (this.sopImages.length === 0) {
             gallery.innerHTML = `
-              <div class="sop-upload-zone" @click="$refs.sopFileInput.click()"
-                   @drop.prevent="handleSopDrop($event)"
-                   @dragover.prevent="$el.classList.add('sop-drag-over')"
-                   @dragleave="$el.classList.remove('sop-drag-over')">
+              <div class="sop-upload-zone" id="sop-zone-empty">
                 <div class="sop-upload-icon">📤</div>
                 <p class="sop-upload-text">点击或拖拽上传离场自检照片</p>
                 <p class="sop-upload-hint">关水 · 关电 · 关门 · 清场</p>
-                <input type="file" x-ref="sopFileInput" @change="handleSopFileSelect($event)"
-                       accept="image/*" multiple class="hidden">
+                <input type="file" id="sop-input-empty" accept="image/*" multiple class="hidden">
               </div>`;
-            // 重新绑定 Alpine 事件（innerHTML 后需手动 init）
-            Alpine.initTree(gallery);
+            bindZone(gallery.querySelector('#sop-zone-empty'), gallery.querySelector('#sop-input-empty'));
             return;
           }
           let cards = '';
           this.sopImages.forEach(img => {
             cards += `
               <div class="sop-photo-card">
-                <button class="sop-remove-btn" @click="removeSopImage('${img.id}')" title="删除">×</button>
+                <button class="sop-remove-btn" data-id="${img.id}" title="删除">×</button>
                 <img src="${img.dataUrl}" alt="${this.escapeHtml(img.title || '离场自检')}" loading="lazy">
                 <div class="sop-photo-caption">${this.escapeHtml(img.title || '离场自检')}</div>
               </div>`;
@@ -1918,15 +1925,14 @@
           gallery.innerHTML =
             '<div class="pdf-sop-gallery-title">📸 离场自检 · 关水 / 关电 / 关门 / 清场</div>' +
             '<div class="sop-grid-top-row">' +
-            '<div class="sop-upload-zone sop-upload-small" @click="$refs.sopFileInput.click()"'
-            + ' @drop.prevent="handleSopDrop($event)"'
-            + ' @dragover.prevent="$el.classList.add(\'sop-drag-over\')"'
-            + ' @dragleave="$el.classList.remove(\'sop-drag-over\')">+ 添加照片</div>'
-            + '<input type="file" x-ref="sopFileInput" @change="handleSopFileSelect($event)"'
-            + ' accept="image/*" multiple class="hidden">'
-            + '</div>' +
+            '<div class="sop-upload-zone sop-upload-small" id="sop-zone-add">+ 添加照片</div>' +
+            '<input type="file" id="sop-input-add" accept="image/*" multiple class="hidden">' +
+            '</div>' +
             '<div class="pdf-sop-grid">' + cards + '</div>';
-          Alpine.initTree(gallery);
+          bindZone(gallery.querySelector('#sop-zone-add'), gallery.querySelector('#sop-input-add'));
+          gallery.querySelectorAll('.sop-remove-btn').forEach(btn => {
+            btn.addEventListener('click', () => self.removeSopImage(btn.dataset.id));
+          });
         },
 
         async handleSopFileSelect(event) {
