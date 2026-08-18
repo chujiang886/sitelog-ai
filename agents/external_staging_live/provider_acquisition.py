@@ -326,7 +326,18 @@ def build_report(
             stderr_excerpt=perr,
         )
         rep.terraform_plan_live = (prc == 0)
-        rep.verdict = "PROVIDER_ACQUIRED_LIVE_INIT_VALIDATE_PLAN_OK"
+        # Honest verdict: reflect the REAL validate/plan results, never assume OK
+        # just because init passed. Forging a unified "OK" when validate/plan fail
+        # would violate the no-forgery principle (e.g. genuine IaC config defects
+        # in infrastructure/staging/*.tf surface here as validate/plan rc=1).
+        if rep.terraform_validate_live and rep.terraform_plan_live:
+            rep.verdict = "PROVIDER_ACQUIRED_LIVE_INIT_VALIDATE_PLAN_OK"
+        elif not rep.terraform_validate_live and not rep.terraform_plan_live:
+            rep.verdict = "PROVIDER_ACQUIRED_INIT_ONLY_VALIDATE_PLAN_FAILED"
+        elif not rep.terraform_validate_live:
+            rep.verdict = "PROVIDER_ACQUIRED_INIT_VALIDATE_FAILED_PLAN_SKIPPED"
+        else:  # init + validate OK, plan failed
+            rep.verdict = "PROVIDER_ACQUIRED_INIT_VALIDATE_OK_PLAN_FAILED"
     else:
         rep.feasibility = assess_acquisition_feasibility()
         rep.verdict = classification.value

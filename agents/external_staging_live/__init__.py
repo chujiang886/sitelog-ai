@@ -71,6 +71,21 @@ from .provider_acquisition import (
     build_report,
     classify_init,
 )
+from .live_resource_onboarding import (
+    ResourceOnboardingDriver,
+    ResourceOnboardingEvidence,
+    advance_resource,
+)
+from .human_authorization import (
+    evaluate_live_change_control,
+    generate_machine_safety_key,
+    make_dual_key,
+    wrap_human_authorization_key,
+)
+from .orchestrator import (
+    LiveQualificationReport,
+    build_live_qualification_report,
+)
 
 __all__ = [
     "PHASE",
@@ -120,4 +135,13 @@ __all__ = [
     "classify_init",
     "assess_acquisition_feasibility",
     "build_report",
+    "ResourceOnboardingDriver",
+    "ResourceOnboardingEvidence",
+    "advance_resource",
+    "evaluate_live_change_control",
+    "generate_machine_safety_key",
+    "make_dual_key",
+    "wrap_human_authorization_key",
+    "LiveQualificationReport",
+    "build_live_qualification_report",
 ]
