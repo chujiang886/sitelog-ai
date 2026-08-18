@@ -271,11 +271,13 @@
       img { page-break-inside: avoid; max-width: 100%; }
       .pdf-section { page-break-inside: avoid; }
       .node-card { page-break-inside: avoid; border: 1px solid #d8d0c0 !important; box-shadow: none !important; }
-      .pdf-cover, .pdf-footer, .pdf-cover-band, .pdf-callout {
+      .pdf-cover, .pdf-footer, .pdf-cover-band, .pdf-callout, .pdf-sop-gallery {
         -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
       }
       .pdf-callout-title { font-size: 15pt !important; font-weight: 800 !important; }
       .pdf-callout .pdf-editable-box { font-size: 13pt !important; line-height: 2 !important; }
+      .pdf-sop-grid { grid-template-columns: repeat(4, 1fr) !important; gap: 6px !important; }
+      .sop-photo-card img { height: 90px !important; }
     }
 
     /* ===== Drag & Drop ===== */
@@ -395,7 +397,36 @@
     .pdf-check-gold .pdf-check-title { color: #8B6914; }
     .pdf-check-desc { font-size: 11px; color: #666; line-height: 1.55; }
 
-    /* Callout 框（SOP / 声明） */
+    /* ═══ SOP 离场照片展示区（替代纯文字 callout） ═══ */
+    .pdf-sop-gallery {
+      background: #FAFAF8; border: 1px solid #DDE5DD; border-radius: 10px;
+      padding: 20px; margin-top: 8px;
+    }
+    .pdf-sop-gallery-title {
+      font-size: 14px; font-weight: 700; color: #1F3D2A; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .pdf-sop-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 10px;
+    }
+    .sop-photo-card {
+      border-radius: 6px; overflow: hidden; border: 1px solid #E0E5DF;
+      background: #fff;
+    }
+    .sop-photo-card img {
+      width: 100%; height: 120px; object-fit: cover; display: block;
+    }
+    .sop-photo-caption {
+      font-size: 11.5px; color: #555; padding: 5px 8px; line-height: 1.35;
+      border-top: 1px solid #EEE; background: #FAFAF8;
+    }
+    .sop-empty {
+      text-align: center; color: #999; font-size: 13px; padding: 24px 12px;
+      font-style: italic;
+    }
+
+    /* Callout 框（其他声明类仍保留） */
     .pdf-callout {
       background: #EDF5EE; border-left: 4px solid #1F3D2A;
       border-radius: 0 8px 8px 0; padding: 24px 28px;
@@ -1801,6 +1832,9 @@
 
           // 同步封面项目信息到 DOM（输入框改了值要实时反映到右侧封面）
           this.syncCoverMeta();
+
+          // 填充 SOP 离场照片展示区（用真实照片替代纯文字说明）
+          this.syncSopGallery();
         },
 
         syncCoverMeta() {
@@ -1821,6 +1855,31 @@
             const entry = map.find(m => txt.includes(m[0]));
             if (entry) { value.textContent = entry[1]; }
           });
+        },
+
+        syncSopGallery() {
+          const gallery = document.getElementById('sop-gallery');
+          if (!gallery) return;
+          // 筛选"离场自检"分类的照片（关水/关电/关门/清场/离场）
+          const sopImages = this.images.filter(img =>
+            /离场|关水|关电|关门|清场|合规|留底|关阀/.test(img.category || '') ||
+            /离场|关水|关电|关门|清场/.test(img.title || '')
+          );
+          if (sopImages.length === 0) {
+            gallery.innerHTML = '<div class="sop-empty">（上传离场自检照片后自动展示：关水 / 关电 / 关门 / 清场）</div>';
+            return;
+          }
+          let cards = '';
+          sopImages.forEach(img => {
+            cards += `
+              <div class="sop-photo-card">
+                <img src="${img.dataUrl}" alt="${this.escapeHtml(img.title || '离场自检')}" loading="lazy">
+                <div class="sop-photo-caption">${this.escapeHtml(img.title || '离场自检')}</div>
+              </div>`;
+          });
+          gallery.innerHTML =
+            '<div class="pdf-sop-gallery-title">📸 离场自检 · 关水 / 关电 / 关门 / 清场</div>' +
+            '<div class="pdf-sop-grid">' + cards + '</div>';
         },
 
         // ===== PDF 导出（方案2：html2pdf.js 直接下载）=====
@@ -2101,11 +2160,8 @@
             <span class="pdf-section-title">班组离场 SOP</span>
             <span class="pdf-section-line"></span>
           </div>
-          <div class="pdf-callout">
-            <p class="pdf-callout-title">「关水、关电、关门！—— 树立门窗最后一道防火墙」</p>
-            <div class="pdf-editable-box pdf-editable-inline" contenteditable="true">
-班组在门窗工序全部完工后，按 SOP 进入离场阶段，与下一道工序柔性交接水电门管理权限。
-            </div>
+          <div class="pdf-sop-gallery" id="sop-gallery">
+            <div class="sop-empty">（上传离场自检照片后自动展示：关水 / 关电 / 关门 / 清场）</div>
           </div>
         </section>
 
@@ -2330,11 +2386,8 @@
             <span class="pdf-section-title">自检结论与离场声明</span>
             <span class="pdf-section-line"></span>
           </div>
-          <div class="pdf-callout">
-            <p class="pdf-callout-title">「关水、关电、关门！—— 树立门窗最后一道防火墙」</p>
-            <div class="pdf-editable-box pdf-editable-inline" contenteditable="true">
-[请编辑本次自检结论：本次离场前自检确认的四项合规动作各完成情况，自检人签字，下道工序入场前的水电门管理权限交接对象。]
-            </div>
+          <div class="pdf-sop-gallery" id="sop-gallery">
+            <div class="sop-empty">（上传离场自检照片后自动展示：关水 / 关电 / 关门 / 清场）</div>
           </div>
         </section>
 
