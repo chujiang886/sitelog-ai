@@ -32,11 +32,34 @@ from .constants import (
     TERMINAL_SUCCESS,
     ALLOWED_TRANSITIONS,
 )
+from .connectivity import ConnectivityCheck, ConnectivityStatus
+from .evidence_chain import EvidenceChain, EvidenceEntry
+from .failure_recovery import FailureRecoveryRecord, FailureRecoveryState
+from .human_input import HumanInputIntake
+from .isolation import IsolationMatrix, IsolationStatus
+from .live_package import (
+    LiveQualificationPackage,
+    build_live_package,
+    deterministic_hash,
+)
+from .package_validator import PackageValidationError, validate_package
+from .apply_gate import (
+    LiveApplyGateState,
+    LiveApplyGateVerdict,
+    evaluate_live_apply_gate,
+)
 from .partial_aggregator import PartialAggregator
+from .provider_account_verification import (
+    ProviderAccountVerification,
+    ProviderAccountVerificationStatus,
+)
+from .real_e2e import RealE2ERecord, RealE2EStatus
 from .resource_state_machine import (
     IllegalStateTransitionError,
     ResourceLiveStateMachine,
 )
+from .runtime_deployment import RuntimeDeploymentRecord, RuntimeDeploymentStatus
+from .runtime_live import RuntimeLiveMatrix, RuntimeLiveStatus
 
 __all__ = [
     "PHASE",
@@ -56,6 +79,31 @@ __all__ = [
     "ResourceLiveStateMachine",
     "IllegalStateTransitionError",
     "PartialAggregator",
+    "ProviderAccountVerification",
+    "ProviderAccountVerificationStatus",
+    "HumanInputIntake",
+    "ConnectivityCheck",
+    "ConnectivityStatus",
+    "IsolationMatrix",
+    "IsolationStatus",
+    "RuntimeDeploymentRecord",
+    "RuntimeDeploymentStatus",
+    "RuntimeLiveMatrix",
+    "RuntimeLiveStatus",
+    "LiveQualificationPackage",
+    "build_live_package",
+    "deterministic_hash",
+    "PackageValidationError",
+    "validate_package",
+    "LiveApplyGateState",
+    "LiveApplyGateVerdict",
+    "evaluate_live_apply_gate",
+    "RealE2ERecord",
+    "RealE2EStatus",
+    "FailureRecoveryRecord",
+    "FailureRecoveryState",
+    "EvidenceChain",
+    "EvidenceEntry",
     "MachineSafetyKey",
     "HumanAuthorizationKey",
     "DualKeyAuthorization",
