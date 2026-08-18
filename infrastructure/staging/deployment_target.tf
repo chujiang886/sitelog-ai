@@ -3,17 +3,18 @@
 # Phase 3.9.14 修正：vpc/subnet 引用改由变量注入，count 保持 0（real_apply_allowed=False）。
 
 resource "tencentcloud_kubernetes_cluster" "staging" {
-  count           = 0 # 占位：AI 不代开真实集群；真人取消 count 后 apply
-  cluster_name    = "boip-external-staging-tke"
-  vpc_id          = var.vpc_id
-  subnet_ids      = [var.private_subnet_id]
-  cluster_version = "1.28.3"
-  tags            = local.staging_tags
+  count             = 0 # 占位：AI 不代开真实集群；真人取消 count 后 apply
+  cluster_name      = "boip-external-staging-tke"
+  vpc_id            = var.vpc_id
+  cluster_subnet_id = var.private_subnet_id # v1.83.23: 用 cluster_subnet_id（string），无 subnet_ids
+  cluster_version   = "1.28.3"
+  tags              = local.staging_tags
 }
 
 resource "tencentcloud_tcr_instance" "staging" {
-  count         = 0 # 占位：AI 不代开真实仓库；真人取消 count 后 apply
-  instance_name = "boipstagingtcr"
+  count         = 0                # 占位：AI 不代开真实仓库；真人取消 count 后 apply
+  name          = "boipstagingtcr" # v1.83.23: 必填 name（非 instance_name）
+  instance_type = "basic"          # v1.83.23: 必填 instance_type（basic|standard|premium）
   tags          = local.staging_tags
 }
 

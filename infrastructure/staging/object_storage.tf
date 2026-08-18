@@ -7,13 +7,9 @@ resource "tencentcloud_cos_bucket" "staging" {
   bucket = "boip-external-staging-${var.project_id}"
   acl    = "private"
   tags   = local.staging_tags
-}
 
-# CORS 仅放行 staging 子域
-resource "tencentcloud_cos_bucket_cors" "staging" {
-  count  = 0
-  bucket = var.bucket_name
-  rules {
+  # CORS 仅放行 staging 子域（v1.83.23: CORS 为 tencentcloud_cos_bucket 内嵌 cors_rules 块，无独立 cors 资源）
+  cors_rules {
     allowed_origins = ["https://${var.staging_subdomain}"]
     allowed_methods = ["GET", "PUT", "POST"]
     allowed_headers = ["*"]
