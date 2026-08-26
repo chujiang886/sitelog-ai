@@ -888,6 +888,7 @@
         templateType: '框架施工',
         images: [],
         sopImages: [],          // 班组离场 SOP 手动上传照片（关水/关电/关门/清场）
+        finishImages: [],       // 完工照片 手动上传（最终交付实景）
         reportHtml: '',
         reportTitle: '',
         pdfFilename: '',
@@ -1008,8 +1009,8 @@
           this.images = [];
           this.reportHtml = this.getTemplateHtml();
           this.reportTitle = this.templateType + '归档';
-          // x-html 渲染后再填充 SOP 手动上传区（否则初始为空白）
-          this.$nextTick(() => this.syncSopGallery());
+          // x-html 渲染后再填充 SOP / 完工照片 手动上传区（否则初始为空白）
+          this.$nextTick(() => { this.syncSopGallery(); this.syncFinishGallery(); });
         },
 
         getTemplateHtml() {
@@ -1811,6 +1812,7 @@
           // 封面项目信息（归档人/施工部位/日期）与图片无关，先同步，避免无图时提前 return 不更新
           this.syncCoverMeta();
           this.syncSopGallery(); // SOP 区独立于主图，必须每次都渲染（即使无主图）
+          this.syncFinishGallery(); // 完工照片画廊同理，独立于主图渲染
           this.captureDomEdits(); // 先回写用户编辑，避免重建丢失
           this.ensureTitles();   // 最终安全网：确保没有空 title/desc 渲染出去
 
@@ -1870,8 +1872,9 @@
           // 同步封面项目信息到 DOM（输入框改了值要实时反映到右侧封面）
           this.syncCoverMeta();
 
-          // 填充 SOP 离场照片展示区（用真实照片替代纯文字说明）
+          // 填充 SOP 离场照片 / 完工照片 展示区（用真实照片替代纯文字说明）
           this.syncSopGallery();
+          this.syncFinishGallery();
         },
 
         syncCoverMeta() {
@@ -1976,6 +1979,90 @@
         removeSopImage(id) {
           this.sopImages = this.sopImages.filter(i => i.id !== id);
           this.syncSopGallery();
+        },
+
+        // ===== 完工照片 手动上传画廊（与 SOP 同源机制）=====
+        syncFinishGallery() {
+          const gallery = document.getElementById('finish-gallery');
+          if (!gallery) return;
+          const self = this;
+          const bindZone = (zone, input) => {
+            if (!zone || !input) return;
+            zone.addEventListener('click', () => input.click());
+            zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('sop-drag-over'); });
+            zone.addEventListener('dragleave', () => zone.classList.remove('sop-drag-over'));
+            zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('sop-drag-over'); self.handleFinishDrop(e); });
+            input.addEventListener('change', e => self.handleFinishFileSelect(e));
+          };
+          if (this.finishImages.length === 0) {
+            gallery.innerHTML = `
+              <div class="sop-upload-zone" id="finish-zone-empty">
+                <div class="sop-upload-icon">📤</div>
+                <p class="sop-upload-text">点击或拖拽上传完工照片</p>
+                <p class="sop-upload-hint">最终交付 · 整体效果 · 细部特写</p>
+                <input type="file" id="finish-input-empty" accept="image/*" multiple class="hidden">
+              </div>`;
+            bindZone(gallery.querySelector('#finish-zone-empty'), gallery.querySelector('#finish-input-empty'));
+            return;
+          }
+          let cards = '';
+          this.finishImages.forEach(img => {
+            cards += `
+              <div class="sop-photo-card">
+                <button class="sop-remove-btn" data-id="${img.id}" title="删除">×</button>
+                <img src="${img.dataUrl}" alt="${this.escapeHtml(img.title || '完工照片')}" loading="lazy">
+                <div class="sop-photo-caption">${this.escapeHtml(img.title || '完工照片')}</div>
+              </div>`;
+          });
+          gallery.innerHTML =
+            '<div class="pdf-sop-gallery-title">📸 完工实景 · 最终交付照片</div>' +
+            '<div class="sop-grid-top-row">' +
+            '<div class="sop-upload-zone sop-upload-small" id="finish-zone-add">+ 添加照片</div>' +
+            '<input type="file" id="finish-input-add" accept="image/*" multiple class="hidden">' +
+            '</div>' +
+            '<div class="pdf-sop-grid">' + cards + '</div>';
+          bindZone(gallery.querySelector('#finish-zone-add'), gallery.querySelector('#finish-input-add'));
+          gallery.querySelectorAll('.sop-remove-btn').forEach(btn => {
+            btn.addEventListener('click', () => self.removeFinishImage(btn.dataset.id));
+          });
+        },
+
+        async handleFinishFileSelect(event) {
+          const files = Array.from(event.target.files);
+          event.target.value = '';
+          await this.processFinishFiles(files);
+        },
+
+        async handleFinishDrop(event) {
+          const el = event.target.closest('.sop-upload-zone');
+          if (el) el.classList.remove('sop-drag-over');
+          const files = Array.from(event.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+          await this.processFinishFiles(files);
+        },
+
+        async processFinishFiles(files) {
+          if (files.length === 0) return;
+          for (const file of files) {
+            if (file.size > 10 * 1024 * 1024) {
+              this.showToast(`⚠️ ${file.name} 超过 10MB，已跳过`, 'error');
+              continue;
+            }
+            const dataUrl = await this.fileToDataUrl(file);
+            this.finishImages.push({
+              id: Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+              file: file,
+              dataUrl: dataUrl,
+              title: file.name.replace(/\.[^.]+$/, ''),
+              time: new Date().toLocaleString('zh-CN', { hour12: false })
+            });
+          }
+          this.showToast(`✅ 完工照片已添加 ${files.length} 张`);
+          this.syncFinishGallery();
+        },
+
+        removeFinishImage(id) {
+          this.finishImages = this.finishImages.filter(i => i.id !== id);
+          this.syncFinishGallery();
         },
 
         // ===== PDF 导出（方案2：html2pdf.js 直接下载）=====
@@ -2189,58 +2276,44 @@
           </div>
         </div>
 
-        <!-- ═══ 一、阶段实施概况 ═══ -->
+        <!-- ═══ 一、班组进场 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
             <span class="pdf-section-num">一</span>
-            <span class="pdf-section-title">阶段实施概况</span>
+            <span class="pdf-section-title">班组进场</span>
             <span class="pdf-section-line"></span>
           </div>
           <div class="pdf-editable-box" contenteditable="true">
-本次框架施工的整体进度总结，包括入场时间、施工范围、班组配置、材料品牌等关键信息。建议 100-200 字。
+本次框架施工班组进场情况：入场时间、施工部位、班组人员配置、主要材料品牌与到场状态、安全交底要点。建议 100-200 字。
           </div>
         </section>
 
-        <!-- ═══ 二、现场工艺与进度详解 ═══ -->
+        <!-- ═══ 二、施工节点 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
             <span class="pdf-section-num">二</span>
-            <span class="pdf-section-title">现场工艺与进度详解</span>
+            <span class="pdf-section-title">施工节点</span>
             <span class="pdf-section-line"></span>
           </div>
           <div id="images-container"></div>
         </section>
 
-        <!-- ═══ 四、影像追溯体系 ═══ -->
+        <!-- ═══ 三、完工照片 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
-            <span class="pdf-section-num">四</span>
-            <span class="pdf-section-title">影像追溯体系</span>
+            <span class="pdf-section-num">三</span>
+            <span class="pdf-section-title">完工照片</span>
             <span class="pdf-section-line"></span>
           </div>
-          <div class="pdf-grid-3">
-            <div class="pdf-info-card">
-              <div class="pdf-info-card-icon">📸</div>
-              <p class="pdf-info-card-title">影像数量</p>
-              <p class="pdf-info-card-desc">覆盖全部关键工序，每张照片均含拍摄人、时间、定位水印</p>
-            </div>
-            <div class="pdf-info-card">
-              <div class="pdf-info-card-icon">🔍</div>
-              <p class="pdf-info-card-title">影像要素</p>
-              <p class="pdf-info-card-desc">水印可作为业主第三方追溯凭证</p>
-            </div>
-            <div class="pdf-info-card">
-              <div class="pdf-info-card-icon">📦</div>
-              <p class="pdf-info-card-title">影像归档</p>
-              <p class="pdf-info-card-desc">原图随本档案一并交付业主保存</p>
-            </div>
+          <div class="pdf-sop-gallery" id="finish-gallery">
+            <!-- syncFinishGallery() 动态渲染 -->
           </div>
         </section>
 
-        <!-- ═══ 五、班组离场 SOP ═══ -->
+        <!-- ═══ 四、班组离场 SOP ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
-            <span class="pdf-section-num">五</span>
+            <span class="pdf-section-num">四</span>
             <span class="pdf-section-title">班组离场 SOP</span>
             <span class="pdf-section-line"></span>
           </div>
@@ -2249,10 +2322,10 @@
           </div>
         </section>
 
-        <!-- ═══ 六、业主使用与维护建议 ═══ -->
+        <!-- ═══ 五、业主使用与维护建议 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
-            <span class="pdf-section-num">六</span>
+            <span class="pdf-section-num">五</span>
             <span class="pdf-section-title">业主使用与维护建议</span>
             <span class="pdf-section-line"></span>
           </div>
@@ -2290,32 +2363,44 @@
           </div>
         </div>
 
-        <!-- ═══ 一、阶段实施概况 ═══ -->
+        <!-- ═══ 一、班组进场 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
             <span class="pdf-section-num">一</span>
-            <span class="pdf-section-title">阶段实施概况</span>
+            <span class="pdf-section-title">班组进场</span>
             <span class="pdf-section-line"></span>
           </div>
           <div class="pdf-editable-box" contenteditable="true">
-本次玻扇施工的整体进度总结，包括玻璃品牌 / 规格 / 合片工艺 / 密封系统 / 五金配置等关键信息。
+本次玻扇施工班组进场情况：入场时间、施工部位、班组人员配置、玻璃 / 五金材料品牌与到场状态、安全交底要点。建议 100-200 字。
           </div>
         </section>
 
-        <!-- ═══ 二、玻扇工艺与进度详解 ═══ -->
+        <!-- ═══ 二、施工节点 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
             <span class="pdf-section-num">二</span>
-            <span class="pdf-section-title">玻扇工艺与进度详解</span>
+            <span class="pdf-section-title">施工节点</span>
             <span class="pdf-section-line"></span>
           </div>
           <div id="images-container"></div>
         </section>
 
-        <!-- ═══ 三、班组离场 SOP ═══ -->
+        <!-- ═══ 三、完工照片 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
             <span class="pdf-section-num">三</span>
+            <span class="pdf-section-title">完工照片</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-sop-gallery" id="finish-gallery">
+            <!-- syncFinishGallery() 动态渲染 -->
+          </div>
+        </section>
+
+        <!-- ═══ 四、班组离场 SOP ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">四</span>
             <span class="pdf-section-title">班组离场 SOP</span>
             <span class="pdf-section-line"></span>
           </div>
@@ -2324,10 +2409,10 @@
           </div>
         </section>
 
-        <!-- ═══ 四、业主使用与维护建议 ═══ -->
+        <!-- ═══ 五、业主使用与维护建议 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
-            <span class="pdf-section-num">四</span>
+            <span class="pdf-section-num">五</span>
             <span class="pdf-section-title">业主使用与维护建议</span>
             <span class="pdf-section-line"></span>
           </div>
