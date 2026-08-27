@@ -670,26 +670,26 @@
         <!-- 操作按钮 -->
         <button
           @click="aiOrganizeAll"
-          :disabled="processing || images.length === 0"
+          :disabled="processing || (images.length === 0 && arrivalImages.length === 0 && finishImages.length === 0)"
           class="w-full mb-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
         >
           <span x-show="!processing">✨</span>
           <span x-show="processing">⏳</span>
-          <span x-text="processing ? `整理中 ${processedCount}/${images.length}` : 'AI 一键整理'"></span>
+          <span x-text="processing ? `整理中 ${processedCount}/${images.length + arrivalImages.length + finishImages.length}` : 'AI 一键整理'"></span>
         </button>
 
         <button
           @click="clearAllImages"
-          x-show="images.length > 0"
+          x-show="images.length > 0 || arrivalImages.length > 0 || finishImages.length > 0 || sopImages.length > 0"
           class="w-full mb-4 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition"
         >
           🗑️ 清空全部图片
         </button>
 
         <!-- 已上传图片列表 -->
-        <div x-show="images.length > 0" class="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+        <div x-show="images.length > 0 || arrivalImages.length > 0 || finishImages.length > 0" class="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
           <div class="text-xs font-semibold text-slate-500 mb-2 sticky top-0 bg-white py-1">
-            已上传 <span x-text="images.length"></span> 张
+            已上传 <span x-text="images.length + arrivalImages.length + finishImages.length"></span> 张
           </div>
           <template x-for="(img, idx) in images" :key="img.id">
             <div class="image-thumb border border-slate-200 rounded-lg p-2 hover:border-blue-300 transition bg-white">
@@ -729,7 +729,7 @@
         </div>
 
         <!-- 空状态 -->
-        <div x-show="images.length === 0" class="text-center py-6 text-slate-400 text-sm">
+        <div x-show="images.length === 0 && arrivalImages.length === 0 && finishImages.length === 0" class="text-center py-6 text-slate-400 text-sm">
           暂无照片
         </div>
 
@@ -886,7 +886,8 @@
         apiKey: '',
         apiProvider: 'qwen',
         templateType: '框架施工',
-        images: [],
+        images: [],             // 施工节点照片
+        arrivalImages: [],      // 班组进场照片（人员到位、材料到场、安全交底）
         sopImages: [],          // 班组离场 SOP 手动上传照片（关水/关电/关门/清场）
         finishImages: [],       // 完工照片 手动上传（最终交付实景）
         reportHtml: '',
@@ -1007,10 +1008,13 @@
             return;
           }
           this.images = [];
+          this.arrivalImages = [];
+          this.finishImages = [];
+          this.sopImages = [];
           this.reportHtml = this.getTemplateHtml();
           this.reportTitle = this.templateType + '归档';
-          // x-html 渲染后再填充 SOP / 完工照片 手动上传区（否则初始为空白）
-          this.$nextTick(() => { this.syncSopGallery(); this.syncFinishGallery(); });
+          // x-html 渲染后再填充各手动上传区（否则初始为空白）
+          this.$nextTick(() => { this.syncArrivalGallery(); this.syncSopGallery(); this.syncFinishGallery(); });
         },
 
         getTemplateHtml() {
@@ -1064,6 +1068,7 @@
               file: file,
               dataUrl: dataUrl,
               category: this.guessCategory(file.name),
+              section: 'construction',
               time: new Date().toLocaleString('zh-CN', { hour12: false }),
               title: '',
               desc: '',
@@ -1105,6 +1110,9 @@
         clearAllImages() {
           if (confirm('确定清空所有图片？')) {
             this.images = [];
+            this.arrivalImages = [];
+            this.finishImages = [];
+            this.sopImages = [];
             this.syncToReport();
           }
         },
@@ -1118,7 +1126,11 @@
           }
           // 只分析还没有被 AI 分析过的照片（用 _analyzed 标记，而非检查 title）
           // 因为 ensureTitles 会在渲染时自动补 title 兜底值，不能用它判断是否已分析
-          const todo = this.images.filter(img => !img._analyzed);
+          const todo = [
+            ...this.images.filter(img => !img._analyzed),
+            ...this.arrivalImages.filter(img => !img._analyzed),
+            ...this.finishImages.filter(img => !img._analyzed)
+          ];
           if (todo.length === 0) {
             this.showToast('✅ 所有照片已有识别结果，无需重复整理（如需重做请用单张「重分析」）');
             return;
@@ -1136,7 +1148,9 @@
                 await this.analyzeImage(img);
               } catch (e) {
                 console.error('分析失败', img.file && img.file.name, e);
-                img.title = `施工节点 ${this.images.indexOf(img) + 1}`;
+                const sectionName = img.section === 'arrival' ? '进场照片' : (img.section === 'finish' ? '完工照片' : '施工节点');
+                const idx = img.section === 'arrival' ? this.arrivalImages.indexOf(img) + 1 : (img.section === 'finish' ? this.finishImages.indexOf(img) + 1 : this.images.indexOf(img) + 1);
+                img.title = `${sectionName} ${idx}`;
                 img.desc = `[AI 识别失败] ${e.message}\n\n请按 F12 打开浏览器控制台查看详细原因，或手动填写。`;
                 img.aiError = e.message;
                 failures.push({ name: (img.file && img.file.name) || img.id, error: e.message });
@@ -1191,16 +1205,41 @@
           );
         },
 
+        toggleArrivalConfirm(imgId) {
+          const img = this.arrivalImages.find(i => i.id === imgId);
+          if (!img) return;
+          img.aiConfirmed = !img.aiConfirmed;
+          this.syncArrivalGallery();
+          this.showToast(
+            img.aiConfirmed ? `✓「${img.title || '进场照片'}」已确认入档` : `↩「${img.title || '进场照片'}」已撤销确认`,
+            img.aiConfirmed ? 'success' : 'info'
+          );
+        },
+
+        toggleFinishConfirm(imgId) {
+          const img = this.finishImages.find(i => i.id === imgId);
+          if (!img) return;
+          img.aiConfirmed = !img.aiConfirmed;
+          this.syncFinishGallery();
+          this.showToast(
+            img.aiConfirmed ? `✓「${img.title || '完工照片'}」已确认入档` : `↩「${img.title || '完工照片'}」已撤销确认`,
+            img.aiConfirmed ? 'success' : 'info'
+          );
+        },
+
         confirmAll() {
-          const pending = this.images.filter(i => !i.aiConfirmed);
+          const allImages = [...this.images, ...this.arrivalImages, ...this.finishImages];
+          const pending = allImages.filter(i => !i.aiConfirmed);
           if (pending.length === 0) {
             this.showToast('✅ 全部已确认，无需操作');
             return;
           }
           if (!confirm(`一键确认全部 ${pending.length} 张照片的 AI 识别结果？\n\n如有错误建议逐张确认后核对。`)) return;
           this.images.forEach(i => i.aiConfirmed = true);
+          this.arrivalImages.forEach(i => i.aiConfirmed = true);
+          this.finishImages.forEach(i => i.aiConfirmed = true);
           this.syncToReport();
-          this.showToast(`✓ 全部 ${this.images.length} 张已确认`, 'success');
+          this.showToast(`✓ 全部 ${allImages.length} 张已确认`, 'success');
         },
 
         scrollToPending() {
@@ -1217,11 +1256,18 @@
         // 事件委托：x-html 注入内容里的 @click 不会被 Alpine 绑定，
         // 故改用 data-action，由根容器（article）接收冒泡后处理
         onReportClick(e) {
-          const btn = e.target.closest('[data-action="confirm"]');
+          const btn = e.target.closest('[data-action]');
           if (!btn) return;
-          const block = btn.closest('.node-block');
+          const action = btn.dataset.action;
+          const block = btn.closest('.node-block') || btn.closest('.sop-photo-card');
           if (!block) return;
-          this.toggleConfirm(block.dataset.imgId);
+          if (action === 'confirm') {
+            this.toggleConfirm(block.dataset.imgId);
+          } else if (action === 'confirm-arrival') {
+            this.toggleArrivalConfirm(block.dataset.arrivalId);
+          } else if (action === 'confirm-finish') {
+            this.toggleFinishConfirm(block.dataset.finishId);
+          }
         },
 
         // 重建 innerHTML 前，先把用户在 contenteditable 里的编辑回写到 img 数据，
@@ -1297,14 +1343,18 @@
         },
 
         get pendingCount() {
-          return this.images.filter(i => !i.aiConfirmed).length;
+          return [
+            ...this.images, ...this.arrivalImages, ...this.finishImages
+          ].filter(i => !i.aiConfirmed).length;
         },
         get confirmedCount() {
-          return this.images.filter(i => i.aiConfirmed).length;
+          return [
+            ...this.images, ...this.arrivalImages, ...this.finishImages
+          ].filter(i => i.aiConfirmed).length;
         },
 
         async analyzeImage(img) {
-          const prompt = this.buildAnalysisPrompt();
+          const prompt = this.buildAnalysisPrompt(img.section || 'construction');
 
           // ─── 三阶段校验流程 ───
           // ① 多模型并行投票（每个模型跑一次，结果合并）
@@ -1317,6 +1367,33 @@
             : ['qwen3-vl-plus', 'qwen-vl-max', 'qwen-vl-plus'];
 
           const votes = await this.callVisionAPIVoting(img.dataUrl, prompt, models);
+
+          // ── 进场 / 完工 照片：不跑施工分类投票与像素校验，直接取最详细描述 ──
+          if (img.section === 'arrival' || img.section === 'finish') {
+            const sorted = [...votes].sort((a, b) => (b.desc || '').length - (a.desc || '').length);
+            const winner = sorted[0];
+            const longestStage = votes.map(v => v.stage || '').sort((a, b) => b.length - a.length)[0];
+
+            img.category = img.section === 'arrival' ? '班组进场' : '完工照片';
+            img.stage = longestStage || (img.section === 'arrival' ? '班组进场' : '完工交付');
+
+            let bestDesc = (winner.desc || '').trim();
+            if (!bestDesc) {
+              const alt = votes.filter(v => v !== winner && (v.desc || '').trim())
+                .sort((a, b) => (b.desc || '').length - (a.desc || '').length)[0];
+              if (alt) bestDesc = alt.desc.trim();
+            }
+            if (!bestDesc && (winner.stage || '').trim()) bestDesc = winner.stage.trim() + '。';
+            if (!bestDesc) bestDesc = '📝 请补充本张照片的具体说明（AI 未能生成差异化描述）';
+
+            img.title = (winner.title || '').trim() || (img.section === 'arrival' ? '班组进场节点' : '完工照片节点');
+            img.desc = bestDesc;
+            img.highlights = Array.isArray(winner.highlights) ? winner.highlights : [];
+            img.aiConfirmed = false;
+            img._analyzed = true;
+            img.aiConfidence = { votes: [], section: img.section };
+            return;
+          }
 
           // 类别投票：得票最多的获胜（如果同票，优先级：成品保护 > 玻扇 > 五金 > 密封 > 框架）
           const PRIORITY = ['成品保护', '玻扇施工', '五金安装', '密封收口', '框架施工'];
@@ -1432,7 +1509,45 @@
           }
         },
 
-        buildAnalysisPrompt() {
+        buildAnalysisPrompt(section = 'construction') {
+          if (section === 'arrival') {
+            return `你是门窗安装项目经理，分析这张【班组进场】照片，返回 JSON（纯 JSON，不要 markdown）：
+
+{
+  "title": "进场节点标题（8-15字专业术语）",
+  "stage": "进场场景（10-20字），如：人员到位 / 材料到场 / 安全交底 / 工具清点",
+  "desc": "用一句话描述这张照片具体拍到了什么（拍摄角度+画面主体+可见细节+进场状态）。每张照片不同，desc必须不同。",
+  "highlights": ["亮点1", "亮点2", "亮点3"]
+}
+
+场景说明：
+- 班组进场节点记录的是施工前准备：人员到场、材料品牌/数量验收、安全交底、工具摆放、现场保护等。
+- 不要把它当成施工过程或完工交付来分析。
+
+⚠️ desc 是最重要的字段！必须写出这张照片独有的内容。
+❌ 错误示范："班组已到达现场"（太通用，每张都一样）
+✅ 正确示范："近景拍摄堆放在地面的阿尔卑斯型材包装，标签显示型号为TLM-75系列"
+✅ 正确示范："俯拍视角：三名工人围看 tablets 进行安全交底签字，背景为阳台洞口"`;
+          }
+          if (section === 'finish') {
+            return `你是门窗安装项目经理，分析这张【完工照片】，返回 JSON（纯 JSON，不要 markdown）：
+
+{
+  "title": "完工节点标题（8-15字专业术语）",
+  "stage": "完工场景（10-20字），如：最终交付 / 整体效果 / 细部特写 / 成品保护",
+  "desc": "用一句话描述这张照片具体拍到了什么（拍摄角度+画面主体+可见细节+完工状态）。每张照片不同，desc必须不同。",
+  "highlights": ["亮点1", "亮点2", "亮点3"]
+}
+
+场景说明：
+- 完工照片节点记录的是最终交付状态：整体安装效果、细部工艺、成品保护、清洁状态、与室内装修的配合等。
+- 突出「可交付给业主」的视觉证据。
+
+⚠️ desc 是最重要的字段！必须写出这张照片独有的内容。
+❌ 错误示范："门窗安装完成"（太通用，每张都一样）
+✅ 正确示范："室外正视拍摄整扇推拉门，框体垂直度良好，玻璃保护膜完整未撕"
+✅ 正确示范："特写拍摄窗扇与墙体接缝处硅酮胶打胶饱满、连续无断点"`;
+          }
           return `你是门窗安装项目经理，分析这张施工照片，返回 JSON（纯 JSON，不要 markdown）：
 
 {
@@ -1811,6 +1926,7 @@
           if (!container) return;
           // 封面项目信息（归档人/施工部位/日期）与图片无关，先同步，避免无图时提前 return 不更新
           this.syncCoverMeta();
+          this.syncArrivalGallery(); // 班组进场照片区独立渲染
           this.syncSopGallery(); // SOP 区独立于主图，必须每次都渲染（即使无主图）
           this.syncFinishGallery(); // 完工照片画廊同理，独立于主图渲染
           this.captureDomEdits(); // 先回写用户编辑，避免重建丢失
@@ -1818,18 +1934,38 @@
 
           if (this.images.length === 0) {
             container.innerHTML = `
-              <div class="text-center py-12 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg">
-                <div class="text-5xl mb-3">📷</div>
-                <p>从左侧拖入现场照片</p>
-                <p class="text-xs mt-1">或点「📂 示例」查看效果</p>
+              <div class="sop-upload-zone" id="node-zone-empty">
+                <div class="sop-upload-icon">📤</div>
+                <p class="sop-upload-text">点击或拖拽上传施工节点照片</p>
+                <p class="sop-upload-hint">框架 / 玻扇 / 五金 / 密封 / 成品保护</p>
+                <input type="file" id="node-input-empty" accept="image/*" multiple class="hidden">
               </div>
             `;
+            const zone = container.querySelector('#node-zone-empty');
+            const input = container.querySelector('#node-input-empty');
+            if (zone && input) {
+              zone.addEventListener('click', () => input.click());
+              zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('sop-drag-over'); });
+              zone.addEventListener('dragleave', () => zone.classList.remove('sop-drag-over'));
+              zone.addEventListener('drop', e => {
+                e.preventDefault(); zone.classList.remove('sop-drag-over');
+                const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                this.processFiles(files);
+              });
+              input.addEventListener('change', e => this.handleFileSelect(e));
+            }
             return;
           }
 
           // 注意：封面和项目信息已在 getTemplateHtml() 中通过 {{PROJECT_INFO}} 注入到模板
           // #images-container 只放节点卡片，不再注入封面
-          let html = '<div class="node-cards-container">';
+          // 在施工节点顶部提供与 arrival/finish 同源的「添加照片」入口
+          let html =
+            '<div class="sop-grid-top-row mb-4">' +
+            '<div class="sop-upload-zone sop-upload-small" id="node-zone-add">+ 添加照片</div>' +
+            '<input type="file" id="node-input-add" accept="image/*" multiple class="hidden">' +
+            '</div>' +
+            '<div class="node-cards-container">';
           this.images.forEach((img, idx) => {
             const highlightsHtml = (img.highlights || [])
               .map(h => `<span class="highlight-badge">✦ ${h}</span>`)
@@ -1872,6 +2008,22 @@
           // 同步封面项目信息到 DOM（输入框改了值要实时反映到右侧封面）
           this.syncCoverMeta();
 
+          // 绑定施工节点区顶部的「添加照片」入口（与左侧上传同源）
+          const nodeZone = document.getElementById('node-zone-add');
+          const nodeInput = document.getElementById('node-input-add');
+          if (nodeZone && nodeInput) {
+            nodeZone.addEventListener('click', () => nodeInput.click());
+            nodeZone.addEventListener('dragover', e => { e.preventDefault(); nodeZone.classList.add('sop-drag-over'); });
+            nodeZone.addEventListener('dragleave', () => nodeZone.classList.remove('sop-drag-over'));
+            nodeZone.addEventListener('drop', e => {
+              e.preventDefault();
+              nodeZone.classList.remove('sop-drag-over');
+              const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+              this.processFiles(files);
+            });
+            nodeInput.addEventListener('change', e => this.handleFileSelect(e));
+          }
+
           // 填充 SOP 离场照片 / 完工照片 展示区（用真实照片替代纯文字说明）
           this.syncSopGallery();
           this.syncFinishGallery();
@@ -1895,6 +2047,106 @@
             const entry = map.find(m => txt.includes(m[0]));
             if (entry) { value.textContent = entry[1]; }
           });
+        },
+
+        // ===== 班组进场照片手动上传画廊（与 SOP 同源机制）=====
+        syncArrivalGallery() {
+          const gallery = document.getElementById('arrival-gallery');
+          if (!gallery) return;
+          const self = this;
+          const bindZone = (zone, input) => {
+            if (!zone || !input) return;
+            zone.addEventListener('click', () => input.click());
+            zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('sop-drag-over'); });
+            zone.addEventListener('dragleave', () => zone.classList.remove('sop-drag-over'));
+            zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('sop-drag-over'); self.handleArrivalDrop(e); });
+            input.addEventListener('change', e => self.handleArrivalFileSelect(e));
+          };
+          if (this.arrivalImages.length === 0) {
+            gallery.innerHTML = `
+              <div class="sop-upload-zone" id="arrival-zone-empty">
+                <div class="sop-upload-icon">📤</div>
+                <p class="sop-upload-text">点击或拖拽上传进场照片</p>
+                <p class="sop-upload-hint">人员到位 · 材料到场 · 安全交底</p>
+                <input type="file" id="arrival-input-empty" accept="image/*" multiple class="hidden">
+              </div>`;
+            bindZone(gallery.querySelector('#arrival-zone-empty'), gallery.querySelector('#arrival-input-empty'));
+            return;
+          }
+          let cards = '';
+          this.arrivalImages.forEach(img => {
+            const confirmBadge = img.aiConfirmed
+              ? '<span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold">✓ 已确认</span><button data-action="confirm-arrival" class="text-xs text-slate-400 hover:text-blue-600 underline">↩ 撤销</button>'
+              : '<span class="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold border border-amber-300">⚠️ 待复核</span><button data-action="confirm-arrival" class="text-xs bg-blue-600 text-white px-2 py-0.5 rounded font-bold hover:bg-blue-700">✓ 确认入档</button>';
+            const highlights = (img.highlights || []).map(h => `<span class="highlight-badge text-[10px]">✦ ${this.escapeHtml(h)}</span>`).join(' ');
+            cards += `
+              <div class="sop-photo-card node-block${img.aiConfirmed ? '' : ' pending-confirm'}" data-arrival-id="${img.id}">
+                <button class="sop-remove-btn" data-id="${img.id}" title="删除">×</button>
+                <img src="${img.dataUrl}" alt="${this.escapeHtml(img.title || '进场照片')}" loading="lazy">
+                <div class="sop-photo-caption font-semibold text-sm text-[#1F3D2A]">${this.escapeHtml(img.title || '进场照片')}</div>
+                ${img.stage ? `<div class="sop-photo-caption text-xs text-slate-500">${this.escapeHtml(img.stage)}</div>` : ''}
+                ${img.desc ? `<div class="sop-photo-caption text-xs text-slate-600 leading-relaxed">${this.escapeHtml(img.desc.length > 80 ? img.desc.slice(0,80)+'...' : img.desc)}</div>` : ''}
+                ${highlights ? `<div class="sop-photo-caption flex flex-wrap gap-1 mt-1">${highlights}</div>` : ''}
+                <div class="sop-photo-caption mt-1">${confirmBadge}</div>
+              </div>`;
+          });
+          gallery.innerHTML =
+            '<div class="pdf-sop-gallery-title">📸 班组进场 · 人员到位 / 材料到场 / 安全交底</div>' +
+            '<div class="sop-grid-top-row">' +
+            '<div class="sop-upload-zone sop-upload-small" id="arrival-zone-add">+ 添加照片</div>' +
+            '<input type="file" id="arrival-input-add" accept="image/*" multiple class="hidden">' +
+            '</div>' +
+            '<div class="pdf-sop-grid">' + cards + '</div>';
+          bindZone(gallery.querySelector('#arrival-zone-add'), gallery.querySelector('#arrival-input-add'));
+          gallery.querySelectorAll('.sop-remove-btn').forEach(btn => {
+            btn.addEventListener('click', () => self.removeArrivalImage(btn.dataset.id));
+          });
+        },
+
+        async handleArrivalFileSelect(event) {
+          const files = Array.from(event.target.files);
+          event.target.value = '';
+          await this.processArrivalFiles(files);
+        },
+
+        async handleArrivalDrop(event) {
+          const el = event.target.closest('.sop-upload-zone');
+          if (el) el.classList.remove('sop-drag-over');
+          const files = Array.from(event.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+          await this.processArrivalFiles(files);
+        },
+
+        async processArrivalFiles(files) {
+          if (files.length === 0) return;
+          for (const file of files) {
+            if (file.size > 10 * 1024 * 1024) {
+              this.showToast(`⚠️ ${file.name} 超过 10MB，已跳过`, 'error');
+              continue;
+            }
+            const dataUrl = await this.fileToDataUrl(file);
+            this.arrivalImages.push({
+              id: Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+              file: file,
+              dataUrl: dataUrl,
+              title: '',
+              desc: '',
+              highlights: [],
+              stage: '',
+              category: '班组进场',
+              section: 'arrival',
+              time: new Date().toLocaleString('zh-CN', { hour12: false }),
+              aiConfirmed: false,
+              _analyzed: false,
+              analyzing: false
+            });
+          }
+          this.showToast(`✅ 进场照片已添加 ${files.length} 张，可点「AI 一键整理」分析`);
+          this.syncArrivalGallery();
+        },
+
+        removeArrivalImage(id) {
+          this.arrivalImages = this.arrivalImages.filter(i => i.id !== id);
+          this.syncArrivalGallery();
         },
 
         syncSopGallery() {
@@ -2007,11 +2259,19 @@
           }
           let cards = '';
           this.finishImages.forEach(img => {
+            const confirmBadge = img.aiConfirmed
+              ? '<span class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold">✓ 已确认</span><button data-action="confirm-finish" class="text-xs text-slate-400 hover:text-blue-600 underline">↩ 撤销</button>'
+              : '<span class="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold border border-amber-300">⚠️ 待复核</span><button data-action="confirm-finish" class="text-xs bg-blue-600 text-white px-2 py-0.5 rounded font-bold hover:bg-blue-700">✓ 确认入档</button>';
+            const highlights = (img.highlights || []).map(h => `<span class="highlight-badge text-[10px]">✦ ${this.escapeHtml(h)}</span>`).join(' ');
             cards += `
-              <div class="sop-photo-card">
+              <div class="sop-photo-card node-block${img.aiConfirmed ? '' : ' pending-confirm'}" data-finish-id="${img.id}">
                 <button class="sop-remove-btn" data-id="${img.id}" title="删除">×</button>
                 <img src="${img.dataUrl}" alt="${this.escapeHtml(img.title || '完工照片')}" loading="lazy">
-                <div class="sop-photo-caption">${this.escapeHtml(img.title || '完工照片')}</div>
+                <div class="sop-photo-caption font-semibold text-sm text-[#1F3D2A]">${this.escapeHtml(img.title || '完工照片')}</div>
+                ${img.stage ? `<div class="sop-photo-caption text-xs text-slate-500">${this.escapeHtml(img.stage)}</div>` : ''}
+                ${img.desc ? `<div class="sop-photo-caption text-xs text-slate-600 leading-relaxed">${this.escapeHtml(img.desc.length > 80 ? img.desc.slice(0,80)+'...' : img.desc)}</div>` : ''}
+                ${highlights ? `<div class="sop-photo-caption flex flex-wrap gap-1 mt-1">${highlights}</div>` : ''}
+                <div class="sop-photo-caption mt-1">${confirmBadge}</div>
               </div>`;
           });
           gallery.innerHTML =
@@ -2052,8 +2312,16 @@
               id: Date.now() + '_' + Math.random().toString(36).slice(2, 8),
               file: file,
               dataUrl: dataUrl,
-              title: file.name.replace(/\.[^.]+$/, ''),
-              time: new Date().toLocaleString('zh-CN', { hour12: false })
+              title: '',
+              desc: '',
+              highlights: [],
+              stage: '',
+              category: '完工照片',
+              section: 'finish',
+              time: new Date().toLocaleString('zh-CN', { hour12: false }),
+              aiConfirmed: false,
+              _analyzed: false,
+              analyzing: false
             });
           }
           this.showToast(`✅ 完工照片已添加 ${files.length} 张`);
@@ -2068,11 +2336,12 @@
         // ===== PDF 导出（方案2：html2pdf.js 直接下载）=====
         // 用户点击 → 弹「导出指引」弹窗 → 用户点「立即下载 PDF」→ 直接生成并下载 PDF 文件
         exportPDF() {
-          if (this.images.length === 0) {
+          const totalPhotos = this.images.length + this.arrivalImages.length + this.finishImages.length + this.sopImages.length;
+          if (totalPhotos === 0) {
             if (!confirm('当前报告暂无照片，是否仍要导出空白模板？')) return;
           }
           // 所有已 AI 分析的照片都会进 PDF；未确认仅表示尚未逐张打勾核对，不影响入档
-          const pending = this.images.filter(i => !i.aiConfirmed);
+          const pending = [...this.images, ...this.arrivalImages, ...this.finishImages].filter(i => !i.aiConfirmed);
           if (pending.length > 0) {
             this.showToast(`ℹ️ 有 ${pending.length} 张照片待复核，仍将一并入档（逐张点「✓确认入档」可标记已核对）`, 'info', 6000);
           }
@@ -2276,32 +2545,44 @@
           </div>
         </div>
 
-        <!-- ═══ 一、班组进场 ═══ -->
+        <!-- ═══ 一、阶段实施概况 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
             <span class="pdf-section-num">一</span>
-            <span class="pdf-section-title">班组进场</span>
+            <span class="pdf-section-title">阶段实施概况</span>
             <span class="pdf-section-line"></span>
           </div>
           <div class="pdf-editable-box" contenteditable="true">
-本次框架施工班组进场情况：入场时间、施工部位、班组人员配置、主要材料品牌与到场状态、安全交底要点。建议 100-200 字。
+本次框架施工整体进度与实施概况：施工范围、阶段目标、已完成工序、当前状态、下一步计划及总体质量把控要点。建议 100-200 字。
           </div>
         </section>
 
-        <!-- ═══ 二、施工节点 ═══ -->
+        <!-- ═══ 二、班组进场 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
             <span class="pdf-section-num">二</span>
+            <span class="pdf-section-title">班组进场</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-sop-gallery" id="arrival-gallery">
+            <!-- syncArrivalGallery() 动态渲染：人员到位、材料到场、安全交底等进场照片 -->
+          </div>
+        </section>
+
+        <!-- ═══ 三、施工节点 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">三</span>
             <span class="pdf-section-title">施工节点</span>
             <span class="pdf-section-line"></span>
           </div>
           <div id="images-container"></div>
         </section>
 
-        <!-- ═══ 三、完工照片 ═══ -->
+        <!-- ═══ 四、完工照片 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
-            <span class="pdf-section-num">三</span>
+            <span class="pdf-section-num">四</span>
             <span class="pdf-section-title">完工照片</span>
             <span class="pdf-section-line"></span>
           </div>
@@ -2310,10 +2591,10 @@
           </div>
         </section>
 
-        <!-- ═══ 四、班组离场 SOP ═══ -->
+        <!-- ═══ 五、班组离场 SOP ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
-            <span class="pdf-section-num">四</span>
+            <span class="pdf-section-num">五</span>
             <span class="pdf-section-title">班组离场 SOP</span>
             <span class="pdf-section-line"></span>
           </div>
@@ -2322,10 +2603,10 @@
           </div>
         </section>
 
-        <!-- ═══ 五、业主使用与维护建议 ═══ -->
+        <!-- ═══ 六、业主使用与维护建议 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
-            <span class="pdf-section-num">五</span>
+            <span class="pdf-section-num">六</span>
             <span class="pdf-section-title">业主使用与维护建议</span>
             <span class="pdf-section-line"></span>
           </div>
@@ -2363,32 +2644,44 @@
           </div>
         </div>
 
-        <!-- ═══ 一、班组进场 ═══ -->
+        <!-- ═══ 一、阶段实施概况 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
             <span class="pdf-section-num">一</span>
-            <span class="pdf-section-title">班组进场</span>
+            <span class="pdf-section-title">阶段实施概况</span>
             <span class="pdf-section-line"></span>
           </div>
           <div class="pdf-editable-box" contenteditable="true">
-本次玻扇施工班组进场情况：入场时间、施工部位、班组人员配置、玻璃 / 五金材料品牌与到场状态、安全交底要点。建议 100-200 字。
+本次玻扇施工整体进度与实施概况：施工范围、阶段目标、已完成工序、当前状态、下一步计划及总体质量把控要点。建议 100-200 字。
           </div>
         </section>
 
-        <!-- ═══ 二、施工节点 ═══ -->
+        <!-- ═══ 二、班组进场 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
             <span class="pdf-section-num">二</span>
+            <span class="pdf-section-title">班组进场</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-sop-gallery" id="arrival-gallery">
+            <!-- syncArrivalGallery() 动态渲染：人员到位、材料到场、安全交底等进场照片 -->
+          </div>
+        </section>
+
+        <!-- ═══ 三、施工节点 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">三</span>
             <span class="pdf-section-title">施工节点</span>
             <span class="pdf-section-line"></span>
           </div>
           <div id="images-container"></div>
         </section>
 
-        <!-- ═══ 三、完工照片 ═══ -->
+        <!-- ═══ 四、完工照片 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
-            <span class="pdf-section-num">三</span>
+            <span class="pdf-section-num">四</span>
             <span class="pdf-section-title">完工照片</span>
             <span class="pdf-section-line"></span>
           </div>
@@ -2397,10 +2690,10 @@
           </div>
         </section>
 
-        <!-- ═══ 四、班组离场 SOP ═══ -->
+        <!-- ═══ 五、班组离场 SOP ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
-            <span class="pdf-section-num">四</span>
+            <span class="pdf-section-num">五</span>
             <span class="pdf-section-title">班组离场 SOP</span>
             <span class="pdf-section-line"></span>
           </div>
@@ -2409,10 +2702,10 @@
           </div>
         </section>
 
-        <!-- ═══ 五、业主使用与维护建议 ═══ -->
+        <!-- ═══ 六、业主使用与维护建议 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
-            <span class="pdf-section-num">五</span>
+            <span class="pdf-section-num">六</span>
             <span class="pdf-section-title">业主使用与维护建议</span>
             <span class="pdf-section-line"></span>
           </div>
