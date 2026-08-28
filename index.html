@@ -11,6 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js" defer></script>
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="vendor/html2canvas.min.js"></script>
+  <script src="vendor/qrcode.min.js"></script>
   <script>
     // ═══════════════════════════════════════════════════════════════
     //  html2pdf 胶水层 v4.0.0 —— A4 规范化分页引擎（本地化，无 CDN 依赖）
@@ -609,7 +610,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v4.1.0</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v4.4.0</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -629,6 +630,12 @@
         </button>
         <button @click="exportPDF" class="px-4 py-1.5 text-sm bg-white text-blue-900 font-semibold rounded hover:bg-blue-50 transition">
           📥 导出 PDF
+        </button>
+        <button @click="openShareDialog()" class="px-4 py-1.5 text-sm bg-[#B8924A] text-white font-semibold rounded hover:bg-[#a8833e] transition" title="一键生成分享二维码，业主扫码即看">
+          ✅ 确认完成 · 生成分享码
+        </button>
+        <button @click="openShareManage()" class="px-3 py-1.5 text-sm hover:bg-white/10 rounded transition" title="查看已分享清单、查看次数、作废链接">
+          📤 分享管理
         </button>
       </div>
     </div>
@@ -866,6 +873,121 @@
     </div>
   </div>
 
+  <!-- ========== 分享弹窗（v4.4：确认完成 → 二维码 → 业主扫码看） ========== -->
+  <div
+    x-show="shareDialogOpen"
+    x-transition.opacity.duration.150ms
+    class="no-print fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+    @click.self="shareDialogOpen = false"
+    @keydown.escape.window="if(shareDialogOpen && !shareBusy) shareDialogOpen = false"
+  >
+    <div class="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl max-h-[92vh] overflow-y-auto" @click.stop>
+
+      <!-- ── 未生成：确认 + 上传 ── -->
+      <div x-show="!shareResult">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-bold text-lg text-slate-900">✅ 确认完成 · 生成分享码</h3>
+          <button @click="shareDialogOpen = false" :disabled="shareBusy" class="text-slate-400 hover:text-slate-600 text-2xl leading-none disabled:opacity-40">×</button>
+        </div>
+
+        <div class="space-y-3 text-sm">
+          <div class="bg-[#1F3D2A] text-white rounded-lg p-4">
+            <p class="text-xs opacity-70 mb-1">将分享这份工程记录</p>
+            <p class="font-semibold" x-text="projectName || '未命名项目'"></p>
+            <p class="text-xs opacity-80 mt-1" x-text="(siteLocation || '—') + ' · ' + (archiveDate || '')"></p>
+            <p class="text-xs opacity-60 mt-2" x-text="'照片 ' + (images.length + arrivalImages.length + finishImages.length + sopImages.length) + ' 张 · ' + templateType"></p>
+          </div>
+
+          <div class="bg-amber-50 border-l-4 border-amber-500 rounded p-3 text-xs text-amber-900 leading-relaxed">
+            <p>📌 点击确认后，整份记录（含你已手改的文字）会上传到初匠服务器，生成一个<strong>专属二维码链接</strong>。业主用微信扫码即可在手机上查看，无需下载、无需安装。</p>
+          </div>
+
+          <div>
+            <p class="text-xs font-semibold text-slate-500 mb-1">🔐 管理密码（首次分享需输入，用于生成/管理分享码）</p>
+            <input type="password" x-model="shareAdminPw" placeholder="向负责人索取" class="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:border-[#B8924A]">
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-4 mt-4 border-t border-slate-200">
+          <button @click="shareDialogOpen = false" :disabled="shareBusy" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition disabled:opacity-40">取消</button>
+          <button @click="doShare()" :disabled="shareBusy || !shareAdminPw.trim()" class="px-5 py-2 bg-[#1F3D2A] text-white rounded-lg text-sm hover:opacity-90 transition disabled:opacity-50 flex items-center gap-2">
+            <span x-show="shareBusy" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            <span x-text="shareBusy ? '上传中…' : '✅ 确认完成，生成分享码'"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ── 已生成：展示二维码 + 品牌分享卡 ── -->
+      <div x-show="shareResult">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-bold text-lg text-[#1F3D2A]">🎉 分享码已生成</h3>
+          <button @click="shareDialogOpen = false" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">×</button>
+        </div>
+
+        <!-- 品牌分享卡（可下载） -->
+        <div class="flex justify-center mb-3">
+          <canvas id="share-card-canvas" class="rounded-lg shadow border border-slate-200 max-w-full"></canvas>
+        </div>
+
+        <div class="bg-green-50 border-l-4 border-green-500 rounded p-3 text-xs text-green-900 mb-3 leading-relaxed">
+          <p>👆 长按或右键保存这张分享卡，直接发到客户群即可。</p>
+          <p class="mt-1 break-all"><span class="font-mono text-[11px]" x-text="shareResult ? shareResult.url : ''"></span></p>
+        </div>
+
+        <div class="flex justify-center gap-2">
+          <button @click="downloadShareCard()" class="px-4 py-2 bg-[#1F3D2A] text-white rounded-lg text-sm hover:opacity-90 transition">💾 保存分享卡</button>
+          <button @click="copyShareUrl()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition">🔗 复制链接</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 分享管理面板（已分享清单 / 查看次数 / 作废） ========== -->
+  <div
+    x-show="shareManageOpen"
+    x-transition.opacity.duration.150ms
+    class="no-print fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+    @click.self="shareManageOpen = false"
+    @keydown.escape.window="if(shareManageOpen) shareManageOpen = false"
+  >
+    <div class="bg-white rounded-xl p-6 w-full max-w-2xl shadow-2xl max-h-[88vh] overflow-y-auto" @click.stop>
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-lg text-slate-900">📤 分享管理</h3>
+        <button @click="shareManageOpen = false" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">×</button>
+      </div>
+
+      <div x-show="!shareAdminPw.trim()" class="mb-3">
+        <input type="password" x-model="shareAdminPw" placeholder="输入管理密码查看清单" class="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:border-[#B8924A]">
+      </div>
+
+      <div class="flex justify-end mb-3">
+        <button @click="loadShareList()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition" x-text="shareListLoading ? '刷新中…' : '🔄 刷新清单'"></button>
+      </div>
+
+      <div x-show="shareListLoading" class="text-center text-slate-400 text-sm py-8">加载中…</div>
+      <div x-show="!shareListLoading && shareList.length === 0" class="text-center text-slate-400 text-sm py-8">暂无分享记录</div>
+
+      <div x-show="!shareListLoading && shareList.length > 0" class="space-y-2">
+        <template x-for="item in shareList" :key="item.id">
+          <div class="border border-slate-200 rounded-lg p-3 flex items-center gap-3">
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-slate-900 truncate" x-text="item.title || item.id"></p>
+              <p class="text-xs text-slate-500 truncate" x-text="(item.project || '') + ' · ' + item.created_at"></p>
+              <div class="flex items-center gap-3 mt-1 text-xs">
+                <span class="text-slate-600">👁 查看 <b x-text="item.views"></b> 次</span>
+                <span x-show="item.revoked" class="text-red-500">已作废</span>
+                <span x-show="!item.revoked" class="text-green-600">有效</span>
+              </div>
+            </div>
+            <button @click="copyText(item.url)" class="px-2 py-1 text-xs bg-slate-100 rounded hover:bg-slate-200 shrink-0">复制</button>
+            <button x-show="!item.revoked" @click="revokeShare(item.id)" class="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 shrink-0">作废</button>
+            <button x-show="item.revoked" @click="restoreShare(item.id)" class="px-2 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100 shrink-0">恢复</button>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
   <!-- ========== 全局通知 ========== -->
   <div
     x-show="toast.show"
@@ -894,6 +1016,14 @@
         reportTitle: '',
         pdfFilename: '',
         pdfFilenameTouched: false,
+        // ===== 分享功能（v4.4：确认完成 → 二维码 → 业主扫码看）=====
+        shareDialogOpen: false,      // 分享弹窗是否打开
+        shareBusy: false,            // 上传进行中
+        shareResult: null,           // { id, url } 分享成功结果
+        shareAdminPw: '',            // 管理密码输入框（分享/清单/作废用）
+        shareManageOpen: false,      // 分享管理面板（已分享清单）
+        shareList: [],               // 已分享清单数据
+        shareListLoading: false,
         // 项目信息（用于 PDF 封面 / 归档抬头）
         projectName: '',
         siteLocation: '',
@@ -2392,6 +2522,264 @@
         // 关闭导出指引
         closeExportGuide() {
           this.exportGuideOpen = false;
+        },
+
+        // ===== v4.4 分享功能：确认完成 → 上传 → 二维码 → 业主扫码看 =====
+        SHARE_API: 'https://cj-az.cn/api/share',
+
+        openShareDialog() {
+          this.shareResult = null;
+          this.shareAdminPw = localStorage.getItem('sitelog_share_pw') || '';
+          this.shareDialogOpen = true;
+        },
+
+        async doShare() {
+          if (this.shareBusy) return;
+          const pw = (this.shareAdminPw || '').trim();
+          if (!pw) { this.showToast('❌ 请输入管理密码', 'error'); return; }
+          const totalPhotos = this.images.length + this.arrivalImages.length + this.finishImages.length + this.sopImages.length;
+          if (totalPhotos === 0 && !confirm('当前还没有上传任何照片，确定要分享吗？')) return;
+
+          this.shareBusy = true;
+          try {
+            this.syncCoverMeta();
+            this.showToast('📦 正在打包报告（压缩照片中）…', 'info', 8000);
+            const payload = await this.buildSharePayload();
+            const resp = await fetch(this.SHARE_API, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-Share-Token': pw },
+              body: JSON.stringify(payload)
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (resp.status === 401) {
+              this.showToast('❌ 管理密码不正确，请联系负责人获取', 'error');
+              return;
+            }
+            if (!resp.ok || !data.ok) {
+              this.showToast('❌ 分享失败：' + ((data && data.error) || ('HTTP ' + resp.status)), 'error');
+              return;
+            }
+            localStorage.setItem('sitelog_share_pw', pw);
+            this.shareResult = { id: data.id, url: data.url };
+            this.showToast('✅ 分享码已生成，保存分享卡发到客户群即可');
+            await this.$nextTick();
+            this.drawShareCard(data.url, data.id);
+          } catch (e) {
+            console.error('[share] 上传失败:', e);
+            this.showToast('❌ 分享失败：' + (e.message || '网络错误').slice(0, 60), 'error');
+          } finally {
+            this.shareBusy = false;
+          }
+        },
+
+        // 打包当前报告：克隆当前 DOM（含用户手改内容）+ 收集 CSS + 压缩大图
+        async buildSharePayload() {
+          const container = document.getElementById('report-content');
+          if (!container) throw new Error('未找到报告内容，请刷新页面');
+          let css = '';
+          document.querySelectorAll('style').forEach(st => { css += st.textContent + NL; });
+          const clone = container.cloneNode(true);
+          clone.querySelectorAll('button, details.debug-panel, .sop-upload-zone, .sop-grid-top-row, .sop-remove-btn').forEach(el => el.remove());
+          clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+          const imgs = Array.from(clone.querySelectorAll('img'));
+          let compressed = 0;
+          for (const im of imgs) {
+            const src = im.getAttribute('src') || '';
+            if (src.startsWith('data:image') && src.length > 400 * 1024) {
+              try { im.setAttribute('src', await this.compressDataUrl(src)); compressed++; } catch (e) { /* 单张失败不阻塞 */ }
+            }
+          }
+          const title = (this.pdfFilename && this.pdfFilename.trim())
+            ? this.pdfFilename.trim().replace(/[\/:*?"<>|]/g, '_')
+            : ((this.projectName || '未命名项目') + ' 施工归档');
+          if (compressed > 0) console.log('[share] 已压缩 ' + compressed + ' 张大图');
+          return {
+            title: title.slice(0, 80),
+            project: (this.projectName || '') + (this.siteLocation ? ' · ' + this.siteLocation : ''),
+            owner: this.archivePerson || '',
+            css: css,
+            html: clone.innerHTML
+          };
+        },
+
+        // 大图压缩：长边 1280px / JPEG 0.78，控制上传体积
+        compressDataUrl(dataUrl) {
+          return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+              const MAX = 1280;
+              let w = img.naturalWidth, h = img.naturalHeight;
+              if (Math.max(w, h) > MAX) { const k = MAX / Math.max(w, h); w = Math.round(w * k); h = Math.round(h * k); }
+              const c = document.createElement('canvas');
+              c.width = w; c.height = h;
+              c.getContext('2d').drawImage(img, 0, 0, w, h);
+              resolve(c.toDataURL('image/jpeg', 0.78));
+            };
+            img.onerror = () => resolve(dataUrl);
+            img.src = dataUrl;
+          });
+        },
+
+        // 品牌分享卡：墨绿底 + 项目名 + 二维码（canvas 绘制，可保存为图片发群）
+        drawShareCard(url, id) {
+          const canvas = document.getElementById('share-card-canvas');
+          if (!canvas || typeof window.qrcode !== 'function') {
+            this.showToast('❌ 二维码组件未加载，请刷新页面重试', 'error');
+            return;
+          }
+          const W = 750, H = 1000;
+          canvas.width = W; canvas.height = H;
+          canvas.style.width = '300px'; canvas.style.height = '400px';
+          const ctx = canvas.getContext('2d');
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#1F3D2A'; ctx.fillRect(0, 0, W, H);
+          ctx.strokeStyle = '#B8924A'; ctx.lineWidth = 2;
+          ctx.strokeRect(26, 26, W - 52, H - 52);
+          ctx.fillStyle = '#B8924A';
+          ctx.font = '500 22px "PingFang SC","Microsoft YaHei",sans-serif';
+          ctx.fillText('CHUJIANG · 初匠门窗', W / 2, 96);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '500 38px "PingFang SC","Microsoft YaHei",sans-serif';
+          const title = (this.pdfFilename && this.pdfFilename.trim()) || ((this.projectName || '未命名项目') + ' 施工归档');
+          const lines = this.wrapCanvasText(ctx, title, W - 160);
+          lines.slice(0, 2).forEach((ln, i) => ctx.fillText(ln, W / 2, 175 + i * 52));
+          const divY = 175 + Math.min(lines.length, 2) * 52 + 2;
+          ctx.fillStyle = '#B8924A'; ctx.fillRect(W / 2 - 40, divY, 80, 3);
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          ctx.font = '22px "PingFang SC","Microsoft YaHei",sans-serif';
+          ctx.fillText((this.projectName || '—') + (this.siteLocation ? ' · ' + this.siteLocation : ''), W / 2, divY + 48);
+          ctx.fillText('归档日期：' + (this.archiveDate || new Date().toISOString().slice(0, 10)), W / 2, divY + 82);
+          const qrSize = 380, qrX = (W - qrSize) / 2, qrY = divY + 118;
+          ctx.fillStyle = '#ffffff';
+          this.drawRoundRect(ctx, qrX, qrY, qrSize, qrSize, 18); ctx.fill();
+          try {
+            const qr = window.qrcode(0, 'M');
+            qr.addData(url); qr.make();
+            const n = qr.getModuleCount();
+            const inner = qrSize - 60;
+            const cell = inner / n;
+            const ox = qrX + 30, oy = qrY + 30;
+            ctx.fillStyle = '#1F3D2A';
+            for (let r = 0; r < n; r++) {
+              for (let c = 0; c < n; c++) {
+                if (qr.isDark(r, c)) ctx.fillRect(ox + c * cell, oy + r * cell, cell + 0.5, cell + 0.5);
+              }
+            }
+          } catch (e) { console.error('[share] 二维码生成失败:', e); }
+          ctx.fillStyle = '#B8924A';
+          ctx.font = '500 26px "PingFang SC","Microsoft YaHei",sans-serif';
+          ctx.fillText('微信扫码 · 查看工程施工记录', W / 2, qrY + qrSize + 58);
+          ctx.fillStyle = 'rgba(255,255,255,0.7)';
+          ctx.font = '20px "PingFang SC","Microsoft YaHei",sans-serif';
+          ctx.fillText('汕头市初匠门窗科技有限公司', W / 2, H - 96);
+          ctx.font = '17px "PingFang SC","Microsoft YaHei",sans-serif';
+          ctx.fillText('记录编号 ' + id + ' · 粤ICP备2024297744号-2', W / 2, H - 62);
+        },
+
+        wrapCanvasText(ctx, text, maxWidth) {
+          const lines = []; let cur = '';
+          for (const ch of String(text)) {
+            const test = cur + ch;
+            if (ctx.measureText(test).width > maxWidth && cur) { lines.push(cur); cur = ch; }
+            else cur = test;
+          }
+          if (cur) lines.push(cur);
+          return lines;
+        },
+
+        drawRoundRect(ctx, x, y, w, h, r) {
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.arcTo(x + w, y, x + w, y + h, r);
+          ctx.arcTo(x + w, y + h, x, y + h, r);
+          ctx.arcTo(x, y + h, x, y, r);
+          ctx.arcTo(x, y, x + w, y, r);
+          ctx.closePath();
+        },
+
+        downloadShareCard() {
+          const canvas = document.getElementById('share-card-canvas');
+          if (!canvas) return;
+          const a = document.createElement('a');
+          a.href = canvas.toDataURL('image/png');
+          a.download = ((this.projectName || '初匠工程记录') + '分享卡.png').replace(/[\/:*?"<>|]/g, '_');
+          document.body.appendChild(a); a.click(); a.remove();
+          this.showToast('✅ 分享卡已下载，发到客户群即可');
+        },
+
+        copyShareUrl() { if (this.shareResult && this.shareResult.url) this.copyText(this.shareResult.url); },
+
+        async copyText(text) {
+          try {
+            await navigator.clipboard.writeText(text);
+            this.showToast('✅ 链接已复制');
+          } catch (e) {
+            const ta = document.createElement('textarea');
+            ta.value = text; document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); this.showToast('✅ 链接已复制'); }
+            catch (e2) { this.showToast('❌ 复制失败，请手动复制：' + text, 'error', 6000); }
+            ta.remove();
+          }
+        },
+
+        openShareManage() {
+          this.shareAdminPw = localStorage.getItem('sitelog_share_pw') || '';
+          this.shareManageOpen = true;
+          if (this.shareAdminPw.trim()) this.loadShareList();
+        },
+
+        async loadShareList() {
+          const pw = (this.shareAdminPw || '').trim();
+          if (!pw) { this.showToast('❌ 请先输入管理密码', 'error'); return; }
+          this.shareListLoading = true;
+          try {
+            const resp = await fetch(this.SHARE_API + '/list', { headers: { 'X-Share-Token': pw } });
+            const data = await resp.json().catch(() => ({}));
+            if (resp.status === 401) {
+              this.showToast('❌ 管理密码不正确', 'error');
+              this.shareList = [];
+              return;
+            }
+            if (data.ok) {
+              this.shareList = data.items || [];
+              localStorage.setItem('sitelog_share_pw', pw);
+            } else {
+              this.showToast('❌ 加载失败：' + (data.error || resp.status), 'error');
+            }
+          } catch (e) {
+            this.showToast('❌ 网络错误：' + (e.message || '').slice(0, 50), 'error');
+          } finally {
+            this.shareListLoading = false;
+          }
+        },
+
+        async revokeShare(id) {
+          if (!confirm('确定作废这个分享链接吗？作废后业主扫码将显示"链接已失效"。')) return;
+          await this.shareAction(id, '/revoke');
+        },
+
+        async restoreShare(id) {
+          await this.shareAction(id, '/restore');
+        },
+
+        async shareAction(id, action) {
+          const pw = (this.shareAdminPw || '').trim();
+          try {
+            const resp = await fetch(this.SHARE_API + action, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-Share-Token': pw },
+              body: JSON.stringify({ id: id })
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (data.ok) {
+              this.showToast(action === '/revoke' ? '✅ 已作废，旧二维码即刻失效' : '✅ 链接已恢复');
+              this.loadShareList();
+            } else {
+              this.showToast('❌ 操作失败：' + (data.error || resp.status), 'error');
+            }
+          } catch (e) {
+            this.showToast('❌ 网络错误：' + (e.message || '').slice(0, 50), 'error');
+          }
         },
 
         // ===== 示例数据 =====
