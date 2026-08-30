@@ -610,7 +610,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v4.4.1</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v4.5.0</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -901,16 +901,11 @@
           <div class="bg-amber-50 border-l-4 border-amber-500 rounded p-3 text-xs text-amber-900 leading-relaxed">
             <p>📌 点击确认后，整份记录（含你已手改的文字）会上传到初匠服务器，生成一个<strong>专属二维码链接</strong>。业主用微信扫码即可在手机上查看，无需下载、无需安装。</p>
           </div>
-
-          <div>
-            <p class="text-xs font-semibold text-slate-500 mb-1">🔐 管理密码（首次分享需输入，用于生成/管理分享码）</p>
-            <input type="password" x-model="shareAdminPw" placeholder="向负责人索取" class="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:border-[#B8924A]">
-          </div>
         </div>
 
         <div class="flex justify-end gap-2 pt-4 mt-4 border-t border-slate-200">
           <button @click="shareDialogOpen = false" :disabled="shareBusy" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition disabled:opacity-40">取消</button>
-          <button @click="doShare()" :disabled="shareBusy || !shareAdminPw.trim()" class="px-5 py-2 bg-[#1F3D2A] text-white rounded-lg text-sm hover:opacity-90 transition disabled:opacity-50 flex items-center gap-2">
+          <button @click="doShare()" :disabled="shareBusy" class="px-5 py-2 bg-[#1F3D2A] text-white rounded-lg text-sm hover:opacity-90 transition disabled:opacity-50 flex items-center gap-2">
             <span x-show="shareBusy" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
             <span x-text="shareBusy ? '上传中…' : '✅ 确认完成，生成分享码'"></span>
           </button>
@@ -954,10 +949,6 @@
       <div class="flex items-center justify-between mb-4">
         <h3 class="font-bold text-lg text-slate-900">📤 分享管理</h3>
         <button @click="shareManageOpen = false" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">×</button>
-      </div>
-
-      <div x-show="!shareAdminPw.trim()" class="mb-3">
-        <input type="password" x-model="shareAdminPw" placeholder="输入管理密码查看清单" class="w-full px-3 py-2 text-sm border border-slate-300 rounded focus:outline-none focus:border-[#B8924A]">
       </div>
 
       <div class="flex justify-end mb-3">
@@ -1020,7 +1011,6 @@
         shareDialogOpen: false,      // 分享弹窗是否打开
         shareBusy: false,            // 上传进行中
         shareResult: null,           // { id, url } 分享成功结果
-        shareAdminPw: '',            // 管理密码输入框（分享/清单/作废用）
         shareManageOpen: false,      // 分享管理面板（已分享清单）
         shareList: [],               // 已分享清单数据
         shareListLoading: false,
@@ -2529,14 +2519,11 @@
 
         openShareDialog() {
           this.shareResult = null;
-          this.shareAdminPw = localStorage.getItem('sitelog_share_pw') || '';
           this.shareDialogOpen = true;
         },
 
         async doShare() {
           if (this.shareBusy) return;
-          const pw = (this.shareAdminPw || '').trim();
-          if (!pw) { this.showToast('❌ 请输入管理密码', 'error'); return; }
           const totalPhotos = this.images.length + this.arrivalImages.length + this.finishImages.length + this.sopImages.length;
           if (totalPhotos === 0 && !confirm('当前还没有上传任何照片，确定要分享吗？')) return;
 
@@ -2547,19 +2534,18 @@
             const payload = await this.buildSharePayload();
             const resp = await fetch(this.SHARE_API, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-Share-Token': pw },
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload)
             });
             const data = await resp.json().catch(() => ({}));
             if (resp.status === 401) {
-              this.showToast('❌ 管理密码不正确，请联系负责人获取', 'error');
+              this.showToast('❌ 无权访问分享服务，请从初匠系统页面打开', 'error');
               return;
             }
             if (!resp.ok || !data.ok) {
               this.showToast('❌ 分享失败：' + ((data && data.error) || ('HTTP ' + resp.status)), 'error');
               return;
             }
-            localStorage.setItem('sitelog_share_pw', pw);
             this.shareResult = { id: data.id, url: data.url };
             this.showToast('✅ 分享码已生成，保存分享卡发到客户群即可');
             await this.$nextTick();
@@ -2723,26 +2709,22 @@
         },
 
         openShareManage() {
-          this.shareAdminPw = localStorage.getItem('sitelog_share_pw') || '';
           this.shareManageOpen = true;
-          if (this.shareAdminPw.trim()) this.loadShareList();
+          this.loadShareList();
         },
 
         async loadShareList() {
-          const pw = (this.shareAdminPw || '').trim();
-          if (!pw) { this.showToast('❌ 请先输入管理密码', 'error'); return; }
           this.shareListLoading = true;
           try {
-            const resp = await fetch(this.SHARE_API + '/list', { headers: { 'X-Share-Token': pw } });
+            const resp = await fetch(this.SHARE_API + '/list');
             const data = await resp.json().catch(() => ({}));
             if (resp.status === 401) {
-              this.showToast('❌ 管理密码不正确', 'error');
+              this.showToast('❌ 无权访问分享服务，请从初匠系统页面打开', 'error');
               this.shareList = [];
               return;
             }
             if (data.ok) {
               this.shareList = data.items || [];
-              localStorage.setItem('sitelog_share_pw', pw);
             } else {
               this.showToast('❌ 加载失败：' + (data.error || resp.status), 'error');
             }
@@ -2763,11 +2745,10 @@
         },
 
         async shareAction(id, action) {
-          const pw = (this.shareAdminPw || '').trim();
           try {
             const resp = await fetch(this.SHARE_API + action, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'X-Share-Token': pw },
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ id: id })
             });
             const data = await resp.json().catch(() => ({}));
