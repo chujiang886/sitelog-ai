@@ -610,7 +610,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v4.6.0</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v4.6.1</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -774,7 +774,7 @@
   >
     <div class="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl" @click.stop>
       <div class="flex items-center justify-between mb-4">
-        <h3 class="font-bold text-lg text-slate-900">⚙️ AI 视觉模型设置</h3>
+        <h3 class="font-bold text-lg text-slate-900">⚙️ AI 与工程分享设置</h3>
         <button @click="closeSettings()" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">×</button>
       </div>
 
@@ -801,6 +801,17 @@
             🔒 Key 仅保存在你本地浏览器（localStorage），<strong>不上传任何服务器</strong>。<br>
             📷 图片也只在浏览器内存中处理，<strong>不会发给 AI 厂商做训练</strong>。
           </p>
+        </div>
+
+        <div class="border-t border-slate-200 pt-3">
+          <label class="block text-sm font-medium text-slate-700 mb-1">工程分享凭据</label>
+          <input type="password" x-model="shareToken" @input="saveSettings()" autocomplete="off"
+            placeholder="粘贴管理员提供的分享凭据"
+            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+          <p class="text-xs text-slate-500 mt-1">用于生成、查看和撤回工程分享，仅保存在本机浏览器，并发送给初匠分享服务器。</p>
+          <label class="block text-sm text-blue-600 mt-2 cursor-pointer">📂 导入分享配置
+            <input type="file" accept=".json,application/json" @change="importShareConfig($event)" class="block text-xs mt-1 w-full">
+          </label>
         </div>
 
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900">
@@ -1134,6 +1145,7 @@
     function siteLogApp() {
       return {
         // ===== 状态 =====
+        shareToken: '',
         apiKey: '',
         apiProvider: 'qwen',
         templateType: '框架施工',
@@ -1168,6 +1180,7 @@
 
         // ===== 初始化 =====
         async init() {
+          this.shareToken = localStorage.getItem('sitelog_share_token') || '';
           // ─── 方案 B：URL 参数自动填 Key（云端版"零配置"）───
           // 用法：?key=sk-xxx&provider=qwen
           // 适用于通过「共享 Key 引导页」生成的链接
@@ -1226,6 +1239,7 @@
         },
 
         saveSettings() {
+          localStorage.setItem('sitelog_share_token', this.shareToken.trim());
           localStorage.setItem('sitelog_api_key', this.apiKey);
           localStorage.setItem('sitelog_api_provider', this.apiProvider);
         },
@@ -2763,6 +2777,43 @@
         // ===== v4.4 分享功能：确认完成 → 上传 → 二维码 → 业主扫码看 =====
         SHARE_API: 'https://cj-az.cn/api/share',
 
+        async importShareConfig(event) {
+          const file = event.target.files && event.target.files[0];
+          if (!file) return;
+          try {
+            const config = JSON.parse(await file.text());
+            if (config.service !== 'cj-share' || typeof config.token !== 'string' || config.token.trim().length < 32) {
+              throw new Error('请选择管理员提供的工程分享配置文件');
+            }
+            this.shareToken = config.token.trim();
+            this.saveSettings();
+            this.showToast('✅ 分享配置已保存，可以生成分享码');
+          } catch (error) {
+            this.showToast('❌ 导入失败：' + error.message, 'error');
+          } finally { event.target.value = ''; }
+        },
+
+        async shareRequest(path = '', options = {}) {
+          const token = this.shareToken.trim();
+          if (!token) {
+            this.shareDialogOpen = false;
+            this.shareManageOpen = false;
+            this.showSettings = true;
+            throw new Error('请在设置中导入分享配置或填写工程分享凭据');
+          }
+          const response = await fetch(this.SHARE_API + path, {
+            ...options,
+            headers: { ...options.headers, 'X-Share-Token': token }
+          });
+          if (response.status === 401) {
+            this.shareDialogOpen = false;
+            this.shareManageOpen = false;
+            this.showSettings = true;
+            throw new Error('分享凭据无效或已更新，请在设置中重新导入分享配置');
+          }
+          return response;
+        },
+
         openShareDialog() {
           this.shareResult = null;
           this.shareDialogOpen = true;
@@ -2778,7 +2829,7 @@
             this.syncCoverMeta();
             this.showToast('📦 正在打包报告（压缩照片中）…', 'info', 8000);
             const payload = await this.buildSharePayload();
-            const resp = await fetch(this.SHARE_API, {
+            const resp = await this.shareRequest('', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload)
@@ -2962,7 +3013,7 @@
         async loadShareList() {
           this.shareListLoading = true;
           try {
-            const resp = await fetch(this.SHARE_API + '/list');
+            const resp = await this.shareRequest('/list');
             const data = await resp.json().catch(() => ({}));
             if (resp.status === 401) {
               this.showToast('❌ 无权访问分享服务，请从初匠系统页面打开', 'error');
@@ -2992,7 +3043,7 @@
 
         async shareAction(id, action) {
           try {
-            const resp = await fetch(this.SHARE_API + action, {
+            const resp = await this.shareRequest(action, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ id: id })
