@@ -610,7 +610,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v4.6.2</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v4.6.3</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -809,6 +809,8 @@
             placeholder="粘贴管理员提供的分享凭据"
             class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
           <p class="text-xs text-slate-500 mt-1">用于生成、查看和撤回工程分享，仅保存在本机浏览器，并发送给初匠分享服务器。</p>
+          <button @click="checkShareConnection()" :disabled="shareChecking" class="text-sm text-blue-600 mt-2 disabled:opacity-50" x-text="shareChecking ? '正在验证…' : '验证分享连接'"></button>
+          <p class="text-xs mt-1" role="status" x-text="shareConnectionMessage"></p>
           <label class="block text-sm text-blue-600 mt-2 cursor-pointer">📂 导入分享配置
             <input type="file" accept=".json,application/json" @change="importShareConfig($event)" class="block text-xs mt-1 w-full">
           </label>
@@ -894,6 +896,14 @@
   >
     <div class="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl max-h-[92vh] overflow-y-auto" @click.stop>
 
+      <div x-show="shareError" class="bg-red-50 border border-red-200 rounded-lg p-3 mb-3 text-sm text-red-800" role="alert">
+        <p x-text="shareError"></p>
+        <label x-show="!shareResult" class="block mt-2 cursor-pointer">导入管理员提供的分享配置后，再点击确认（当前报告会保留）
+          <input type="file" accept=".json,application/json" @change="importShareConfig($event)" class="block text-xs mt-2 w-full">
+        </label>
+        <button x-show="shareResult && !shareCardReady" @click="retryShareCard()" class="underline mt-2">重新绘制二维码</button>
+      </div>
+
       <!-- ── 未生成：确认 + 上传 ── -->
       <div x-show="!shareResult">
         <div class="flex items-center justify-between mb-4">
@@ -926,7 +936,7 @@
       <!-- ── 已生成：展示二维码 + 品牌分享卡 ── -->
       <div x-show="shareResult">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="font-bold text-lg text-[#1F3D2A]">🎉 分享码已生成</h3>
+          <h3 class="font-bold text-lg text-[#1F3D2A]" x-text="shareCardReady ? '🎉 分享码已生成' : '分享链接已生成'"></h3>
           <button @click="shareDialogOpen = false" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">×</button>
         </div>
 
@@ -941,7 +951,7 @@
         </div>
 
         <div class="flex justify-center gap-2">
-          <button @click="downloadShareCard()" class="px-4 py-2 bg-[#1F3D2A] text-white rounded-lg text-sm hover:opacity-90 transition">💾 保存分享卡</button>
+          <button @click="downloadShareCard()" :disabled="!shareCardReady" class="px-4 py-2 bg-[#1F3D2A] text-white rounded-lg text-sm hover:opacity-90 transition">💾 保存分享卡</button>
           <button @click="copyShareUrl()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition">🔗 复制链接</button>
         </div>
       </div>
@@ -1159,6 +1169,10 @@
         pdfFilenameTouched: false,
         // ===== 分享功能（v4.4：确认完成 → 二维码 → 业主扫码看）=====
         shareDialogOpen: false,      // 分享弹窗是否打开
+        shareError: '',
+        shareConnectionMessage: '',
+        shareChecking: false,
+        shareCardReady: false,
         shareBusy: false,            // 上传进行中
         shareResult: null,           // { id, url } 分享成功结果
         shareManageOpen: false,      // 分享管理面板（已分享清单）
@@ -2757,6 +2771,29 @@
         // ===== v4.4 分享功能：确认完成 → 上传 → 二维码 → 业主扫码看 =====
         SHARE_API: 'https://cj-az.cn/api/share',
 
+        async validateShareToken(token) {
+          if (!token || !token.trim()) throw new Error('尚未配置工程分享，请导入管理员提供的分享配置文件');
+          const response = await fetch(this.SHARE_API + '/list', {
+            headers: { 'X-Share-Token': token.trim() }, cache: 'no-store'
+          });
+          if (response.status === 401) throw new Error('分享凭据无效，请导入管理员提供的分享配置文件（不是 AI Key）');
+          if (response.status === 403) throw new Error('当前页面来源未获分享服务允许，请联系管理员检查来源配置');
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.ok) throw new Error('分享连接验证失败（HTTP ' + response.status + '），请稍后重试');
+        },
+
+        async checkShareConnection() {
+          this.shareChecking = true;
+          this.shareConnectionMessage = '正在验证分享连接…';
+          try {
+            await this.validateShareToken(this.shareToken);
+            this.saveSettings();
+            this.shareConnectionMessage = '✅ 分享连接验证通过';
+          } catch (error) {
+            this.shareConnectionMessage = '❌ ' + error.message;
+          } finally { this.shareChecking = false; }
+        },
+
         async importShareConfig(event) {
           const file = event.target.files && event.target.files[0];
           if (!file) return;
@@ -2765,11 +2802,16 @@
             if (config.service !== 'cj-share' || typeof config.token !== 'string' || config.token.trim().length < 32) {
               throw new Error('请选择管理员提供的工程分享配置文件');
             }
+            await this.validateShareToken(config.token);
             this.shareToken = config.token.trim();
             this.saveSettings();
-            this.showToast('✅ 分享配置已保存，可以生成分享码');
+            this.shareError = '';
+            this.shareConnectionMessage = '✅ 分享连接验证通过';
+            this.showToast('✅ 分享连接验证通过，可以生成分享码');
           } catch (error) {
-            this.showToast('❌ 导入失败：' + error.message, 'error');
+            this.shareConnectionMessage = '❌ 导入失败：' + error.message;
+            if (this.shareDialogOpen) this.shareError = this.shareConnectionMessage;
+            this.showToast(this.shareConnectionMessage, 'error', 8000);
           } finally { event.target.value = ''; }
         },
 
@@ -2796,6 +2838,8 @@
 
         openShareDialog() {
           this.shareResult = null;
+          this.shareError = '';
+          this.shareCardReady = false;
           this.shareDialogOpen = true;
         },
 
@@ -2805,7 +2849,10 @@
           if (totalPhotos === 0 && !confirm('当前还没有上传任何照片，确定要分享吗？')) return;
 
           this.shareBusy = true;
+          this.shareError = '';
+          this.shareCardReady = false;
           try {
+            await this.validateShareToken(this.shareToken);
             this.syncCoverMeta();
             this.showToast('📦 正在打包报告（压缩照片中）…', 'info', 8000);
             const payload = await this.buildSharePayload();
@@ -2824,12 +2871,14 @@
               return;
             }
             this.shareResult = { id: data.id, url: data.url };
-            this.showToast('✅ 分享码已生成，保存分享卡发到客户群即可');
             await this.$nextTick();
             this.drawShareCard(data.url, data.id);
+            this.shareCardReady = true;
+            this.showToast('✅ 分享码已生成，保存分享卡发到客户群即可');
           } catch (e) {
             console.error('[share] 上传失败:', e);
-            this.showToast('❌ 分享失败：' + (e.message || '网络错误').slice(0, 60), 'error');
+            this.shareError = (this.shareResult ? '链接已创建，二维码未完成：' : '分享未完成：') + (e.message || '网络错误');
+            this.showToast(this.shareError, 'error', 8000);
           } finally {
             this.shareBusy = false;
           }
@@ -2887,8 +2936,7 @@
         drawShareCard(url, id) {
           const canvas = document.getElementById('share-card-canvas');
           if (!canvas || typeof window.qrcode !== 'function') {
-            this.showToast('❌ 二维码组件未加载，请刷新页面重试', 'error');
-            return;
+            throw new Error('二维码组件未就绪，请稍后重绘，或先复制分享链接');
           }
           const W = 750, H = 1000;
           canvas.width = W; canvas.height = H;
@@ -2928,7 +2976,7 @@
                 if (qr.isDark(r, c)) ctx.fillRect(ox + c * cell, oy + r * cell, cell + 0.5, cell + 0.5);
               }
             }
-          } catch (e) { console.error('[share] 二维码生成失败:', e); }
+          } catch (e) { throw new Error('二维码绘制失败，请重绘或复制分享链接'); }
           ctx.fillStyle = '#B8924A';
           ctx.font = '500 26px "PingFang SC","Microsoft YaHei",sans-serif';
           ctx.fillText('微信扫码 · 查看工程施工记录', W / 2, qrY + qrSize + 58);
@@ -2960,7 +3008,17 @@
           ctx.closePath();
         },
 
+        retryShareCard() {
+          if (!this.shareResult) return;
+          try {
+            this.drawShareCard(this.shareResult.url, this.shareResult.id);
+            this.shareCardReady = true;
+            this.shareError = '';
+          } catch (error) { this.shareError = error.message; }
+        },
+
         downloadShareCard() {
+          if (!this.shareCardReady) return;
           const canvas = document.getElementById('share-card-canvas');
           if (!canvas) return;
           const a = document.createElement('a');

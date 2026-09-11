@@ -45,8 +45,8 @@ test('凭据过期时提示重新导入', async () => {
   await assert.rejects(app.shareRequest(), /凭据无效/);
   assert.equal(app.showSettings, true);
 });
-test('导入配置仅接受分享服务凭据', async () => {
-  const app = appWithFetch(() => {});
+test('导入配置仅接受通过服务器验证的分享服务凭据', async () => {
+  const app = appWithFetch(async () => ({ status: 200, ok: true, json: async () => ({ ok: true }) }));
   const token = 'imported-test-credential-abcdefghijklmnopqrstuvwxyz';
   await app.importShareConfig({ target: { files: [{ text: async () => JSON.stringify({ service: 'cj-share', token }) }], value: 'config.json' } });
   assert.equal(app.shareToken, token);
@@ -113,4 +113,50 @@ test('启动时仅有分享配置不会强制检查 AI，保存后分享凭据�
   app.showSettings = true;
   app.closeSettings();
   assert.equal(saved.get('sitelog_share_token'), token);
+});
+
+test('无效凭据在上传和压缩之前拦截，保留审核内容并显示持久错误', async () => {
+  const calls = [];
+  const app = appWithFetch(async (url) => { calls.push(url); return { status: 401 }; });
+  app.images = [{ desc: '用户审核通过的文字' }];
+  app.shareDialogOpen = true;
+  app.buildSharePayload = () => { throw new Error('不应打包'); };
+  app.showToast = () => {};
+  await app.doShare();
+  assert.deepEqual(calls, [app.SHARE_API + '/list']);
+  assert.match(app.shareError, /凭据无效/);
+  assert.equal(app.shareDialogOpen, true);
+  assert.equal(app.images[0].desc, '用户审核通过的文字');
+  assert.equal(app.shareBusy, false);
+});
+test('无效配置文件不覆盖已保存凭据，也不谎报可分享', async () => {
+  const saved = new Map();
+  const app = appWithFetch(async () => ({ status: 401 }), saved);
+  const oldToken = app.shareToken;
+  app.shareDialogOpen = true;
+  await app.importShareConfig({ target: { files: [{ text: async () => JSON.stringify({ service: 'cj-share', token: 'invalid-test-credential-abcdefghijklmnopqrstuvwxyz' }) }], value: 'config.json' } });
+  assert.equal(app.shareToken, oldToken);
+  assert.equal(saved.size, 0);
+  assert.match(app.shareConnectionMessage, /导入失败/);
+  assert.match(app.shareError, /凭据无效/);
+});
+test('二维码绘制失败保留已创建链接，重绘不重复上传', async () => {
+  let posts = 0;
+  const app = appWithFetch(async (_url, options) => {
+    if (options.method === 'POST') posts++;
+    return { status: 200, ok: true, json: async () => ({ ok: true, id: 'ABC234', url: 'https://cj-az.cn/s/ABC234' }) };
+  });
+  app.images = [{}];
+  app.syncCoverMeta = () => {};
+  app.buildSharePayload = async () => ({ html: '<p>审核记录</p>' });
+  app.$nextTick = async () => {};
+  app.drawShareCard = () => { throw new Error('绘制失败'); };
+  await app.doShare();
+  assert.equal(app.shareResult.url, 'https://cj-az.cn/s/ABC234');
+  assert.equal(app.shareCardReady, false);
+  assert.match(app.shareError, /链接已创建/);
+  app.drawShareCard = () => {};
+  app.retryShareCard();
+  assert.equal(app.shareCardReady, true);
+  assert.equal(posts, 1);
 });
