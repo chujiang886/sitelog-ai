@@ -610,7 +610,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v4.6.1</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v4.6.2</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -770,7 +770,7 @@
     x-transition.opacity.duration.150ms
     class="no-print fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
     @click.self="closeSettings()"
-    @keydown.escape.window="closeSettings()"
+    @keydown.escape.window="if(showSettings) closeSettings()"
   >
     <div class="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl" @click.stop>
       <div class="flex items-center justify-between mb-4">
@@ -788,7 +788,7 @@
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">API Key</label>
+          <label class="block text-sm font-medium text-slate-700 mb-1">AI API Key（仅 AI 识别需要）</label>
           <input
             type="password"
             x-model="apiKey"
@@ -798,8 +798,8 @@
             class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none"
           >
           <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">
-            🔒 Key 仅保存在你本地浏览器（localStorage），<strong>不上传任何服务器</strong>。<br>
-            📷 图片也只在浏览器内存中处理，<strong>不会发给 AI 厂商做训练</strong>。
+            AI Key 保存在当前浏览器，使用 AI 识别时随照片发送给所选服务方。<br>
+            手动整理、导出 PDF 和工程分享无需填写 AI Key。
           </p>
         </div>
 
@@ -823,7 +823,7 @@
         <div class="flex justify-between items-center pt-2">
           <button @click="testConnection" :disabled="!apiKey || testing" class="text-sm text-blue-600 hover:underline disabled:opacity-50" x-text="testing ? '测试中...' : '🔌 测试连接'"></button>
           <div class="flex gap-2">
-            <button @click="closeSettings()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition">取消</button>
+            <button @click="closeSettings()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition">关闭</button>
             <button @click="closeSettings()" class="px-5 py-2 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800 transition">完成 ✓</button>
           </div>
         </div>
@@ -1210,23 +1210,9 @@
           const isInjected = localStorage.getItem('sitelog_api_injected') === '1';
           const injectedAt = localStorage.getItem('sitelog_api_injected_at');
 
+          // AI 与工程分享独立配置，仅在用户调用 AI 时提示缺少 AI Key。
           if (!this.apiKey || this.apiKey.length < 10) {
-            // 没有 Key：检查是否能走代理模式
-            try {
-              const resp = await fetch('/api/health', { cache: 'no-store' });
-              if (resp.ok) {
-                const health = await resp.json();
-                if (health.key_configured) {
-                  this.showToast('⚠️ 老板电脑代理可用，但本地 Key 为空，请点「设置」填 Key 或刷新页面', 'error');
-                } else {
-                  this.showToast('👋 欢迎使用施格归档！请先点「设置」填 API Key', 'info');
-                }
-              } else {
-                this.showToast('👋 欢迎使用施格归档！请先点「设置」填 API Key', 'info');
-              }
-            } catch (e) {
-              this.showToast('👋 欢迎使用施格归档！请先点「设置」填 API Key', 'info');
-            }
+            return;
           } else if (isInjected) {
             // Key 是被自动注入的（局域网共享 或 URL 链接）
             const source = urlKey ? '共享链接' : '老板电脑';
@@ -1255,18 +1241,12 @@
             .replace(/'/g, '&#39;');
         },
 
-        // ===== 统一关闭设置（带视觉反馈） =====
+        // 保存设置不要求 AI 或分享凭据必填，各功能在实际调用时校验。
         closeSettings() {
-          // 1) 强制立即保存（不等 debounce）
+          if (!this.showSettings) return;
           this.saveSettings();
-          // 2) 关闭弹窗
           this.showSettings = false;
-          // 3) 视觉反馈（无论是否有 key 都给提示）
-          if (this.apiKey && this.apiKey.trim().length > 0) {
-            this.showToast('✅ 设置已保存（Key 已存到本地浏览器）');
-          } else {
-            this.showToast('⚠️ 弹窗已关闭，但 Key 为空，下次使用前请先填写', 'error');
-          }
+          this.showToast('✅ 设置已保存', 'success');
         },
 
         openSettings() {
