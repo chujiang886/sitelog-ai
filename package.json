@@ -1,11 +1,18 @@
 {
   "name": "sitelog-ai",
-  "version": "1.0.0",
+  "version": "5.0.0",
   "description": "门窗施工归档 AI 助手",
   "scripts": {
-    "build": "echo Static site",
+    "build": "tailwindcss -i app.css -o vendor/app.css --minify --content ./index.html,./auth-client.js",
     "dev": "npx serve -s . -l 3000",
     "start": "npx serve -s . -l 3000",
     "test": "node --test test-share.cjs"
+  },
+  "devDependencies": {
+    "alpinejs": "^3.13.5",
+    "jsqr": "^1.4.0",
+    "playwright": "^1.62.1",
+    "pngjs": "^7.0.0",
+    "tailwindcss": "^3.4.17"
   }
 }

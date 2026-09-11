@@ -1,2 +1,4 @@
 分享连接配置.json
 node_modules/
+test-output/
+playwright-report/

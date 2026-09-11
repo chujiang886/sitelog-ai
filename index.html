@@ -7,8 +7,10 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>施格归档 · 现场施工归档 AI 助手</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js" defer></script>
+  <link rel="stylesheet" href="vendor/app.css">
+  <script>if (location.hostname === "chujiang886.github.io") location.replace("https://cj-az.cn/sitelog/");</script>
+  <script src="auth-client.js"></script>
+  <script src="vendor/alpine.min.js" defer></script>
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="vendor/html2canvas.min.js"></script>
   <script src="vendor/qrcode.min.js"></script>
@@ -600,30 +602,42 @@
       border-radius: 50%; animation: pdfspin 0.8s linear infinite;
     }
     @keyframes pdfspin { to { transform: rotate(360deg); } }
+    header button, header select { white-space: nowrap; flex-shrink: 0; }
+    @media screen and (max-width: 767px) {
+      #report-content:not(.pdf-exporting) { padding: 12px; }
+      .pdf-cover-band { padding: 18px 14px; gap: 12px; }
+      .pdf-cover-body { padding: 24px 14px; }
+      .pdf-cover-main-title { font-size: 28px; letter-spacing: 1px; }
+      .pdf-cover-brand { font-size: 13px; letter-spacing: 1px; }
+      .pdf-cover-badge { white-space: nowrap; }
+      .pdf-meta-grid { grid-template-columns: 1fr; gap: 1px; }
+      .pdf-cover-tagline { font-size: 14px; letter-spacing: 1px; }
+    }
+
   </style>
 </head>
 <body class="bg-slate-50" x-data="siteLogApp()">
 
   <!-- ========== 顶部导航栏 ========== -->
-  <header class="no-print brand-gradient text-white shadow-lg sticky top-0 z-40">
-    <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+  <header class="no-print brand-gradient text-white shadow-lg lg:sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v4.6.3</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v5.0.0</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2 min-w-0">
         <select x-model="templateType" @change="switchTemplate" class="text-slate-900 text-sm px-3 py-1.5 rounded border-0">
           <option value="框架施工">🔲 框架施工归档</option>
           <option value="玻扇施工">🪟 玻扇施工归档</option>
           <option value="五金安装">🔧 五金安装归档</option>
           <option value="离场自检">🚪 离场前自检留底</option>
         </select>
-        <button @click="openSettings()" class="px-3 py-1.5 text-sm hover:bg-white/10 rounded transition flex items-center gap-1.5" title="API Key 设置">
-          <span>⚙️ 设置</span>
-          <span x-show="apiKey && apiKey.length > 10" class="w-1.5 h-1.5 bg-green-400 rounded-full" title="Key 已配置"></span>
+        <button @click="openSettings()" class="px-3 py-1.5 text-sm hover:bg-white/10 rounded transition flex items-center gap-1.5" title="账号与公司设置">
+          <span>👤 账号</span>
+          <span class="text-xs" x-text="accountUser ? accountUser.display_name : '未登录'"></span>
         </button>
         <button @click="loadSampleData" class="px-3 py-1.5 text-sm hover:bg-white/10 rounded transition" title="载入示例数据">
           📂 示例
@@ -642,11 +656,11 @@
   </header>
 
   <!-- ========== 主内容区 ========== -->
-  <main class="max-w-7xl mx-auto p-6 grid grid-cols-12 gap-6">
+  <main class="max-w-7xl mx-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
 
     <!-- ========== 左侧：图片工作台 ========== -->
-    <aside class="col-span-3 no-print">
-      <div class="bg-white rounded-lg border border-slate-200 p-4 sticky top-24">
+    <aside class="lg:col-span-3 no-print min-w-0">
+      <div class="bg-white rounded-lg border border-slate-200 p-4 lg:sticky top-24">
 
         <!-- 上传区 -->
         <div
@@ -727,7 +741,7 @@
                   </select>
                   <p class="text-xs text-slate-400 mt-1 truncate" x-text="img.time"></p>
                   <div class="flex gap-2 mt-1">
-                    <button @click="reAnalyze(img)" :disabled="!apiKey || img.analyzing" class="text-xs text-blue-600 hover:underline" x-text="img.analyzing ? '分析中...' : '重分析'"></button>
+                    <button @click="reAnalyze(img)" :disabled="!aiConfigured || img.analyzing" class="text-xs text-blue-600 hover:underline" x-text="img.analyzing ? '分析中...' : '重分析'"></button>
                     <button @click="removeImage(img.id)" class="text-xs text-red-600 hover:underline">删除</button>
                   </div>
                 </div>
@@ -745,7 +759,7 @@
     </aside>
 
     <!-- ========== 右侧：归档报告（可编辑） ========== -->
-    <section class="col-span-9">
+    <section class="lg:col-span-9 min-w-0">
       <!-- 编辑模式提示条 -->
       <div class="no-print mb-3 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-center gap-2">
         <span>✏️</span>
@@ -764,74 +778,94 @@
 
   </main>
 
-      <!-- ========== 设置弹窗 ========== -->
-  <div
-    x-show="showSettings"
-    x-transition.opacity.duration.150ms
-    class="no-print fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-    @click.self="closeSettings()"
-    @keydown.escape.window="if(showSettings) closeSettings()"
-  >
-    <div class="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl" @click.stop>
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="font-bold text-lg text-slate-900">⚙️ AI 与工程分享设置</h3>
-        <button @click="closeSettings()" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">×</button>
+  <!-- 员工登录 -->
+  <div x-show="showLogin" x-cloak class="fixed inset-0 bg-slate-950/70 z-[80] flex items-center justify-center p-4 no-print">
+    <form @submit.prevent="loginAccount()" class="bg-white rounded-xl p-7 w-full max-w-md shadow-2xl max-h-[94vh] overflow-y-auto">
+      <p class="text-sm text-emerald-800 mb-2">初匠门窗 · 施格归档</p>
+      <h2 class="text-2xl font-bold mb-3">员工登录</h2>
+      <p class="text-sm text-slate-600 mb-5">使用管理员分配的账号登录，换电脑也使用同一个账号。</p>
+      <label class="block text-sm font-medium mb-1" for="login-user">员工账号</label>
+      <input id="login-user" x-model="loginForm.username" autocomplete="username" required class="w-full border rounded-lg px-3 py-2 mb-4" placeholder="输入员工账号">
+      <label class="block text-sm font-medium mb-1" for="login-pass">密码</label>
+      <input id="login-pass" type="password" x-model="loginForm.password" autocomplete="current-password" required maxlength="128" class="w-full border rounded-lg px-3 py-2 mb-4" placeholder="输入密码">
+      <p role="alert" x-show="authError" x-text="authError" class="text-sm text-red-700 mb-3"></p>
+      <button type="submit" :disabled="authBusy" class="w-full bg-[#1F3D2A] text-white rounded-lg py-3 disabled:opacity-50" x-text="authBusy ? '正在登录…' : '登录'"></button>
+      <p class="text-sm text-slate-500 mt-4">忘记密码请联系管理员重置。</p>
+    </form>
+  </div>
+
+  <!-- 初始密码修改及个人密码管理 -->
+  <div x-show="showPassword" x-cloak class="fixed inset-0 bg-slate-950/70 z-[90] flex items-center justify-center p-4 no-print">
+    <form @submit.prevent="changeOwnPassword()" class="bg-white rounded-xl p-7 w-full max-w-md shadow-2xl max-h-[94vh] overflow-y-auto">
+      <h2 class="text-xl font-bold mb-3">修改密码</h2>
+      <p class="text-sm text-slate-600 mb-4" x-text="accountUser && accountUser.must_change_password ? '首次登录或密码重置后，请设置自己的密码。' : '修改后所有设备都需要使用新密码重新登录。'"></p>
+      <label class="block text-sm mb-1" for="password-current">当前密码</label>
+      <input id="password-current" type="password" x-model="passwordForm.current" autocomplete="current-password" required maxlength="128" class="w-full border rounded-lg px-3 py-2 mb-3">
+      <label class="block text-sm mb-1" for="password-next">新密码（至少 12 个字符）</label>
+      <input id="password-next" type="password" x-model="passwordForm.next" autocomplete="new-password" required minlength="12" maxlength="128" class="w-full border rounded-lg px-3 py-2 mb-3">
+      <label class="block text-sm mb-1" for="password-confirm">再次输入新密码</label>
+      <input id="password-confirm" type="password" x-model="passwordForm.confirm" autocomplete="new-password" required minlength="12" maxlength="128" class="w-full border rounded-lg px-3 py-2 mb-4">
+      <p role="alert" x-show="authError" x-text="authError" class="text-sm text-red-700 mb-3"></p>
+      <button type="submit" :disabled="authBusy" class="w-full bg-[#1F3D2A] text-white rounded-lg py-3 disabled:opacity-50">保存新密码</button>
+      <button type="button" x-show="accountUser && !accountUser.must_change_password" @click="showPassword = false" class="w-full py-2 mt-2 text-slate-600">取消</button>
+    </form>
+  </div>
+
+  <!-- 个人账号 -->
+  <div x-show="showSettings" x-cloak @click.self="closeSettings()" @keydown.escape.window="if(showSettings) closeSettings()" class="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-xl p-6 w-full max-w-md shadow-xl max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4"><h2 class="text-xl font-bold">我的账号</h2><button @click="closeSettings()" aria-label="关闭账号面板" class="text-2xl">×</button></div>
+      <p class="font-semibold" x-text="accountUser ? accountUser.display_name : '尚未登录'"></p>
+      <p class="text-sm text-slate-500 mt-1" x-text="accountUser ? accountUser.username + ' · ' + (accountUser.role === 'admin' ? '管理员' : '员工') : ''"></p>
+      <p class="text-sm text-slate-600 my-4" x-text="aiConfigured ? '公司 AI 服务已配置，可使用 AI 整理。' : '公司 AI 服务暂未配置，可先手动整理、导出和分享。'"></p>
+      <div class="space-y-3">
+        <button @click="authError = ''; showPassword = true" class="w-full border rounded-lg py-2">修改我的密码</button>
+        <button x-show="accountUser && accountUser.role === 'admin'" @click="closeSettings(); openAdmin()" class="w-full bg-[#1F3D2A] text-white rounded-lg py-2">员工与公司设置</button>
+        <button @click="logoutAccount()" class="w-full text-red-700 border border-red-200 rounded-lg py-2">退出登录</button>
       </div>
+    </div>
+  </div>
 
-      <div class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">服务方</label>
-          <select x-model="apiProvider" @change="saveSettings" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
-            <option value="qwen">通义千问 Qwen-VL（推荐 · 国内直连）</option>
-            <option value="openai">OpenAI GPT-4o（需境外网络）</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">AI API Key（仅 AI 识别需要）</label>
-          <input
-            type="password"
-            x-model="apiKey"
-            @input="saveSettings()"
-            @keydown.enter.prevent="closeSettings()"
-            placeholder="sk-xxxxxxxxxxxxxxxxxx"
-            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none"
-          >
-          <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">
-            AI Key 保存在当前浏览器，使用 AI 识别时随照片发送给所选服务方。<br>
-            手动整理、导出 PDF 和工程分享无需填写 AI Key。
-          </p>
-        </div>
-
-        <div class="border-t border-slate-200 pt-3">
-          <label class="block text-sm font-medium text-slate-700 mb-1">工程分享凭据</label>
-          <input type="password" x-model="shareToken" @input="saveSettings()" autocomplete="off"
-            placeholder="粘贴管理员提供的分享凭据"
-            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
-          <p class="text-xs text-slate-500 mt-1">用于生成、查看和撤回工程分享，仅保存在本机浏览器，并发送给初匠分享服务器。</p>
-          <button @click="checkShareConnection()" :disabled="shareChecking" class="text-sm text-blue-600 mt-2 disabled:opacity-50" x-text="shareChecking ? '正在验证…' : '验证分享连接'"></button>
-          <p class="text-xs mt-1" role="status" x-text="shareConnectionMessage"></p>
-          <label class="block text-sm text-blue-600 mt-2 cursor-pointer">📂 导入分享配置
-            <input type="file" accept=".json,application/json" @change="importShareConfig($event)" class="block text-xs mt-1 w-full">
-          </label>
-        </div>
-
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900">
-          <p class="font-semibold mb-1">💡 免费申请 Key：</p>
-          <a href="https://dashscope.console.aliyun.com/apiKey" target="_blank" class="text-blue-600 hover:underline">👉 通义千问控制台</a>
-          <span class="text-slate-500">（新用户有 100 万 token 免费额度，约可识别 5000 张照片）</span>
-        </div>
-
-        <div class="flex justify-between items-center pt-2">
-          <button @click="testConnection" :disabled="!apiKey || testing" class="text-sm text-blue-600 hover:underline disabled:opacity-50" x-text="testing ? '测试中...' : '🔌 测试连接'"></button>
-          <div class="flex gap-2">
-            <button @click="closeSettings()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm hover:bg-slate-200 transition">关闭</button>
-            <button @click="closeSettings()" class="px-5 py-2 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800 transition">完成 ✓</button>
+  <!-- 管理员工作台 -->
+  <div x-show="showAdmin" x-cloak @click.self="showAdmin = false" class="fixed inset-0 bg-slate-950/60 z-[70] flex items-center justify-center p-3 no-print">
+    <div class="bg-white rounded-xl p-5 sm:p-7 w-full max-w-4xl max-h-[94vh] overflow-y-auto shadow-2xl">
+      <div class="flex justify-between items-center mb-5"><h2 class="text-xl font-bold">员工与公司设置</h2><button @click="showAdmin = false" class="text-2xl" aria-label="关闭管理员面板">×</button></div>
+      <p role="status" x-show="adminMessage" x-text="adminMessage" class="bg-blue-50 text-blue-900 rounded-lg p-3 mb-4 text-sm"></p>
+      <h3 class="font-semibold mb-3">新增员工</h3>
+      <form @submit.prevent="createEmployee()" class="grid sm:grid-cols-2 gap-3 mb-6">
+        <label class="text-sm">员工姓名<input x-model="employeeForm.display_name" required maxlength="40" class="block w-full border rounded-lg px-3 py-2 mt-1" aria-label="新增员工姓名"></label>
+        <label class="text-sm">员工账号<input x-model="employeeForm.username" required pattern="[a-zA-Z0-9_.\-]{3,40}" class="block w-full border rounded-lg px-3 py-2 mt-1" aria-label="新增员工账号" placeholder="3–40 位英文或数字"></label>
+        <label class="text-sm">初始密码<input type="password" x-model="employeeForm.password" required minlength="12" maxlength="128" autocomplete="new-password" class="block w-full border rounded-lg px-3 py-2 mt-1" aria-label="新增员工初始密码" placeholder="至少 12 个字符"></label>
+        <label class="text-sm">权限<select x-model="employeeForm.role" class="block w-full border rounded-lg px-3 py-2 mt-1"><option value="staff">员工：管理自己的记录</option><option value="admin">管理员：管理全部记录和账号</option></select></label>
+        <button type="submit" :disabled="authBusy" class="bg-[#1F3D2A] text-white rounded-lg py-2 disabled:opacity-50">创建员工账号</button>
+      </form>
+      <h3 class="font-semibold mb-3">员工列表</h3>
+      <div class="space-y-2 mb-6">
+        <template x-for="employee in employeeList" :key="employee.id">
+          <div class="flex flex-wrap items-center justify-between gap-2 border rounded-lg p-3">
+            <div><b x-text="employee.display_name"></b><span class="text-sm ml-2" x-text="employee.username"></span><p class="text-sm text-slate-500" x-text="(employee.role === 'admin' ? '管理员' : '员工') + ' · ' + (employee.active ? '已启用' : '已停用')"></p></div>
+            <button @click="editEmployee(employee)" :disabled="accountUser && employee.id === accountUser.id" class="text-sm text-blue-700 underline disabled:opacity-40">管理账号</button>
           </div>
-        </div>
-
-        <div x-show="testResult" x-html="testResult" class="text-xs"></div>
+        </template>
       </div>
+      <form x-show="editingUser" @submit.prevent="saveEmployee()" class="border border-blue-200 bg-blue-50 rounded-lg p-4 mb-6 space-y-3">
+        <h3 class="font-semibold">修改员工账号</h3>
+        <label class="block text-sm">姓名<input x-model="editForm.display_name" required maxlength="40" class="block w-full border rounded px-3 py-2 mt-1" aria-label="修改员工姓名"></label>
+        <label class="block text-sm">角色<select x-model="editForm.role" class="block w-full border rounded px-3 py-2 mt-1" aria-label="修改员工角色"><option value="staff">员工</option><option value="admin">管理员</option></select></label>
+        <label class="flex gap-2 text-sm"><input type="checkbox" x-model="editForm.active">启用账号</label>
+        <label class="block text-sm">重置密码（留空则不更改）<input type="password" x-model="editForm.password" minlength="12" maxlength="128" autocomplete="new-password" class="block w-full border rounded px-3 py-2 mt-1" aria-label="重置员工密码"></label>
+        <div class="flex gap-3"><button type="submit" :disabled="authBusy" class="bg-blue-800 text-white px-4 py-2 rounded">保存账号修改</button><button type="button" @click="editingUser = null" class="px-4 py-2">取消修改</button></div>
+      </form>
+      <details class="border-t pt-4 mb-5">
+        <summary class="font-semibold cursor-pointer">公司 AI 服务（管理员统一配置，可选）</summary>
+        <p class="text-sm text-slate-500 my-3">配置后员工无需填写 AI Key。密钥保存在服务器，页面不会回显。识别照片会发送给所选服务方。</p>
+        <form @submit.prevent="saveCompanyAI()" class="space-y-3">
+          <label class="block text-sm">服务方<select x-model="companyAI.provider" class="block w-full border rounded-lg px-3 py-2 mt-1"><option value="qwen">通义千问</option><option value="openai">OpenAI</option></select></label>
+          <label class="block text-sm">公司 AI Key<input type="password" x-model="companyAI.key" autocomplete="off" class="block w-full border rounded-lg px-3 py-2 mt-1" placeholder="已有配置时留空保留原值"></label>
+          <button type="submit" :disabled="authBusy" class="bg-slate-800 text-white rounded-lg px-4 py-2">保存公司 AI 配置</button>
+        </form>
+      </details>
+      <details class="border-t pt-4"><summary @click="loadAudit()" class="font-semibold cursor-pointer">最近操作记录</summary><div class="mt-3 space-y-2"><template x-for="event in auditItems" :key="event.id"><p class="text-sm border-b pb-2"><span x-text="new Date(event.created_at * 1000).toLocaleString('zh-CN')"></span> · <span x-text="event.display_name || '服务接口'"></span> · <span x-text="auditLabel(event.action)"></span> <span x-text="event.target"></span></p></template></div></details>
     </div>
   </div>
 
@@ -898,9 +932,7 @@
 
       <div x-show="shareError" class="bg-red-50 border border-red-200 rounded-lg p-3 mb-3 text-sm text-red-800" role="alert">
         <p x-text="shareError"></p>
-        <label x-show="!shareResult" class="block mt-2 cursor-pointer">导入管理员提供的分享配置后，再点击确认（当前报告会保留）
-          <input type="file" accept=".json,application/json" @change="importShareConfig($event)" class="block text-xs mt-2 w-full">
-        </label>
+        <button x-show="!accountUser" @click="showLogin = true" class="underline mt-2">登录员工账号后继续（审核内容会保留）</button>
         <button x-show="shareResult && !shareCardReady" @click="retryShareCard()" class="underline mt-2">重新绘制二维码</button>
       </div>
 
@@ -1154,9 +1186,8 @@
 
     function siteLogApp() {
       return {
+        ...window.accountFeatures,
         // ===== 状态 =====
-        shareToken: '',
-        apiKey: '',
         apiProvider: 'qwen',
         templateType: '框架施工',
         images: [],             // 施工节点照片
@@ -1194,54 +1225,8 @@
 
         // ===== 初始化 =====
         async init() {
-          this.shareToken = localStorage.getItem('sitelog_share_token') || '';
-          // ─── 方案 B：URL 参数自动填 Key（云端版"零配置"）───
-          // 用法：?key=sk-xxx&provider=qwen
-          // 适用于通过「共享 Key 引导页」生成的链接
-          const urlParams = new URLSearchParams(window.location.search);
-          const urlKey = urlParams.get('key');
-          const urlProvider = urlParams.get('provider');
-          if (urlKey && urlKey.length > 10) {
-            // 检测到 URL 带 Key → 自动填入 + 标记为注入（隐藏明文）
-            this.apiKey = urlKey;
-            this.apiProvider = urlProvider || 'qwen';
-            localStorage.setItem('sitelog_api_key', this.apiKey);
-            localStorage.setItem('sitelog_api_provider', this.apiProvider);
-            localStorage.setItem('sitelog_api_injected', '1');
-            localStorage.setItem('sitelog_api_injected_at', new Date().toISOString());
-            // 清理 URL 参数（保留其他参数）
-            const newQs = urlParams.toString().replace(/key=[^&]+&?/g, '').replace(/provider=[^&]+&?/g, '').replace(/^&/, '');
-            const newUrl = window.location.pathname + (newQs ? '?' + newQs : '');
-            window.history.replaceState({}, document.title, newUrl);
-          } else {
-            this.apiKey = localStorage.getItem('sitelog_api_key') || '';
-            this.apiProvider = localStorage.getItem('sitelog_api_provider') || 'qwen';
-          }
-
           this.switchTemplate();
-
-          // ─── 方案 A：检测 Key 是否由老板电脑自动注入 ───
-          const isInjected = localStorage.getItem('sitelog_api_injected') === '1';
-          const injectedAt = localStorage.getItem('sitelog_api_injected_at');
-
-          // AI 与工程分享独立配置，仅在用户调用 AI 时提示缺少 AI Key。
-          if (!this.apiKey || this.apiKey.length < 10) {
-            return;
-          } else if (isInjected) {
-            // Key 是被自动注入的（局域网共享 或 URL 链接）
-            const source = urlKey ? '共享链接' : '老板电脑';
-            const time = injectedAt ? new Date(injectedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '刚刚';
-            this.showToast('🔑 Key 已通过 ' + source + ' 自动配置（' + time + '），工友无需手动设置', 'info');
-          } else {
-            // 本地手动填的 Key
-            this.showToast('✅ 已加载本地保存的 API Key（' + this.apiProvider + '）');
-          }
-        },
-
-        saveSettings() {
-          localStorage.setItem('sitelog_share_token', this.shareToken.trim());
-          localStorage.setItem('sitelog_api_key', this.apiKey);
-          localStorage.setItem('sitelog_api_provider', this.apiProvider);
+          await this.refreshSession();
         },
 
         // 转义用户输入，避免注入到 x-html 报告时产生 XSS
@@ -1255,17 +1240,8 @@
             .replace(/'/g, '&#39;');
         },
 
-        // 保存设置不要求 AI 或分享凭据必填，各功能在实际调用时校验。
-        closeSettings() {
-          if (!this.showSettings) return;
-          this.saveSettings();
-          this.showSettings = false;
-          this.showToast('✅ 设置已保存', 'success');
-        },
-
-        openSettings() {
-          this.showSettings = true;
-        },
+        closeSettings() { this.showSettings = false; },
+        openSettings() { this.showSettings = true; },
 
         // ===== 模板切换 =====
         switchTemplate() {
@@ -1385,9 +1361,9 @@
 
         // ===== AI 视觉识别 =====
         async aiOrganizeAll() {
-          if (!this.apiKey) {
+          if (!this.aiConfigured) {
             this.showSettings = true;
-            this.showToast('⚠️ 请先在设置中填入 API Key', 'error');
+            this.showToast('公司尚未配置 AI 服务，请联系管理员；手动整理与分享可正常使用', 'error');
             return;
           }
           // 只分析还没有被 AI 分析过的照片（用 _analyzed 标记，而非检查 title）
@@ -1442,7 +1418,7 @@
         },
 
         async reAnalyze(img) {
-          if (!this.apiKey) {
+          if (!this.aiConfigured) {
             this.showSettings = true;
             return;
           }
@@ -1968,84 +1944,20 @@
         },
 
         async callVisionAPI(imageDataUrl, prompt, modelOverride) {
-          const baseConfig = this.apiProvider === 'openai'
-            ? {
-                url: 'https://api.openai.com/v1/chat/completions',
-                authHeader: 'Bearer ' + this.apiKey,
-                useProxy: false,
-                defaultModel: 'gpt-4o-mini'
-              }
-            : {
-                url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
-                authHeader: 'Bearer ' + this.apiKey,
-                useProxy: false,
-                defaultModel: 'qwen-vl-plus'
-              };
-
-          const config = Object.assign({}, baseConfig);
-          config.model = modelOverride || baseConfig.defaultModel;
-
-          // ─── 方案 A：检测到 Key 是「自动注入」的，走本地代理 ───
-          const isInjectedKey = localStorage.getItem('sitelog_api_injected') === '1';
-          if (this.apiProvider === 'qwen' && isInjectedKey) {
-            try {
-              const healthResp = await fetch('/api/health', { cache: 'no-store' });
-              if (healthResp.ok) {
-                const health = await healthResp.json();
-                if (health.key_configured) {
-                  config.url = '/api/qwen';
-                  config.authHeader = '';
-                  config.useProxy = true;
-                }
-              }
-            } catch (e) {
-              console.warn('⚠️ sitelog-ai: 局域网代理不可用，回退到直连模式', e);
-            }
-          }
-
-          const headers = { 'Content-Type': 'application/json' };
-          if (!config.useProxy && config.authHeader) {
-            headers['Authorization'] = config.authHeader;
-          }
-
-          // 注意：必须用 mode: 'cors' + credentials: 'omit'，
-          // 避免某些浏览器在 CORS 预检时返回 "Failed to fetch"
-          const fetchOptions = {
+          const config = { model: modelOverride || (this.apiProvider === 'openai' ? 'gpt-4o-mini' : 'qwen-vl-plus') };
+          const response = await this.sessionRequest('/ai/analyze', {
             method: 'POST',
-            mode: 'cors',
-            credentials: 'omit',
-            cache: 'no-store',
-            headers: headers,
             body: JSON.stringify({
               model: config.model,
-              messages: [{
-                role: 'user',
-                content: [
-                  { type: 'image_url', image_url: { url: imageDataUrl } },
-                  { type: 'text', text: prompt }
-                ]
-              }],
-              // 注意：不使用 response_format: json_object
-              // 原因：qwen-vl-plus 在 json_object 模式下处理大图片时不稳定（直接报错）
-              // 改为自由文本 + 智能提取 JSON，兼容性更好且 3 个模型都能正常返回
-              // response_format: { type: 'json_object' }  // 已移除
-              // v4.6：略降随机性保证术语准确，同时放宽长度让 50-110 字说明写得完整
-              temperature: 0.55,
-              max_tokens: 800
+              messages: [{ role: 'user', content: [
+                { type: 'image_url', image_url: { url: imageDataUrl } },
+                { type: 'text', text: prompt }
+              ] }]
             })
-          };
-
-          let response;
-          try {
-            response = await fetch(config.url, fetchOptions);
-          } catch (networkErr) {
-            // "Failed to fetch" 在浏览器里通常意味着 CORS / 网络 / 预检失败
-            throw new Error(`网络层失败（Failed to fetch）：${networkErr.message || '可能原因：1) dashscope 临时限流 2) 公司网络代理拦截 3) 浏览器扩展拦截'}`);
-          }
-
+          });
           if (!response.ok) {
-            const err = await response.text();
-            throw new Error(`HTTP ${response.status}: ${err.slice(0, 200)}`);
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || 'AI 识别暂时不可用');
           }
 
           const data = await response.json();
@@ -2769,71 +2681,10 @@
         },
 
         // ===== v4.4 分享功能：确认完成 → 上传 → 二维码 → 业主扫码看 =====
-        SHARE_API: 'https://cj-az.cn/api/share',
-
-        async validateShareToken(token) {
-          if (!token || !token.trim()) throw new Error('尚未配置工程分享，请导入管理员提供的分享配置文件');
-          const response = await fetch(this.SHARE_API + '/list', {
-            headers: { 'X-Share-Token': token.trim() }, cache: 'no-store'
-          });
-          if (response.status === 401) throw new Error('分享凭据无效，请导入管理员提供的分享配置文件（不是 AI Key）');
-          if (response.status === 403) throw new Error('当前页面来源未获分享服务允许，请联系管理员检查来源配置');
-          const data = await response.json().catch(() => ({}));
-          if (!response.ok || !data.ok) throw new Error('分享连接验证失败（HTTP ' + response.status + '），请稍后重试');
-        },
-
-        async checkShareConnection() {
-          this.shareChecking = true;
-          this.shareConnectionMessage = '正在验证分享连接…';
-          try {
-            await this.validateShareToken(this.shareToken);
-            this.saveSettings();
-            this.shareConnectionMessage = '✅ 分享连接验证通过';
-          } catch (error) {
-            this.shareConnectionMessage = '❌ ' + error.message;
-          } finally { this.shareChecking = false; }
-        },
-
-        async importShareConfig(event) {
-          const file = event.target.files && event.target.files[0];
-          if (!file) return;
-          try {
-            const config = JSON.parse(await file.text());
-            if (config.service !== 'cj-share' || typeof config.token !== 'string' || config.token.trim().length < 32) {
-              throw new Error('请选择管理员提供的工程分享配置文件');
-            }
-            await this.validateShareToken(config.token);
-            this.shareToken = config.token.trim();
-            this.saveSettings();
-            this.shareError = '';
-            this.shareConnectionMessage = '✅ 分享连接验证通过';
-            this.showToast('✅ 分享连接验证通过，可以生成分享码');
-          } catch (error) {
-            this.shareConnectionMessage = '❌ 导入失败：' + error.message;
-            if (this.shareDialogOpen) this.shareError = this.shareConnectionMessage;
-            this.showToast(this.shareConnectionMessage, 'error', 8000);
-          } finally { event.target.value = ''; }
-        },
+        SHARE_API: '/api/share',
 
         async shareRequest(path = '', options = {}) {
-          const token = this.shareToken.trim();
-          if (!token) {
-            this.shareDialogOpen = false;
-            this.shareManageOpen = false;
-            this.showSettings = true;
-            throw new Error('请在设置中导入分享配置或填写工程分享凭据');
-          }
-          const response = await fetch(this.SHARE_API + path, {
-            ...options,
-            headers: { ...options.headers, 'X-Share-Token': token }
-          });
-          if (response.status === 401) {
-            this.shareDialogOpen = false;
-            this.shareManageOpen = false;
-            this.showSettings = true;
-            throw new Error('分享凭据无效或已更新，请在设置中重新导入分享配置');
-          }
-          return response;
+          return this.sessionRequest(path, options);
         },
 
         openShareDialog() {
@@ -2852,7 +2703,7 @@
           this.shareError = '';
           this.shareCardReady = false;
           try {
-            await this.validateShareToken(this.shareToken);
+            await this.accountJSON('/list');
             this.syncCoverMeta();
             this.showToast('📦 正在打包报告（压缩照片中）…', 'info', 8000);
             const payload = await this.buildSharePayload();
