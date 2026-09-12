@@ -7,8 +7,10 @@ const {chromium}=require('playwright'),{PNG}=require('pngjs'),assert=require('no
   let old=true;
   await page.route(base+'/sitelog/',r=>old?r.fulfill({contentType:'text/html',body:execFileSync('git',['show','58900dd:index.html'],{encoding:'utf8',maxBuffer:2e6})}):r.continue());
   await page.route('**/sitelog/auth-client.js',r=>old?r.fulfill({contentType:'application/javascript',body:execFileSync('git',['show','58900dd:auth-client.js'],{encoding:'utf8'})}):r.continue());
-  await page.goto(base+'/sitelog/');await page.locator('#login-user').fill('admin');await page.locator('#login-pass').fill('Test-admin-ready-12345');
-  await page.getByRole('button',{name:'登录',exact:true}).click();await page.locator('#login-user').waitFor({state:'hidden'});
+  await page.goto(base+'/sitelog/');
+  await page.waitForFunction(()=>window.Alpine && Alpine.$data(document.body).showLogin);
+  await page.locator('#login-user').fill('admin');await page.locator('#login-pass').fill('Test-admin-ready-12345');
+  await page.locator('button[type=submit]').first().click();await page.locator('#login-user').waitFor({state:'hidden'});
   const img=new PNG({width:128,height:128});img.data.fill(255);
   await page.locator('input[type=file]').first().setInputFiles({name:'保留照片.png',mimeType:'image/png',buffer:PNG.sync.write(img)});
   await page.locator('#report-content img').first().waitFor();await page.locator('#report-content [contenteditable=true]').first().fill('旧页面审核文字不得丢失');
