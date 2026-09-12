@@ -29,3 +29,23 @@ test('二维码失败保留链接，重绘不会再次上传',async()=>{
 test('员工页面不包含分享配置导入和直接 AI 密钥请求',()=>{
  assert.ok(!html.includes('importShareConfig'));assert.ok(!html.includes('X-Share-Token'));assert.ok(!html.includes("authHeader: 'Bearer '"));
 });
+
+test('已打开的员工页面在配置完成后即时恢复，保留照片和人工审核内容',async()=>{
+ const app=makeApp(async()=>({status:200,ok:true,json:async()=>({ok:true,user:{id:3,display_name:'员工'},csrf:'fresh-csrf',ai:{configured:true,provider:'tencent'}})}));
+ app.accountUser={id:3};app.aiConfigured=false;app.images=[{desc:'人工审核内容',_analyzed:true}];app.reportHtml='<p>未保存的报告</p>';
+ await app.aiOrganizeAll();
+ assert.equal(app.aiConfigured,true);assert.equal(app.apiProvider,'tencent');assert.equal(app.csrf,'fresh-csrf');
+ assert.equal(app.images[0].desc,'人工审核内容');assert.equal(app.reportHtml,'<p>未保存的报告</p>');assert.equal(app.showLogin,false);
+});
+
+test('公司状态网络异常不清空内容、不误报退出登录，也不继续发送识别请求',async()=>{
+ let requests=0;const app=makeApp(async()=>{requests++;throw Error('网络中断')});
+ app.accountUser={id:3};app.aiConfigured=true;app.images=[{desc:'保留'}];
+ await app.aiOrganizeAll();assert.equal(requests,1);assert.equal(app.showLogin,false);assert.equal(app.images[0].desc,'保留');assert.equal(app.aiChecking,false);
+});
+
+test('配置变更期间的重复点击只触发一次状态检查',async()=>{
+ let resolve,requests=0;const app=makeApp(()=>{requests++;return new Promise(r=>resolve=r)});app.accountUser={id:3};
+ const first=app.aiOrganizeAll();await app.aiOrganizeAll();assert.equal(requests,1);
+ resolve({status:200,ok:true,json:async()=>({ok:true,user:{id:3},csrf:'fresh',ai:{configured:true,provider:'tencent'}})});await first;
+});

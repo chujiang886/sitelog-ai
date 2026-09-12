@@ -2,7 +2,7 @@
 window.accountFeatures = {
   accountUser: null, csrf: '', authBusy: false, authError: '',
   showLogin: false, showPassword: false, showAdmin: false,
-  aiConfigured: false, aiProvider: 'qwen', adminMessage: '',
+  aiConfigured: false, aiChecking: false, aiProvider: 'qwen', adminMessage: '',
   loginForm: { username: '', password: '' },
   passwordForm: { current: '', next: '', confirm: '' },
   employeeForm: { username: '', display_name: '', password: '', role: 'staff' },
@@ -35,20 +35,43 @@ window.accountFeatures = {
     return data;
   },
 
+  applySession(data) {
+    this.accountUser = data.user;
+    this.csrf = data.csrf;
+    this.aiConfigured = !!data.ai.configured;
+    this.apiProvider = data.ai.provider;
+    this.companyAI.provider = data.ai.provider;
+    this.showLogin = false;
+    this.showPassword = !!data.user.must_change_password;
+    if (!this.archivePerson) this.archivePerson = data.user.display_name;
+  },
+
+  async refreshCompanyStatus(quiet = false) {
+    if (!this.accountUser) return false;
+    try {
+      this.applySession(await this.accountJSON('/auth/me'));
+      return !this.showPassword;
+    } catch (error) {
+      if (!quiet) this.showToast(error.message, 'error');
+      return false;
+    }
+  },
+
+  async ensureCompanyAI() {
+    if (!await this.refreshCompanyStatus()) return false;
+    if (this.aiConfigured) return true;
+    this.showSettings = true;
+    this.showToast('公司 AI 服务尚未配置；管理员配置一次后即可使用，当前内容已保留', 'error');
+    return false;
+  },
+
   async refreshSession() {
     try {
       const response = await fetch('/api/share/auth/me', { credentials: 'same-origin', cache: 'no-store' });
       if (response.status === 401) { this.accountUser = null; this.showLogin = true; return; }
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.error || '无法连接账号服务');
-      this.accountUser = data.user;
-      this.csrf = data.csrf;
-      this.aiConfigured = data.ai.configured;
-      this.apiProvider = data.ai.provider;
-      this.companyAI.provider = data.ai.provider;
-      this.showLogin = false;
-      this.showPassword = !!data.user.must_change_password;
-      if (!this.archivePerson) this.archivePerson = data.user.display_name;
+      this.applySession(data);
     } catch (error) { this.authError = error.message; this.showLogin = true; }
   },
 
@@ -146,7 +169,7 @@ window.accountFeatures = {
       await this.accountJSON('/admin/ai', this.companyAI);
       this.companyAI.key = '';
       await this.refreshSession();
-      this.adminMessage = '公司 AI 设置已保存，员工重新登录后即可使用。';
+      this.adminMessage = '公司 AI 设置已保存，员工再次点击 AI 整理即可使用，无需重新登录。';
     } catch (error) { this.adminMessage = error.message; }
     finally { this.authBusy = false; }
   },

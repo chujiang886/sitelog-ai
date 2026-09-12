@@ -54,6 +54,13 @@ async function capture(page, name) { await page.screenshot({ path: path.join(out
 
   const workerContext = await browser.newContext({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
   const worker = await workerContext.newPage();
+  let staleAI = process.env.TEST_REAL_AI === '1';
+  if (staleAI) await worker.route('**/api/share/auth/me', async route => {
+    const response = await route.fetch();
+    if (!response.ok() || !staleAI) return route.fulfill({ response });
+    const data = await response.json(); data.ai = { configured: false, provider: 'qwen' };
+    await route.fulfill({ response, json: data });
+  });
   worker.on('pageerror', e => errors.push(e.message));
   await worker.goto(base + '/sitelog/');
   await login(worker, workerUsername, workerInitial);
@@ -61,11 +68,26 @@ async function capture(page, name) { await page.screenshot({ path: path.join(out
   await login(worker, workerUsername, workerReady);
   await worker.locator('#login-user').waitFor({ state: 'hidden' });
   await worker.getByPlaceholder('项目名称', { exact: true }).fill('公司登录端到端验收工程');
-  const image = new PNG({ width: 32, height: 32 });
+  const image = new PNG({ width: 128, height: 128 });
   image.data.fill(220);
   for (let i = 3; i < image.data.length; i += 4) image.data[i] = 255;
   await worker.locator('input[type=file]').first().setInputFiles({ name: '施工照片.png', mimeType: 'image/png', buffer: PNG.sync.write(image) });
   await worker.locator('#report-content img').first().waitFor({ state: 'visible' });
+  if (process.env.TEST_REAL_AI === '1') {
+    await worker.locator('#report-content [contenteditable=true]').first().fill('审核备注保留验证');
+    staleAI = false;
+    const aiResponse = worker.waitForResponse(r => r.url().endsWith('/ai/analyze'), { timeout: 120000 });
+    await worker.getByRole('button', { name: /AI 一键整理/ }).click();
+    const response = await aiResponse;
+    assert.equal(response.status(), 200);
+    assert.ok((await response.json()).choices[0].message.content);
+    await worker.getByRole('button', { name: /AI 一键整理/ }).waitFor({ state: 'visible', timeout: 120000 });
+    assert.equal(await worker.getByPlaceholder('项目名称', { exact: true }).inputValue(), '公司登录端到端验收工程');
+    assert.equal(await worker.locator('#report-content img').count(), 1);
+    await worker.getByText('审核备注保留验证', { exact: true }).waitFor();
+    await capture(worker, '03-AI在线恢复与真实识别');
+    console.log('通过：旧状态在线恢复、腾讯云真实图片识别、照片和人工备注保留，无需重新登录。');
+  }
   await worker.locator('#report-content [contenteditable=true]').first().fill('人工审核通过：固定点和密封情况均已核对。');
   await worker.getByRole('button', { name: /确认完成.*生成分享码/ }).first().click();
   await worker.getByRole('button', { name: '✅ 确认完成，生成分享码', exact: true }).click();
