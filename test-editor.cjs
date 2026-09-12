@@ -24,7 +24,7 @@ async function login(page,password){await page.locator('#login-user').fill('admi
  let dialogs=0;page.on('dialog',async d=>{dialogs++;await d.accept()});
  await page.locator('select[x-model="templateType"]').selectOption('玻扇施工');await page.waitForFunction(()=>Alpine.$data(document.body).activeTemplate==='玻扇施工');assert.equal(await page.locator('#images-container .node-block').count(),1);
  await page.getByRole('button',{name:'撤销上次操作',exact:true}).click();await page.waitForFunction(()=>Alpine.$data(document.body).templateType==='框架施工');assert.equal(await page.locator('select[x-model="templateType"]').inputValue(),'框架施工');
- await page.locator('input[type=file][accept=".json"]').setInputFiles(pack);await page.waitForFunction(()=>Alpine.$data(document.body).templateType==='框架施工');
+ await page.locator('input[type=file][accept=".json"]').setInputFiles(pack);await page.getByText('工程包已导入，内容可继续编辑',{exact:true}).waitFor();await page.waitForFunction(()=>Alpine.$data(document.body).templateType==='框架施工');
  // 仅有进场照片也必须确认，且切换后保留。
  await page.evaluate(()=>{const a=Alpine.$data(document.body);a.arrivalImages=a.images.map(x=>({...x,section:'arrival'}));a.images=[];a.syncToReport()});
  const before=dialogs;await page.locator('select[x-model="templateType"]').selectOption('五金安装');await page.waitForFunction(()=>Alpine.$data(document.body).activeTemplate==='五金安装');assert.equal(dialogs,before+1);await page.locator('#arrival-gallery .node-block').waitFor();assert.equal(await page.locator('#arrival-gallery .node-block').count(),1);
