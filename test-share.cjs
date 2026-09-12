@@ -16,14 +16,16 @@ test('会话过期打开登录面板并保留人工审核内容',async()=>{
  const app=makeApp(async()=>({status:401}));app.images=[{desc:'已审核'}];app.accountUser={id:1};
  await assert.rejects(app.shareRequest('/list'),/重新登录/);assert.equal(app.showLogin,true);assert.equal(app.images[0].desc,'已审核');
 });
-test('分享先检查会话，再上传，绘制完成后才报告成功',async()=>{
+test('已审核版本发布成功且绘制完成后才报告成功',async()=>{
  const calls=[];const app=makeApp(async(url,options)=>{calls.push(url);return{status:200,ok:true,json:async()=>({ok:true,id:'ABC234',url:'https://cj-az.cn/s/ABC234'})}});
  app.images=[{}];app.syncCoverMeta=()=>{};app.buildSharePayload=async()=>({html:'<p>审核记录</p>'});app.$nextTick=async()=>{};
- let drawn;app.drawShareCard=(url)=>drawn=url;await app.doShare();assert.deepEqual(calls,['/api/share/list','/api/share']);assert.equal(drawn,'https://cj-az.cn/s/ABC234');assert.equal(app.shareCardReady,true);
+ app.publishCloudProject=()=>app.accountJSON('/projects/test/publish',{});
+ let drawn;app.drawShareCard=(url)=>drawn=url;await app.doShare();assert.deepEqual(calls,['/api/share/projects/test/publish']);assert.equal(drawn,'https://cj-az.cn/s/ABC234');assert.equal(app.shareCardReady,true);
 });
 test('二维码失败保留链接，重绘不会再次上传',async()=>{
  let posts=0;const app=makeApp(async(url,options)=>{if(options.method==='POST')posts++;return{status:200,ok:true,json:async()=>({ok:true,id:'ABC234',url:'https://cj-az.cn/s/ABC234'})}});
  app.images=[{}];app.syncCoverMeta=()=>{};app.buildSharePayload=async()=>({html:'<p>审核记录</p>'});app.$nextTick=async()=>{};app.drawShareCard=()=>{throw Error('绘制失败')};
+ app.publishCloudProject=()=>app.accountJSON('/projects/test/publish',{});
  await app.doShare();assert.equal(app.shareCardReady,false);assert.match(app.shareError,/链接已创建/);app.drawShareCard=()=>{};app.retryShareCard();assert.equal(app.shareCardReady,true);assert.equal(posts,1);
 });
 test('员工页面不包含分享配置导入和直接 AI 密钥请求',()=>{

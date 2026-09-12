@@ -71,7 +71,7 @@ async function capture(page, name) { await page.screenshot({ path: path.join(out
   const image = new PNG({ width: 128, height: 128 });
   image.data.fill(220);
   for (let i = 3; i < image.data.length; i += 4) image.data[i] = 255;
-  await worker.locator('input[type=file]').first().setInputFiles({ name: '施工照片.png', mimeType: 'image/png', buffer: PNG.sync.write(image) });
+  await worker.locator('input[type=file][accept="image/*"]').first().setInputFiles({ name: '施工照片.png', mimeType: 'image/png', buffer: PNG.sync.write(image) });
   await worker.locator('#report-content img').first().waitFor({ state: 'visible' });
   if (process.env.TEST_REAL_AI === '1') {
     await worker.locator('#report-content [contenteditable=true]').first().fill('审核备注保留验证');
@@ -89,6 +89,14 @@ async function capture(page, name) { await page.screenshot({ path: path.join(out
     console.log('通过：旧状态在线恢复、腾讯云真实图片识别、照片和人工备注保留，无需重新登录。');
   }
   await worker.locator('#report-content [contenteditable=true]').first().fill('人工审核通过：固定点和密封情况均已核对。');
+  await worker.getByRole('button',{name:'保存云端工程',exact:true}).click();
+  await worker.waitForFunction(()=>Alpine.$data(document.body).cloudMessage.startsWith('云端已保存'));
+  await worker.getByRole('button',{name:'项目工作区',exact:true}).click();
+  await worker.getByRole('button',{name:'提交审核',exact:true}).click();
+  await worker.waitForFunction(()=>Alpine.$data(document.body).cloudStatus==='review');
+  await worker.getByRole('button',{name:'审核通过',exact:true}).click();
+  await worker.waitForFunction(()=>Alpine.$data(document.body).cloudStatus==='approved');
+  await worker.getByLabel('关闭项目工作区',{exact:true}).click();
   await worker.getByRole('button', { name: /确认完成.*生成分享码/ }).first().click();
   await worker.getByRole('button', { name: '✅ 确认完成，生成分享码', exact: true }).click();
   await worker.getByRole('heading', { name: '🎉 分享码已生成', exact: true }).waitFor({ timeout: 30000 });
@@ -106,7 +114,7 @@ async function capture(page, name) { await page.screenshot({ path: path.join(out
   const visitor = await visitorContext.newPage();
   const viewed = await visitor.goto(qr.data);
   assert.equal(viewed.status(), 200);
-  await visitor.getByText('人工审核通过：固定点和密封情况均已核对。').waitFor();
+  await visitor.frameLocator('#document').getByText('人工审核通过：固定点和密封情况均已核对。').waitFor();
   await capture(visitor, '05-手机免登录查看');
   console.log('通过：员工上传照片、人工审核、生成分享、真实下载 PNG、解码扫码、手机免登录读取审核内容。');
 

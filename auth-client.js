@@ -40,7 +40,7 @@ window.accountFeatures = {
     this.csrf = data.csrf;
     this.aiConfigured = !!data.ai.configured;
     this.apiProvider = data.ai.provider;
-    this.companyAI.provider = data.ai.provider;
+    if (!this.showAdmin) this.companyAI.provider = data.ai.provider;
     this.showLogin = false;
     this.showPassword = !!data.user.must_change_password;
     if (!this.archivePerson) this.archivePerson = data.user.display_name;
@@ -84,20 +84,20 @@ window.accountFeatures = {
       if (!response.ok) throw new Error(data.error || '登录失败');
       this.loginForm.password = '';
       await this.refreshSession();
+      if (this.editorReady) await this.activateDraftAccount();
     } catch (error) { this.authError = error.message; }
     finally { this.authBusy = false; }
   },
 
   async logoutAccount() {
-    if (!confirm('退出登录将清空本页未保存的工程内容，请先导出留底。确定退出？')) return;
+    if (this.editorReady && this.draftOwner && !await this.saveLocalDraft()) return;
+    if (!confirm('当前工程已保存为此账号的本机草稿。确定退出登录？')) return;
     try {
       await this.accountJSON('/auth/logout', {});
       this.accountUser = null; this.csrf = ''; this.showLogin = true;
       this.showSettings = false; this.showAdmin = false; this.showPassword = false;
       this.shareDialogOpen = false; this.shareManageOpen = false; this.shareResult = null;
-      this.images = []; this.arrivalImages = []; this.finishImages = []; this.sopImages = [];
-      this.projectName = ''; this.siteLocation = ''; this.archivePerson = ''; this.pdfFilename = '';
-      this.switchTemplate();
+      if (this.clearEditorForAccount) await this.clearEditorForAccount();
     } catch (error) { this.showToast(error.message, 'error'); }
   },
 
@@ -115,7 +115,7 @@ window.accountFeatures = {
   },
 
   async openAdmin() {
-    this.showAdmin = true; this.adminMessage = '';
+    this.companyAI.provider = this.apiProvider;this.showAdmin = true; this.adminMessage = '';
     await this.loadEmployees();
   },
 

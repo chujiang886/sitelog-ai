@@ -1,0 +1,23 @@
+// 现场助手：缺项提醒只检查留底情况，不能代替质量验收。
+window.fieldFeatures={
+ fieldPanel:false,fieldFacts:{measurements:'',materials:'',verification:''},fieldChecks:{},customerTimeline:false,
+ issueItems:[],issueForm:{title:'',severity:'normal',assignee:'',note:'',media:''},issueNotes:{},issuePhotos:{},
+ caseItems:[],caseForm:{title:'',problem:'',resolution:'',redacted:false},caseNote:'',
+ checklistItems(){const common=[['arrival','进场与现场概况','arrivalImages'],['finish','完工与环境恢复','finishImages']];const stage={
+ '框架施工':[['frame','框体整体与安装部位','images'],['fixing','连接固定细节','images'],['measure','测量记录与读数留底','images']],
+ '玻扇施工':[['glass','玻璃与开启扇整体','images'],['pad','垫块和安装细节','images'],['seal','接缝与收口细节','images']],
+ '五金安装':[['hardware','五金安装部位','images'],['lock','锁点与开启检查记录','images']],
+ '离场自检':[['cleanup','现场清理与成品保护','sopImages'],['utilities','水电及门窗关闭检查记录','sopImages']]}[this.templateType]||[];return [...common,...stage].map(([key,label,group])=>({key:this.templateType+':'+key,label,group}))},
+ fieldSnapshot(){return {facts:{...this.fieldFacts},checks:JSON.parse(JSON.stringify(this.fieldChecks)),customerTimeline:this.customerTimeline}},
+ syncFieldReport(){const report=document.getElementById('report-content');report.querySelector('[data-field-facts]')?.remove();if(!Object.values(this.fieldFacts).some(Boolean))return;const section=document.createElement('section');section.dataset.fieldFacts='true';section.className='report-section';const labels={measurements:'实测数据与测量依据',materials:'材料信息与来源',verification:'核实结论与待办'};section.innerHTML='<h2>现场事实补录</h2><p>来源：现场人工录入，由归档人员核对。空白项表示未提供依据。</p>'+Object.entries(labels).map(([key,label])=>'<h3>'+label+'</h3><p style="white-space:pre-wrap">'+this.escapeHtml(this.fieldFacts[key]||'待核实')+'</p>').join('');const footer=report.querySelector('.pdf-footer');if(footer)footer.parentElement.insertBefore(section,footer);else report.appendChild(section)},
+ restoreField(value){this.fieldFacts={measurements:'',materials:'',verification:'',...(value?.facts||{})};this.fieldChecks=value?.checks||{};this.customerTimeline=value?.customerTimeline===true;this.issueItems=[]},
+ async openField(){this.fieldPanel=true;await this.projectAction(async()=>{this.colleagues=(await this.accountJSON('/colleagues')).items;if(this.cloudProjectId)this.issueItems=(await this.accountJSON('/projects/'+this.cloudProjectId+'/issues')).items;this.caseItems=(await this.accountJSON('/cases')).items})},
+ checkField(item){return !!this.fieldChecks[item.key]&&this[item.group].some(p=>p.id===this.fieldChecks[item.key])},
+ fieldMissing(){return this.checklistItems().filter(item=>!this.checkField(item)).length},
+ confirmAllAI(){for(const photo of this.allPhotos())if(photo._analyzed)photo.aiConfirmed=true;this.markDraftDirty();this.showToast('已记录人工核对；项目审核仍需单独完成')},
+ async createIssue(){await this.projectAction(async()=>{await this.saveCloudProject();const changed=await this.accountJSON('/projects/'+this.cloudProjectId+'/issues',{project_revision:this.cloudRevision,action:'create',title:this.issueForm.title,severity:this.issueForm.severity,assignee:Number(this.issueForm.assignee)||this.accountUser.id,note:this.issueForm.note,media:this.issueForm.media?[this.issueForm.media]:[]});this.issueForm={title:'',severity:'normal',assignee:'',note:'',media:''};await this.refreshFieldProject(changed.project_revision);this.showToast('问题已记录，工程需重新审核')})},
+ async changeIssue(issue,action){await this.projectAction(async()=>{await this.saveCloudProject();const changed=await this.accountJSON('/projects/'+this.cloudProjectId+'/issues',{project_revision:this.cloudRevision,id:issue.id,revision:issue.revision,action,note:this.issueNotes[issue.id]||'',media:this.issuePhotos[issue.id]?[this.issuePhotos[issue.id]]:[]});this.issueNotes[issue.id]='';await this.refreshFieldProject(changed.project_revision);this.showToast('整改状态已更新')})},
+ async refreshFieldProject(revision){this.issueItems=(await this.accountJSON('/projects/'+this.cloudProjectId+'/issues')).items;const data=await this.loadProjectDetails();this.cloudRevision=revision;this.cloudStatus=data.revision===revision?data.status:'draft';this.markDraftDirty()},
+ async submitCase(){await this.projectAction(async()=>{if(!this.cloudProjectId)throw Error('请先保存并审核发布工程');await this.accountJSON('/cases',{action:'submit',project_id:this.cloudProjectId,...this.caseForm});this.caseForm={title:'',problem:'',resolution:'',redacted:false};this.caseItems=(await this.accountJSON('/cases')).items;this.showToast('脱敏案例已提交，需另一位管理员审核后才进入公司案例库')})},
+ async reviewCase(item,action){await this.projectAction(async()=>{await this.accountJSON('/cases',{id:item.id,action,note:this.caseNote});this.caseNote='';this.caseItems=(await this.accountJSON('/cases')).items;this.showToast('案例状态已更新')})}
+};

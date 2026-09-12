@@ -10,6 +10,10 @@
   <link rel="stylesheet" href="vendor/app.css">
   <script>if (location.hostname === "chujiang886.github.io") location.replace("https://cj-az.cn/sitelog/");</script>
   <script src="auth-client.js"></script>
+  <script src="vendor/purify.min.js"></script>
+  <script src="editor-state.js"></script>
+  <script src="project-client.js"></script>
+  <script src="field-client.js"></script>
   <script src="vendor/alpine.min.js" defer></script>
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="vendor/html2canvas.min.js"></script>
@@ -624,7 +628,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v5.0.1</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v5.1.0</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -654,6 +658,34 @@
       </div>
     </div>
   </header>
+
+  <div class="no-print max-w-7xl mx-auto px-4 py-3 flex flex-wrap gap-3 items-center text-sm bg-white border-b">
+    <span role="status" x-text="draftStatus" :class="draftConflict ? 'text-red-700' : 'text-slate-600'"></span>
+    <button @click="saveLocalDraft()" :disabled="draftWriting || !draftOwner || draftConflict" class="border rounded px-3 py-1 disabled:opacity-50">保存本机草稿</button>
+    <button @click="openProjects()" class="border rounded px-3 py-1">项目工作区</button>
+    <button @click="openField()" class="border rounded px-3 py-1">现场助手</button>
+    <button @click="projectAction(() => saveCloudProject())" :disabled="cloudBusy || !accountUser" class="border rounded px-3 py-1">保存云端工程</button>
+    <span class="text-xs" x-text="cloudMessage"></span>
+    <span x-show="aiJobId" class="text-xs" x-text="aiJobStatus"></span><button x-show="aiJobId" @click="cancelAIJob()" class="border rounded px-3 py-1">取消识别</button>
+    <button @click="loadAIUsage()" class="border rounded px-3 py-1">识别用量</button>
+    <span x-show="aiUsage" class="text-xs" x-text="aiUsage ? '今日'+(aiUsage.scope==='company'?'公司':'个人')+'任务 '+aiUsage.items.reduce((n,x)=>n+x.count,0)+' 次；令牌 '+aiUsage.items.reduce((n,x)=>n+(x.tokens||0),0) : ''"></span>
+    <div x-show="aiUsage && accountUser?.role==='admin'" class="flex gap-2 items-center text-xs"><label>每人每日<input aria-label="每人每日识别上限" type="number" min="1" max="2000" x-model="aiBudget.user_daily" class="border rounded w-20"></label><label>公司每日<input aria-label="公司每日识别上限" type="number" min="1" max="10000" x-model="aiBudget.company_daily" class="border rounded w-20"></label><button @click="saveAIBudget()" class="border rounded px-2">保存次数预算</button><span>次数包含失败和取消任务，令牌以供应商返回为准。</span></div>
+    <button @click="exportProjectPackage()" class="border rounded px-3 py-1">导出工程包</button>
+    <label class="border rounded px-3 py-1 cursor-pointer">导入工程包<input type="file" accept=".json" class="hidden" @change="importProjectPackage($event)"></label>
+    <button @click="undoLastAction()" :disabled="!undoSnapshot || processing" class="border rounded px-3 py-1 disabled:opacity-50">撤销上次操作</button>
+  </div>
+
+  <div x-show="aiCandidate" x-cloak class="no-print fixed inset-0 bg-black/50 z-[75] flex items-center justify-center p-4">
+    <section class="bg-white rounded-xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto" role="dialog" aria-label="比较 AI 新建议">
+      <h2 class="text-xl font-bold mb-4">比较 AI 新建议</h2>
+      <p class="text-sm text-slate-600 mb-4">新建议尚未覆盖当前内容。请核实照片证据后选择采用或保留。</p>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="border rounded p-4"><h3 class="font-bold">当前定稿</h3><p class="my-2" x-text="aiPrevious?.title"></p><p class="whitespace-pre-wrap" x-text="aiPrevious?.desc"></p></div>
+        <div class="border rounded p-4 bg-slate-50"><h3 class="font-bold">AI 新建议</h3><p class="my-2" x-text="aiCandidate?.title"></p><p class="whitespace-pre-wrap" x-text="aiCandidate?.desc"></p></div>
+      </div>
+      <div class="flex justify-end gap-3 mt-5"><button @click="keepManualText()" class="border rounded px-4 py-2">保留当前内容</button><button @click="acceptAICandidate()" class="bg-green-900 text-white rounded px-4 py-2">采用新建议</button></div>
+    </section>
+  </div>
 
   <!-- ========== 主内容区 ========== -->
   <main class="max-w-7xl mx-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
@@ -723,7 +755,7 @@
                 <div class="flex-1 min-w-0">
                   <input
                     x-model="img.title"
-                    @input.debounce.500ms="syncToReport()"
+                    @input.debounce.500ms="img._manual = {...(img._manual || {}), title: true}; syncToReport()"
                     placeholder="节点标题..."
                     class="w-full text-xs font-semibold px-2 py-1 border border-slate-200 rounded mb-1 focus:border-blue-400 focus:outline-none"
                   >
@@ -893,7 +925,7 @@
 
         <div class="bg-amber-50 border-l-4 border-amber-500 rounded p-3 text-xs text-amber-900">
           <p class="font-semibold mb-1">⚠️ 如果下载失败：</p>
-          <p>请检查网络能否访问 <strong>cdnjs.cloudflare.com</strong>；若网络受限，可改用顶部菜单「导出 PDF」右侧的浏览器打印功能，手动选「另存为 PDF」。</p>
+          <p>请允许浏览器打开打印窗口，确认照片已加载，再选择「另存为 PDF」。导出组件已随系统提供，无需连接外部组件网站。</p>
         </div>
 
         <div class="bg-green-50 border-l-4 border-green-500 rounded p-3 text-xs text-green-900">
@@ -952,8 +984,12 @@
           </div>
 
           <div class="bg-amber-50 border-l-4 border-amber-500 rounded p-3 text-xs text-amber-900 leading-relaxed">
-            <p>📌 点击确认后，整份记录（含你已手改的文字）会上传到初匠服务器，生成一个<strong>专属二维码链接</strong>。业主用微信扫码即可在手机上查看，无需下载、无需安装。</p>
+            <p>发布的是已审核的固定版本。后续编辑不会改变这个二维码中的内容；修改后需重新审核并发布。</p>
+            <button @click="shareDialogOpen=false;openProjects()" class="underline mt-2">打开项目工作区完成审核</button>
           </div>
+          <label class="block">分享范围<select aria-label="分享范围" x-model="shareAudience" class="border rounded p-2 ml-2"><option value="public">持链接可查看</option><option value="internal">仅公司登录账号</option><option value="code">访问码保护</option></select></label>
+          <label class="block">有效期<select aria-label="分享有效期" x-model="shareDays" class="border rounded p-2 ml-2"><option value="7">7 天</option><option value="30">30 天</option><option value="90">90 天</option><option value="0">长期有效</option></select></label>
+          <label class="block" x-show="shareAudience==='code'">访问码<input aria-label="分享访问码" x-model="shareCode" maxlength="24" autocomplete="off" class="border rounded p-2 ml-2" placeholder="6–24 位字母或数字"></label>
         </div>
 
         <div class="flex justify-end gap-2 pt-4 mt-4 border-t border-slate-200">
@@ -1123,7 +1159,7 @@
       AI_STYLE.TERMS.forEach(t => { if (d.includes(t)) hit++; });
       score += Math.min(hit, 6) * 7;
       // 有具体数值/规格更专业（间隙 mm、固化 24h、M10 等）
-      if (/\d/.test(d)) score += 12;
+      // 数字不是可信度证据，不按数值多少奖励文案。
       // 套话扣分
       AI_STYLE.BANNED.forEach(w => { if (d.includes(w)) score -= 14; });
       // 通用模板句直接判废
@@ -1187,6 +1223,9 @@
     function siteLogApp() {
       return {
         ...window.accountFeatures,
+        ...window.editorFeatures,
+        ...window.projectFeatures,
+        ...window.fieldFeatures,
         // ===== 状态 =====
         apiProvider: 'qwen',
         templateType: '框架施工',
@@ -1212,7 +1251,7 @@
         // 项目信息（用于 PDF 封面 / 归档抬头）
         projectName: '',
         siteLocation: '',
-        archiveDate: new Date().toISOString().slice(0, 10),
+        archiveDate: new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' }).format(new Date()),
         archivePerson: '',
         processing: false,
         processedCount: 0,
@@ -1227,6 +1266,7 @@
         async init() {
           this.switchTemplate();
           await this.refreshSession();
+          await this.initializeEditor();
         },
 
         // 转义用户输入，避免注入到 x-html 报告时产生 XSS
@@ -1245,18 +1285,17 @@
 
         // ===== 模板切换 =====
         switchTemplate() {
-          // 模板切换时询问是否保留已编辑内容
-          if (this.images.length > 0 && !confirm('切换模板会清空当前报告内容，是否继续？')) {
-            return;
+          if (this.editorReady && this.hasWork()) {
+            if (!confirm('切换将采用新模板的正文，保留所有照片与照片说明；当前版式可撤销恢复。是否继续？')) {
+              this.templateType = this.activeTemplate;return;
+            }
+            this.undoSnapshot = this.snapshot();
           }
-          this.images = [];
-          this.arrivalImages = [];
-          this.finishImages = [];
-          this.sopImages = [];
+          this.activeTemplate = this.templateType;
           this.reportHtml = this.getTemplateHtml();
           this.reportTitle = this.templateType + '归档';
           // x-html 渲染后再填充各手动上传区（否则初始为空白）
-          this.$nextTick(() => { this.syncArrivalGallery(); this.syncSopGallery(); this.syncFinishGallery(); });
+          this.$nextTick(() => { this.syncToReport();this.markDraftDirty?.(); });
         },
 
         getTemplateHtml() {
@@ -1267,19 +1306,27 @@
           else if (this.templateType === '离场自检') html = TEMPLATES.departure();
           else html = TEMPLATES.frame();
 
+          // 所有模板均保留四个照片分区，避免换版式后照片仍在数据中却不可见。
+          let missing = '';
+          for (const [id, title] of [['arrival-gallery','班组进场照片'],['finish-gallery','完工照片'],['sop-gallery','离场留证']]) {
+            if (!html.includes('id="' + id + '"')) missing += '<section class="pdf-section"><h2 class="pdf-section-header">' + title + '</h2><div class="pdf-sop-gallery" id="' + id + '"></div></section>';
+          }
+          html = html.includes('<footer') ? html.replace('<footer', missing + '<footer') : html + missing;
+
           // 注入项目信息到封面占位符（{{PROJECT_INFO}}）
-          const docId = 'CJ-SL-' + new Date().getFullYear()
+          const docId = this.documentId || ('CJ-SL-' + new Date().getFullYear()
             + String(new Date().getMonth()+1).padStart(2,'0')
             + String(new Date().getDate()).padStart(2,'0')
-            + '-' + String(Math.floor(Math.random()*9000)+1000);
+            + '-' + String(Math.floor(Math.random()*9000)+1000));
+          this.documentId = docId;
           const infoHtml = `
             <div class="pdf-meta-grid">
               <div class="pdf-meta-item"><span class="pdf-meta-label">📋 项目名称</span><span class="pdf-meta-value">${this.escapeHtml(this.projectName) || '未命名项目'}</span></div>
               <div class="pdf-meta-item"><span class="pdf-meta-label">📍 施工部位</span><span class="pdf-meta-value">${this.escapeHtml(this.siteLocation) || '—'}</span></div>
-              <div class="pdf-meta-item"><span class="pdf-meta-label">📅 归档日期</span><span class="pdf-meta-value">${this.escapeHtml(this.archiveDate) || new Date().toISOString().slice(0,10)}</span></div>
+              <div class="pdf-meta-item"><span class="pdf-meta-label">📅 归档日期</span><span class="pdf-meta-value">${this.escapeHtml(this.archiveDate) || sitelogEditor.localDate()}</span></div>
               <div class="pdf-meta-item"><span class="pdf-meta-label">👤 归档人</span><span class="pdf-meta-value">${this.escapeHtml(this.archivePerson) || '—'}</span></div>
               <div class="pdf-meta-item"><span class="pdf-meta-label">📄 文档编号</span><span class="pdf-meta-value pdf-meta-mono">${docId}</span></div>
-              <div class="pdf-meta-item"><span class="pdf-meta-label">🔒 密级</span><span class="pdf-meta-value">内部公开</span></div>
+              <div class="pdf-meta-item"><span class="pdf-meta-label">🔒 分享范围</span><span class="pdf-meta-value">发布时确认</span></div>
             </div>`;
           return html.replace('{{PROJECT_INFO}}', infoHtml);
         },
@@ -1351,6 +1398,7 @@
 
         clearAllImages() {
           if (confirm('确定清空所有图片？')) {
+            this.undoSnapshot = this.snapshot();
             this.images = [];
             this.arrivalImages = [];
             this.finishImages = [];
@@ -1370,31 +1418,36 @@
           // 只分析还没有被 AI 分析过的照片（用 _analyzed 标记，而非检查 title）
           // 因为 ensureTitles 会在渲染时自动补 title 兜底值，不能用它判断是否已分析
           const todo = [
-            ...this.images.filter(img => !img._analyzed),
-            ...this.arrivalImages.filter(img => !img._analyzed),
-            ...this.finishImages.filter(img => !img._analyzed)
+            ...this.images.filter(img => !img._analyzed && !Object.keys(img._manual || {}).length),
+            ...this.arrivalImages.filter(img => !img._analyzed && !Object.keys(img._manual || {}).length),
+            ...this.finishImages.filter(img => !img._analyzed && !Object.keys(img._manual || {}).length)
           ];
           if (todo.length === 0) {
-            this.showToast('✅ 所有照片已有识别结果，无需重复整理（如需重做请用单张「重分析」）');
+            this.showToast('现有识别结果和人工内容已保留；需要新建议时请用单张“重分析”');
             return;
           }
+          this.aiCancelRequested = false;
           this.processing = true;
           this.processedCount = 0;
           const failures = [];
-          const CONCURRENCY = 3; // 3 张并发：兼顾速度与 API 限流
+          const CONCURRENCY = 1; // 每账号顺序处理；公司并发由服务器控制。
           let cursor = 0;
           const worker = async () => {
-            while (cursor < todo.length) {
+            while (cursor < todo.length && !this.aiCancelRequested) {
               const img = todo[cursor++];
               img.analyzing = true;
               try {
-                await this.analyzeImage(img);
+                const before=JSON.stringify([img.title,img.desc,img.highlights,img._manual]);
+                const candidate={...img,highlights:[...(img.highlights||[])]};await this.analyzeImage(candidate);
+                if(before===JSON.stringify([img.title,img.desc,img.highlights,img._manual])){
+                  for(const key of ['title','desc','category','stage','highlights','uncertainties','aiConfirmed','_analyzed','aiError','aiSource'])img[key]=candidate[key];
+                }else{this.proposeAI(img,candidate);this.showToast('识别期间你修改了文字，新建议需确认后才会采用');}
               } catch (e) {
                 console.error('分析失败', img.file && img.file.name, e);
                 const sectionName = img.section === 'arrival' ? '进场照片' : (img.section === 'finish' ? '完工照片' : '施工节点');
                 const idx = img.section === 'arrival' ? this.arrivalImages.indexOf(img) + 1 : (img.section === 'finish' ? this.finishImages.indexOf(img) + 1 : this.images.indexOf(img) + 1);
                 img.title = `${sectionName} ${idx}`;
-                img.desc = `[AI 识别失败] ${e.message}\n\n请按 F12 打开浏览器控制台查看详细原因，或手动填写。`;
+                img.desc = `[AI 识别失败] ${e.message}\n\n当前照片已保留，可稍后重试或手动填写。`;
                 img.aiError = e.message;
                 failures.push({ name: (img.file && img.file.name) || img.id, error: e.message });
               } finally {
@@ -1408,7 +1461,7 @@
             await Promise.all(
               Array.from({ length: Math.min(CONCURRENCY, todo.length) }, () => worker())
             );
-            if (failures.length === 0) {
+            if (this.aiCancelRequested) { this.showToast('已停止后续识别，现有内容已保留'); } else if (failures.length === 0) {
               this.showToast(`✨ AI 整理完成，本次共处理 ${this.processedCount} 张 — 点击文字可直接修改，导出时自动保留您的修改`);
             } else {
               this.showToast(`⚠️ ${failures.length} 张识别失败：${failures[0].error.slice(0, 80)}`, 'error');
@@ -1427,9 +1480,10 @@
           if (!ready) return;
           img.analyzing = true;
           try {
-            await this.analyzeImage(img);
-            this.syncToReport();
-            this.showToast('✅ 已重新分析');
+            const candidate = { ...img, highlights: [...(img.highlights || [])], _manual: {} };
+            await this.analyzeImage(candidate);
+            this.proposeAI(img, candidate);
+            this.showToast('新建议已生成，请比较后选择采用或保留当前内容');
           } catch (e) {
             this.showToast('❌ 识别失败：' + e.message, 'error');
           } finally {
@@ -1518,182 +1572,15 @@
         },
 
         async analyzeImage(img) {
-          const prompt = this.buildAnalysisPrompt(img.section || 'construction');
-
-          // ─── 三阶段校验流程 ───
-          // ① 多模型并行投票（每个模型跑一次，结果合并）
-          // ② 客户端图片特征二次校验（拿 base64 解析像素，强制玻璃检测）
-          // ③ 不一致时强制纠正 + 落库
-
-          // 模型选择：按实测质量排序（qwen3-vl-plus 返回最详细，qwen-vl-max 次之，qwen-vl-plus 在 json_object 模式下不稳定）
-          const models = this.apiProvider === 'tencent' ? ['HY-Vision-2.0-Instruct']
-            : this.apiProvider === 'openai' ? ['gpt-4o-mini']
-            : ['qwen3-vl-plus', 'qwen-vl-max', 'qwen-vl-plus'];
-
-          const votes = await this.callVisionAPIVoting(img.dataUrl, prompt, models);
-
-          // ── v4.6：所有模型返回统一再清洗一遍（正则兜底路径未走清洗）──
-          votes.forEach(v => {
-            if (v.desc)  v.desc  = polishSiteLogText(v.desc, { maxLen: 200, minLen: 14 });
-            if (v.title) v.title = polishSiteLogText(v.title, { maxLen: 24 }).replace(/[。！？；]$/, '');
-            if (v.stage) v.stage = polishSiteLogText(v.stage, { maxLen: 26 }).replace(/[。！？；]$/, '');
-            v._score = scoreSiteLogText(v.desc, v.title, v.category);
-          });
-          // 按「文案质量分」而非「长度」排序：术语命中多、有具体数值、
-          // 无拍照腔与套话的说明排前面；通用模板句会被判到最低分。
-          const byQuality = (a, b) => (b._score || 0) - (a._score || 0);
-
-          // ── 进场 / 完工 照片：不跑施工分类投票与像素校验，直接取最优文案 ──
-          if (img.section === 'arrival' || img.section === 'finish') {
-            const sorted = [...votes].sort(byQuality);
-            const winner = sorted[0];
-            const bestStage = [...votes].map(v => v.stage || '').filter(Boolean)
-              .sort((a, b) => b.length - a.length)[0];
-
-            img.category = img.section === 'arrival' ? '班组进场' : '完工照片';
-            img.stage = bestStage || (img.section === 'arrival' ? '班组进场' : '完工交付');
-
-            // 通用模板句（如"班组已到达现场"）判废 → 让位给其它模型或走兜底
-            const isTrash = (d) => !d || AI_STYLE.GENERIC.some(g => d.includes(g));
-            let bestDesc = isTrash(winner.desc) ? '' : (winner.desc || '').trim();
-            if (!bestDesc) {
-              const alt = votes.filter(v => v !== winner && !isTrash(v.desc))
-                .sort(byQuality)[0];
-              if (alt) bestDesc = alt.desc.trim();
-            }
-            if (!bestDesc && (winner.stage || '').trim()) bestDesc = polishSiteLogText(winner.stage);
-            if (!bestDesc) bestDesc = '📝 请补充本张照片的具体说明（AI 未能生成差异化描述）';
-
-            img.title = (winner.title || '').trim() || (img.section === 'arrival' ? '班组进场节点' : '完工照片节点');
-            img.desc = bestDesc;
-            this.dedupeDesc(img, votes);   // v4.6：避免与已有照片说明雷同
-            img.highlights = Array.isArray(winner.highlights) ? winner.highlights : [];
-            img.aiConfirmed = false;
-            img._analyzed = true;
-            img.aiConfidence = { votes: [], section: img.section };
-            return;
-          }
-
-          // 类别投票：得票最多的获胜（如果同票，优先级：成品保护 > 玻扇 > 五金 > 密封 > 框架）
-          const PRIORITY = ['成品保护', '玻扇施工', '五金安装', '密封收口', '框架施工'];
-          const counts = {};
-          votes.forEach(v => { counts[v.category] = (counts[v.category] || 0) + 1; });
-          const maxCount = Math.max(...Object.values(counts));
-          const topCandidates = Object.keys(counts).filter(c => counts[c] === maxCount);
-          let finalCategory = topCandidates.sort((a, b) =>
-            PRIORITY.indexOf(a) - PRIORITY.indexOf(b)
-          )[0];
-
-          // ② 客户端图片特征二次校验：检测玻璃反光（如果有玻璃却归到「框架」，强制纠正）
-          const pixelFeatures = await this.detectImageFeatures(img.dataUrl);
-          const override = this.applyFeatureOverride(finalCategory, pixelFeatures);
-          if (override.changed) {
-            console.log(`🔧 客户端覆盖: ${finalCategory} → ${override.category}（${override.reason}）`);
-            finalCategory = override.category;
-          }
-
-          // ── 智能合并：不只取 category 匹配的第一个，而是选内容最丰富的 ──
-          // 旧逻辑：const winner = votes.find(v => v.category === finalCategory) || votes[0];
-          // 问题：如果高质量模型(如qwen3-vl-plus)给了很好的desc但category不同，
-          //       而低质量模型(如qwen-vl-max)category匹配但desc为空 → 最终拿到空desc
-          //
-          // 新逻辑：优先从同 category 中选 desc 最长的；如果同 category 都没有好 desc，
-          //       则从所有模型中选 desc 最长的（跨 category 补充）
-          // v4.6：排序键用上面定义的 byQuality（文案质量分，非长度）
-          const sameCategory = votes.filter(v => v.category === finalCategory);
-          let winner;
-          if (sameCategory.length > 0) {
-            // 同 category 里取文案质量最高的
-            sameCategory.sort(byQuality);
-            winner = sameCategory[0];
-            // 若同类最优是通用模板句，尝试跨类取更具体的说明
-            if (AI_STYLE.GENERIC.some(g => (winner.desc || '').includes(g))) {
-              const better = [...votes].sort(byQuality).find(v => !AI_STYLE.GENERIC.some(g => (v.desc || '').includes(g)));
-              if (better) winner = better;
-            }
-          } else {
-            // 没有同 category 的（理论上不应该发生），全局按质量排序
-            winner = [...votes].sort(byQuality)[0];
-          }
-          const longestStage = votes.map(v => v.stage || '').sort((a, b) => b.length - a.length)[0];
-
-          img.category = finalCategory;
-          img.stage = longestStage || '';
-
-          // ── 智能兜底：AI 偶尔漏填 title/desc ──
-          // ⚠️ desc 兜底用占位符而非固定模板——每张图内容不同，
-          //    假装识别出相同描述比不写还糟糕（用户会以为识别了实际没有）
-          const CATEGORY_DEFAULTS = {
-            '框架施工':  { title: '框体就位与水平校准' },
-            '玻扇施工':  { title: '中空玻璃合片工艺' },
-            '五金安装':  { title: '门窗五金件安装调试' },
-            '密封收口':  { title: '框墙接缝密封收口' },
-            '成品保护':  { title: '门窗成品保护与自检' },
-            '离场自检':  { title: '离场前合规留底' },
-          };
-          // 归一化 category 匹配（AI 可能返回近义词）
-          const normalizedCat = Object.keys(CATEGORY_DEFAULTS).find(k => {
-            const d = CATEGORY_DEFAULTS[k];
-            if (!d.aliases) return finalCategory.includes(k) || k.includes(finalCategory);
-    return finalCategory === k || k.includes(finalCategory) || finalCategory.includes(k)
-      || (d.aliases && d.aliases.some(a => finalCategory.includes(a) || a.includes(finalCategory)));
-          }) || finalCategory;
-          const defaults = CATEGORY_DEFAULTS[normalizedCat] || {};
-
-          img.title = (winner.title || '').trim() || defaults.title || `${finalCategory}节点`;
-          // ── desc 多级兜底（根治「工艺说明全变占位符」）──
-          // 1) winner 自己的 desc（extractJSON 已做多键名归一化）
-          // 2) winner 没有 → 从同节点其它 vote 借最长的 desc（同一张图的补充视角）
-          // 3) 仍没有 → 用模型给的 stage（进度描述也是真实内容，远胜占位符）
-          // 4) 最后才回退到占位符
-          const isTrash = (d) => !d || AI_STYLE.GENERIC.some(g => d.includes(g));
-          let bestDesc = isTrash(winner.desc) ? '' : (winner.desc || '').trim();
-          if (!bestDesc) {
-            // 退而求其次：从其它模型里挑文案质量最高且非模板句的一条
-            const alt = votes
-              .filter(v => v !== winner && !isTrash(v.desc))
-              .sort(byQuality)[0];
-            if (alt) bestDesc = alt.desc.trim();
-          }
-          if (!bestDesc && (winner.stage || '').trim()) bestDesc = polishSiteLogText(winner.stage) ;
-          if (!bestDesc) bestDesc = '📝 请补充本张照片的具体工艺说明（AI 未能生成差异化描述）';
-          img.desc = bestDesc;
-          this.dedupeDesc(img, votes);   // v4.6：避免与已有照片说明雷同
-          img.highlights = Array.isArray(winner.highlights) ? winner.highlights : [];
-
-          // 缺字段时打日志，方便排查 AI 返回质量问题
-          if (!winner.title) console.warn(`⚠️ AI 未返回 title，使用默认：「${img.title}」(category=${finalCategory})`);
-          if (!winner.desc) console.warn(`⚠️ AI 未返回 desc，使用默认：「${img.desc.slice(0,40)}...」(category=${finalCategory})`);
-
-          img.aiConfidence = {
-            votes: counts,
-            pixelFeatures: pixelFeatures,
-            overrides: override.changed ? [override] : []
-          };
-          // 默认未确认，等用户在复核弹窗/节点上点 ✓ 确认才入档
-          img.aiConfirmed = false;
-          img._analyzed = true;   // 标记：已被 AI 真正分析过（区别于 ensureTitles 兜底）
-
-          // 🔍 调试数据：保留每个模型的原始返回，UI 可展示用于排查 desc 占位符问题
-          img._debug = {
-            finalCategory,
-            winnerModel: winner._model || 'unknown',
-            winnerDesc: (winner.desc || '').slice(0, 120),
-            bestDesc,
-            votes: votes.map(v => ({
-              _model: v._model || '?',
-              category: v.category,
-              title: (v.title || '').slice(0, 60),
-              desc: (v.desc || '').slice(0, 120),
-              stage: (v.stage || '').slice(0, 60),
-              hasDesc: !!(v.desc || v.description || v['描述']),
-              rawLen: (v._raw || '').length,
-            })),
-          };
-          // 如果最终 desc 是占位符，打详细日志（F12 控制台可见）
-          if (bestDesc.includes('请补充') || bestDesc.includes('📝')) {
-            console.error(`🔍 [DESC_DEBUG] img=${img.file?.name||img.id} 最终 desc 为占位符！`, img._debug);
-          }
+          const model = this.apiProvider === 'tencent' ? 'HY-Vision-2.0-Instruct' : this.apiProvider === 'openai' ? 'gpt-4o-mini' : 'qwen-vl-plus';
+          const result = await this.callVisionAPI(img.dataUrl, this.buildAnalysisPrompt(img.section || 'construction'), model);
+          if (result._noJson || !result.desc) throw Error('AI 返回内容不完整，请保留照片并重试');
+          const categories = ['框架施工','玻扇施工','五金安装','密封收口','成品保护','其他'];
+          img.category = img.section === 'arrival' ? '班组进场' : img.section === 'finish' ? '完工照片' : categories.includes(result.category) ? result.category : '其他';
+          img.title = result.title || '待核实节点';img.desc = result.desc;img.stage = result.stage || '';
+          img.highlights = Array.isArray(result.highlights) ? result.highlights : [];
+          img.uncertainties = Array.isArray(result.uncertainties) ? result.uncertainties : ['尺寸、安装精度与验收结论需结合现场记录核实'];
+          img.aiConfirmed = false;img._analyzed = true;img.aiError = '';img.aiSource = {model,generatedAt:new Date().toISOString(),kind:'AI 建议，待人工确认'};
         },
 
         buildAnalysisPrompt(section = 'construction') {
@@ -1821,149 +1708,10 @@
 
         // ─── 客户端图片特征检测 ───
         // 简单的像素统计：检测玻璃反光（高亮像素比例）、深色框体像素、暖色（室内）冷色（室外）
-        async detectImageFeatures(dataUrl) {
-          return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-              try {
-                const canvas = document.createElement('canvas');
-                const size = 64; // 缩到 64×64，足够统计
-                canvas.width = size;
-                canvas.height = size;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, size, size);
-                const data = ctx.getImageData(0, 0, size, size).data;
-
-                let brightPixels = 0;     // 高亮像素（玻璃反光嫌疑）
-                let darkPixels = 0;      // 暗色像素（框体/阴影）
-                let warmPixels = 0;      // 暖色（室内灯光/木质）
-                let coolPixels = 0;      // 冷色（室外天空/玻璃）
-                let greenPixels = 0;     // 绿色（窗外植物/草地，强烈提示「能看到窗外」）
-
-                for (let i = 0; i < data.length; i += 4) {
-                  const r = data[i], g = data[i + 1], b = data[i + 2];
-                  const bright = (r + g + b) / 3 > 200;
-                  const dark = (r + g + b) / 3 < 60;
-                  const warm = r > 180 && g > 140 && b < 120;
-                  const cool = b > 180 && r < 150;
-                  const green = g > 130 && g > r + 20 && g > b + 20;
-                  if (bright) brightPixels++;
-                  if (dark) darkPixels++;
-                  if (warm) warmPixels++;
-                  if (cool) coolPixels++;
-                  if (green) greenPixels++;
-                }
-
-                const total = size * size;
-                const features = {
-                  brightRatio: brightPixels / total,
-                  darkRatio: darkPixels / total,
-                  warmRatio: warmPixels / total,
-                  coolRatio: coolPixels / total,
-                  greenRatio: greenPixels / total,
-                  hasGlassReflection: brightPixels / total > 0.15,  // 15% 以上高亮像素 → 大概率有玻璃反光
-                  hasOutdoorView: greenPixels / total > 0.05,       // 5% 以上绿色 → 窗外有植物
-                  isMostlyDark: darkPixels / total > 0.4            // 40% 以上暗色 → 没装玻璃时通常画面较暗
-                };
-                resolve(features);
-              } catch (e) {
-                console.warn('图片特征检测失败', e);
-                resolve({});
-              }
-            };
-            img.onerror = () => resolve({});
-            img.src = dataUrl;
-          });
-        },
-
-        // ─── 客户端强制覆盖：基于像素特征纠正 AI 错误判断 ───
-        applyFeatureOverride(category, features) {
-          if (!features || Object.keys(features).length === 0) {
-            return { changed: false, category, reason: '特征检测失败，跳过校验' };
-          }
-
-          // 规则 1：如果 AI 说「框架」但有玻璃反光 + 室外视角 → 强制改「成品保护」
-          if (category === '框架施工' && features.hasGlassReflection && features.hasOutdoorView) {
-            return {
-              changed: true,
-              category: '成品保护',
-              reason: `检测到玻璃反光(${Math.round(features.brightRatio * 100)}%) + 室外视角(绿色${Math.round(features.greenRatio * 100)}%)，与「框架施工」矛盾，应为成品保护`
-            };
-          }
-
-          // 规则 2：如果 AI 说「框架」但有玻璃反光 → 强制改「玻扇施工」
-          if (category === '框架施工' && features.hasGlassReflection) {
-            return {
-              changed: true,
-              category: '玻扇施工',
-              reason: `检测到玻璃反光(${Math.round(features.brightRatio * 100)}%)，与「框架施工」矛盾，应为玻扇施工`
-            };
-          }
-
-          // 规则 3：如果 AI 说「玻扇」但完全没有玻璃反光、画面很暗 → 降级为「框架施工」
-          if (category === '玻扇施工' && !features.hasGlassReflection && features.isMostlyDark) {
-            return {
-              changed: true,
-              category: '框架施工',
-              reason: `未检测到玻璃反光且画面较暗（暗色${Math.round(features.darkRatio * 100)}%），更接近框架施工阶段`
-            };
-          }
-
-          return { changed: false, category, reason: '特征与判断一致，无需覆盖' };
-        },
-
-        // ─── 多模型并行投票 ───
-        async callVisionAPIVoting(imageDataUrl, prompt, models) {
-          const tasks = models.map(model => this.callVisionAPI(imageDataUrl, prompt, model));
-          const settled = await Promise.allSettled(tasks);
-
-          const valid = settled
-            .filter(s => s.status === 'fulfilled')
-            .map(s => s.value);
-
-          // 记录失败的模型
-          settled.forEach((s, i) => {
-            if (s.status === 'rejected') {
-              console.warn(`⚠️ 模型 ${models[i]} 识别失败：${s.reason.message}`);
-            }
-          });
-
-          // 如果全部失败，给出**具体**的错误信息（不再笼统）
-          if (valid.length === 0) {
-            const errors = settled
-              .filter(s => s.status === 'rejected')
-              .map((s, i) => `${models[i]}: ${s.reason.message}`)
-              .join(' | ');
-            console.error('所有模型都识别失败', errors);
-            throw new Error(errors || '所有模型都识别失败');
-          }
-
-          console.log(`🗳️ 多模型投票完成：${valid.length}/${models.length} 成功`);
-          valid.forEach((v, i) => {
-            console.log(`   ${models[i]} → ${v.category} / ${v.title}`);
-          });
-
-          return valid;
-        },
-
         async callVisionAPI(imageDataUrl, prompt, modelOverride) {
+          if (imageDataUrl.length > 400 * 1024) imageDataUrl = await this.compressDataUrl(imageDataUrl);
           const config = { model: modelOverride || (this.apiProvider === 'tencent' ? 'HY-Vision-2.0-Instruct' : this.apiProvider === 'openai' ? 'gpt-4o-mini' : 'qwen-vl-plus') };
-          const response = await this.sessionRequest('/ai/analyze', {
-            method: 'POST',
-            body: JSON.stringify({
-              model: config.model,
-              messages: [{ role: 'user', content: [
-                { type: 'image_url', image_url: { url: imageDataUrl } },
-                { type: 'text', text: prompt }
-              ] }]
-            })
-          });
-          if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            throw new Error(error.error || 'AI 识别暂时不可用');
-          }
-
-          const data = await response.json();
+          const data = await this.runAIJob(imageDataUrl, prompt, config.model);
           const rawContent = data.choices[0].message.content;
 
           // 智能提取 JSON（兼容 markdown 代码块、前后废话、键名差异、多余花括号等）
@@ -2080,7 +1828,8 @@
             category:  typeof p.category === 'string' ? p.category.trim() : '',
             stage:     cleanStage,
             desc:      cleanDesc,
-            highlights: polishHl(p.highlights),
+            highlights: polishHl(Array.isArray(p.highlights) ? p.highlights.filter(x=>typeof x==='string') : []),
+            uncertainties: Array.isArray(p.uncertainties) ? p.uncertainties.filter(x=>typeof x==='string').slice(0,10) : [],
             _raw:      raw ? raw.slice(0, 600) : '',
             // 评分用：清洗后的文案质量（越高越专业）
             _score:    scoreSiteLogText(cleanDesc, cleanTitle, (p.category || '').trim())
@@ -2131,7 +1880,7 @@
           if (!container) return;
           // 封面项目信息（归档人/施工部位/日期）与图片无关，先同步，避免无图时提前 return 不更新
           this.syncCoverMeta();
-          this.captureDomEdits(); // 必须在任何画廊重建之前回写用户编辑，否则重建会冲掉手改文字
+          // 正文输入已由 editor-state.js 即时写入数据；渲染不能用旧 DOM 覆盖新值。
           this.syncArrivalGallery(); // 班组进场照片区独立渲染
           this.syncSopGallery(); // SOP 区独立于主图，必须每次都渲染（即使无主图）
           this.syncFinishGallery(); // 完工照片画廊同理，独立于主图渲染
@@ -2173,23 +1922,23 @@
             '<div class="node-cards-container">';
           this.images.forEach((img, idx) => {
             const highlightsHtml = (img.highlights || [])
-              .map(h => `<span class="highlight-badge">✦ ${h}</span>`)
+              .map(h => `<span class="highlight-badge">✦ ${this.escapeHtml(h)}</span>`)
               .join('');
 
             html += `
               <div class="node-card node-block group" data-img-id="${img.id}">
                 <div class="node-card-header">
                   <span class="node-card-num">${String(idx + 1).padStart(2, '0')}</span>
-                  <span class="node-card-meta">${img.category} · ${img.time}</span>
+                  <span class="node-card-meta">${this.escapeHtml(img.category)} · ${this.escapeHtml(img.time)}</span>
                 </div>
-                <h3 class="text-base font-bold text-[#1F3D2A] mb-2 px-5 editable-block" contenteditable="true" style="padding-left:18px;padding-right:18px;">${img.title || '未命名节点'}</h3>
-                ${img.stage ? `<div style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 ${img.stage}</span></div>` : ''}
+                <h3 class="text-base font-bold text-[#1F3D2A] mb-2 px-5 editable-block" contenteditable="true" style="padding-left:18px;padding-right:18px;">${this.escapeHtml(img.title) || '未命名节点'}</h3>
+                ${img.stage ? `<div style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 ${this.escapeHtml(img.stage)}</span></div>` : ''}
                 <div class="node-card-body">
                   <div class="node-card-image">
-                    <img src="${img.dataUrl}" alt="${img.title}" loading="lazy">
+                    <img src="${img.dataUrl}" alt="${this.escapeHtml(img.title)}" loading="lazy">
                   </div>
                   <div class="node-card-detail">
-                    <p class="node-card-desc editable-block" contenteditable="true">${img.desc || '<span style="color:#bbb">[请填写工艺说明]</span>'}</p>
+                    <p class="node-card-desc editable-block" contenteditable="true">${this.escapeHtml(img.desc) || '<span style="color:#bbb">[请填写工艺说明]</span>'}</p>
                     ${this.dupWarnHtml(img)}
                     ${ (img.desc && (img.desc.includes('请补充') || img.desc.includes('📝'))) ? `
                     <details class="mb-2 bg-amber-50 border border-amber-200 rounded p-2 text-xs debug-panel">
@@ -2237,7 +1986,7 @@
           const map = [
             ['项目名称', this.projectName || '未命名项目'],
             ['施工部位', this.siteLocation || '—'],
-            ['归档日期', this.archiveDate || new Date().toISOString().slice(0,10)],
+            ['归档日期', this.archiveDate || sitelogEditor.localDate()],
             ['归档人', this.archivePerson || '—'],
           ];
           cover.querySelectorAll('.pdf-meta-item').forEach(item => {
@@ -2551,6 +2300,7 @@
         // ===== PDF 导出（方案2：html2pdf.js 直接下载）=====
         // 用户点击 → 弹「导出指引」弹窗 → 用户点「立即下载 PDF」→ 直接生成并下载 PDF 文件
         exportPDF() {
+          this.syncFieldReport();
           const totalPhotos = this.images.length + this.arrivalImages.length + this.finishImages.length + this.sopImages.length;
           if (totalPhotos === 0) {
             if (!confirm('当前报告暂无照片，是否仍要导出空白模板？')) return;
@@ -2691,6 +2441,7 @@
         },
 
         openShareDialog() {
+          this.publicationAttempt = null;
           this.shareResult = null;
           this.shareError = '';
           this.shareCardReady = false;
@@ -2706,24 +2457,8 @@
           this.shareError = '';
           this.shareCardReady = false;
           try {
-            await this.accountJSON('/list');
-            this.syncCoverMeta();
-            this.showToast('📦 正在打包报告（压缩照片中）…', 'info', 8000);
-            const payload = await this.buildSharePayload();
-            const resp = await this.shareRequest('', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            });
-            const data = await resp.json().catch(() => ({}));
-            if (resp.status === 401) {
-              this.showToast('❌ 无权访问分享服务，请从初匠系统页面打开', 'error');
-              return;
-            }
-            if (!resp.ok || !data.ok) {
-              this.showToast('❌ 分享失败：' + ((data && data.error) || ('HTTP ' + resp.status)), 'error');
-              return;
-            }
+            this.showToast('正在保存并发布已审核版本…', 'info', 8000);
+            const data = await this.publishCloudProject();
             this.shareResult = { id: data.id, url: data.url };
             await this.$nextTick();
             this.drawShareCard(data.url, data.id);
@@ -2813,7 +2548,7 @@
           ctx.fillStyle = 'rgba(255,255,255,0.85)';
           ctx.font = '22px "PingFang SC","Microsoft YaHei",sans-serif';
           ctx.fillText((this.projectName || '—') + (this.siteLocation ? ' · ' + this.siteLocation : ''), W / 2, divY + 48);
-          ctx.fillText('归档日期：' + (this.archiveDate || new Date().toISOString().slice(0, 10)), W / 2, divY + 82);
+          ctx.fillText('归档日期：' + (this.archiveDate || sitelogEditor.localDate()), W / 2, divY + 82);
           const qrSize = 380, qrX = (W - qrSize) / 2, qrY = divY + 118;
           ctx.fillStyle = '#ffffff';
           this.drawRoundRect(ctx, qrX, qrY, qrSize, qrSize, 18); ctx.fill();
@@ -2963,7 +2698,8 @@
         },
 
         loadSampleData() {
-          if (this.images.length > 0 && !confirm('载入示例会覆盖当前图片，是否继续？')) return;
+          if (this.hasWork() && !confirm('载入示例会替换当前正文与照片，是否继续？可使用撤销恢复。')) return;
+          this.undoSnapshot = this.snapshot();this.resetProjectContext();
           this.templateType = '框架施工';
           this.images = [
             {
@@ -3363,6 +3099,40 @@
       `
     };
   </script>
+
+  <div x-show="projectPanel" x-cloak class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" role="dialog" aria-label="项目工作区">
+    <div class="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-auto" @click.stop>
+      <div class="flex justify-between items-center"><h2 class="text-xl font-bold">项目工作区</h2><button @click="projectPanel=false" aria-label="关闭项目工作区" class="text-2xl">×</button></div>
+      <div class="flex flex-wrap gap-2 my-4"><input x-model="projectQuery" placeholder="搜索项目名称或阶段" class="border rounded p-2"><button @click="projectPage=1;projectAction(()=>loadProjects())" class="border rounded p-2">搜索工程</button><button @click="newLocalProject()" class="border rounded p-2">新建空白工程</button></div>
+      <div class="grid gap-2"><template x-for="item in projectItems" :key="item.id"><button @click="openCloudProject(item.id)" class="border rounded p-3 text-left hover:bg-slate-50"><b x-text="item.title"></b><span class="ml-2 text-sm text-slate-500" x-text="item.stage+' · '+statusLabel(item.status)+' · 修订 '+item.revision"></span></button></template><p x-show="!projectItems.length" class="text-slate-500">尚无可访问工程。编辑后点击“保存云端工程”即可建立。</p></div>
+      <div class="flex gap-3 my-3"><button :disabled="projectPage<=1" @click="projectPage--;projectAction(()=>loadProjects())">上一页</button><span x-text="projectPage+' / '+Math.max(1,Math.ceil(projectTotal/20))"></span><button :disabled="projectPage*20>=projectTotal" @click="projectPage++;projectAction(()=>loadProjects())">下一页</button></div>
+      <details class="my-3"><summary>本机保存的工程草稿</summary><template x-for="draft in localDraftItems" :key="draft.key"><button @click="projectAction(()=>openLocalDraft(draft.key))" class="block border rounded p-2 my-2 w-full text-left" x-text="draft.title+' · '+draft.savedAt"></button></template><p class="text-xs text-slate-500">本机草稿按账号和工程隔离，仅在此浏览器可见。其他设备请使用云端工程或工程包。</p></details>
+      <section x-show="cloudProjectId" class="border-t mt-5 pt-4">
+        <h3 class="font-bold" x-text="'当前工程：'+projectName+' · '+statusLabel(cloudStatus)"></h3>
+        <p class="text-sm text-slate-500 my-2">提交审核会保存当前内容。负责人可自行审核；多人复核可添加“审核人”。审核后再修改，需重新提交。</p>
+        <label class="block my-2">审核备注<input x-model="reviewNote" placeholder="退回时必须说明原因" class="border rounded p-2 ml-2"></label>
+        <div class="flex gap-2"><button @click="reviewProject('submit')" :disabled="cloudBusy" class="border rounded p-2">提交审核</button><button @click="reviewProject('approve')" :disabled="cloudStatus!=='review'" class="border rounded p-2">审核通过</button><button @click="reviewProject('reject')" :disabled="cloudStatus!=='review'" class="border rounded p-2">退回修改</button><button @click="projectPanel=false;openShareDialog()" class="border rounded p-2">发布分享码</button></div>
+        <details class="my-4"><summary>项目成员与审核记录</summary><div class="flex flex-wrap gap-2 my-3"><select aria-label="项目成员" x-model="memberUser" class="border rounded p-2"><option value="">选择员工</option><template x-for="person in colleagues" :key="person.id"><option :value="person.id" x-text="person.display_name"></option></template></select><select aria-label="项目成员权限" x-model="memberRole" class="border rounded p-2"><option value="editor">编辑人</option><option value="reviewer">审核人</option><option value="viewer">只读成员</option><option value="remove">移除成员</option></select><button @click="updateProjectMember()" class="border rounded p-2">更新成员权限</button></div><template x-for="member in projectDetail?.members||[]" :key="member.user_id"><p x-text="member.display_name+' · '+({editor:'编辑人',reviewer:'审核人',viewer:'只读成员'}[member.role])"></p></template><template x-for="(review,i) in projectDetail?.reviews||[]" :key="i"><p class="text-sm my-1" x-text="review.display_name+' · 修订 '+review.revision+' · '+({submit:'提交',approve:'通过',reject:'退回'}[review.decision])+' '+review.note"></p></template></details>
+        <h3 class="font-bold my-2">已发布版本</h3><template x-for="version in projectDetail?.versions||[]" :key="version.id"><div class="border rounded p-3 my-2 flex flex-wrap gap-3 items-center"><span x-text="'第 '+version.number+' 版 · 修订 '+version.revision+' · '+({public:'持链接可查看',internal:'公司内部',code:'访问码'}[version.audience])"></span><a :href="'/s/'+version.share_id" target="_blank" rel="noopener" class="underline">查看档案</a><button @click="changePublication(version.share_id,!version.revoked)" x-text="version.revoked?'恢复分享':'撤回分享'" class="border rounded p-1"></button><span class="text-xs" x-text="version.expires?'有效至 '+new Date(version.expires*1000).toLocaleDateString('zh-CN'):'长期有效'"></span></div></template>
+      </section>
+      <p class="text-sm text-amber-800 mt-4" x-text="cloudMessage"></p>
+    </div>
+  </div>
+
+<div x-show="fieldPanel" x-cloak role="dialog" aria-label="现场助手" class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"><div class="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-auto">
+<div class="flex justify-between"><h2 class="text-xl font-bold">现场助手</h2><button @click="fieldPanel=false" aria-label="关闭现场助手" class="text-2xl">×</button></div>
+<p class="text-sm text-slate-500 my-3">清单用于拍摄留底与补录，不代表安装质量合格。没有现场证据的尺寸、材料和验收结论应留待核实。</p>
+<h3 class="font-bold">拍摄清单</h3><p class="text-amber-800" x-text="'尚有 '+fieldMissing()+' 项未关联留底照片'"></p>
+<template x-for="item in checklistItems()" :key="item.key"><label class="flex gap-3 items-center my-2"><span x-text="(checkField(item)?'已留底：':'待补拍：')+item.label"></span><select x-model="fieldChecks[item.key]" @change="markDraftDirty()" class="border rounded p-2"><option value="">选择对应照片</option><template x-for="photo in $data[item.group]" :key="photo.id"><option :value="photo.id" x-text="photo.title||photo.filename||'照片'"></option></template></select></label></template>
+<h3 class="font-bold mt-5">现场事实补录</h3><label class="block my-2">实测数据与测量依据<textarea x-model="fieldFacts.measurements" @input="markDraftDirty()" maxlength="1500" class="border rounded p-2 w-full" placeholder="只填写已实际测量的数据，并说明位置、工具和测量人"></textarea></label><label class="block my-2">材料信息与来源<textarea x-model="fieldFacts.materials" @input="markDraftDirty()" maxlength="1500" class="border rounded p-2 w-full" placeholder="如实填写已核对的标识、单据或现场确认信息"></textarea></label><label class="block my-2">核实结论与待办<textarea x-model="fieldFacts.verification" @input="markDraftDirty()" maxlength="1500" class="border rounded p-2 w-full" placeholder="尚不能确认的事项，写明待谁核实"></textarea></label>
+<details class="my-3"><summary>AI 建议的事实来源与待核实项</summary><template x-for="photo in allPhotos().filter(p=>p._analyzed)" :key="photo.id"><div class="border rounded p-3 my-2"><b x-text="photo.title"></b><p class="text-xs" x-text="'来源：AI 建议 · '+(photo.aiSource?.model||'历史识别')"></p><p class="text-sm" x-text="(photo.uncertainties||[]).join('；')"></p><label><input type="checkbox" x-model="photo.aiConfirmed" @change="markDraftDirty()"> 已逐项核对照片与文字</label></div></template><button @click="confirmAllAI()" class="border rounded p-2">我已核对全部 AI 建议</button></details>
+<label class="block my-3"><input type="checkbox" x-model="customerTimeline" @change="markDraftDirty()"> 允许客户在公开分享中查看本工程其他同样授权公开的阶段版本</label>
+<button @click="projectAction(()=>saveCloudProject())" :disabled="cloudBusy" class="border rounded p-2">保存补录到云端</button>
+<h3 class="font-bold mt-6">问题整改与复核</h3><p class="text-sm text-slate-500 my-2">关键问题未复核关闭时不能通过项目审核。关键问题的整改与复核必须由不同人员完成。</p>
+<div class="grid gap-2 border rounded p-3"><input x-model="issueForm.title" placeholder="问题简述" class="border rounded p-2"><div class="flex gap-2"><select x-model="issueForm.severity" aria-label="问题级别" class="border rounded p-2"><option value="normal">一般问题</option><option value="critical">关键问题</option></select><select x-model="issueForm.assignee" aria-label="整改负责人" class="border rounded p-2"><option value="">本人负责</option><template x-for="person in colleagues" :key="person.id"><option :value="person.id" x-text="person.display_name"></option></template></select></div><textarea x-model="issueForm.note" placeholder="问题位置与现场说明" class="border rounded p-2"></textarea><select x-model="issueForm.media" aria-label="问题留底照片" class="border rounded p-2"><option value="">选择已同步照片（可选）</option><template x-for="photo in allPhotos().filter(p=>p.mediaId)" :key="photo.id"><option :value="photo.mediaId" x-text="photo.title"></option></template></select><button @click="createIssue()" class="border rounded p-2">登记整改问题</button></div>
+<template x-for="issue in issueItems" :key="issue.id"><div class="border rounded p-3 my-3"><b x-text="issue.title"></b><p class="text-sm" x-text="issue.assignee_name+' · '+(issue.severity==='critical'?'关键问题':'一般问题')+' · '+({open:'待整改',resolved:'待复核',closed:'已关闭'}[issue.status])"></p><template x-for="event in issue.events" :key="event.id"><p class="text-xs my-2" x-text="event.display_name+' · '+({create:'登记',resolve:'提交整改',close:'复核关闭',reopen:'重新打开'}[event.action])+'：'+event.note+' · 留底照片 '+event.media.length+' 张'"></p></template><input x-model="issueNotes[issue.id]" placeholder="整改或复核说明" class="border rounded p-2 w-full"><select x-model="issuePhotos[issue.id]" class="border rounded p-2 my-2"><option value="">选择整改照片</option><template x-for="photo in allPhotos().filter(p=>p.mediaId)" :key="photo.id"><option :value="photo.mediaId" x-text="photo.title"></option></template></select><div class="flex gap-2"><button x-show="issue.status==='open'" @click="changeIssue(issue,'resolve')" class="border rounded p-2">提交整改结果</button><button x-show="issue.status==='resolved'" @click="changeIssue(issue,'close')" class="border rounded p-2">复核关闭</button><button x-show="issue.status!=='open'" @click="changeIssue(issue,'reopen')" class="border rounded p-2">重新打开问题</button></div></div></template>
+<h3 class="font-bold mt-6">公司培训案例</h3><p class="text-sm text-slate-500 my-2">只收录人工编写的脱敏文字，不复制客户项目名、房号或照片。另一位管理员审核通过后，公司账号可查阅。</p><div class="grid gap-2"><input x-model="caseForm.title" placeholder="脱敏案例标题" class="border rounded p-2"><textarea x-model="caseForm.problem" placeholder="通用问题与判断依据" class="border rounded p-2"></textarea><textarea x-model="caseForm.resolution" placeholder="处理方法与复核要点" class="border rounded p-2"></textarea><label><input type="checkbox" x-model="caseForm.redacted"> 已移除姓名、地址、联系方式等客户资料</label><button @click="submitCase()" class="border rounded p-2">提交培训案例审核</button></div><input x-show="accountUser?.role==='admin'" x-model="caseNote" placeholder="案例审核意见" class="border rounded p-2 my-3 w-full"><template x-for="item in caseItems" :key="item.id"><div class="border rounded p-3 my-2"><b x-text="item.title"></b><span class="text-xs ml-2" x-text="{pending:'待审核',approved:'已通过',rejected:'已退回',withdrawn:'已撤回'}[item.status]"></span><p class="whitespace-pre-wrap my-2" x-text="item.problem"></p><p class="whitespace-pre-wrap my-2" x-text="item.resolution"></p><p class="text-xs" x-text="item.review_note"></p><div class="flex gap-2"><button x-show="accountUser?.role==='admin'&&item.status==='pending'" @click="reviewCase(item,'approve')" class="border rounded p-2">通过案例</button><button x-show="accountUser?.role==='admin'&&item.status==='pending'" @click="reviewCase(item,'reject')" class="border rounded p-2">退回案例</button><button x-show="item.status!=='withdrawn'" @click="reviewCase(item,'withdraw')" class="border rounded p-2">撤回案例</button></div></div></template>
+</div></div>
 
 </body>
 </html>

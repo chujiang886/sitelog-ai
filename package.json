@@ -1,6 +1,6 @@
 {
   "name": "sitelog-ai",
-  "version": "5.0.1",
+  "version": "5.1.0",
   "description": "门窗施工归档 AI 助手",
   "scripts": {
     "build": "tailwindcss -i app.css -o vendor/app.css --minify --content ./index.html,./auth-client.js",
@@ -10,6 +10,7 @@
   },
   "devDependencies": {
     "alpinejs": "^3.13.5",
+    "dompurify": "3.4.15",
     "jsqr": "^1.4.0",
     "playwright": "^1.62.1",
     "pngjs": "^7.0.0",
