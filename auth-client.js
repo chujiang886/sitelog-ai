@@ -9,7 +9,7 @@ window.accountFeatures = {
   employeeList: [], editingUser: null, editForm: {}, auditItems: [],
   companyAI: { provider: 'qwen', name: '', protocol: 'openai', base_url: '', model: '', key: '' },
   aiPresets: [], companyAILoaded: false, companyAIModel: '',
-  availableAIModels: [], aiModelMessage: '',
+  availableAIModels: [], aiModelMessage: '', aiConfigMessage: '',
   aiModelReferences: [
     {name:'Hy4 preview',id:'hy4-preview'}, {name:'Hy3',id:'hy3'},
     {name:'DeepSeek-V4.1-Flash',id:'deepseek-flash'},
@@ -127,7 +127,7 @@ window.accountFeatures = {
 
   async openAdmin() {
     this.showAdmin = true; this.adminMessage = ''; this.companyAILoaded = false;
-    this.availableAIModels = []; this.aiModelMessage = '';
+    this.availableAIModels = []; this.aiModelMessage = ''; this.aiConfigMessage = '';
     this.companyAI.key = '';
     try {
       const data = await this.accountJSON('/admin/ai');
@@ -208,13 +208,13 @@ window.accountFeatures = {
 
   async saveCompanyAI() {
     if (this.authBusy || !this.companyAILoaded) return;
-    this.authBusy = true; this.adminMessage = '正在验证接口与图片识别能力，请稍候…';
+    this.authBusy = true; this.aiConfigMessage = '正在验证接口与图片识别能力，请稍候…';
     try {
       const saved = await this.accountJSON('/admin/ai', this.companyAI);
       this.companyAI = { ...saved, key: '' };
       await this.refreshSession();
-      this.adminMessage = '公司 AI 设置已保存，员工再次点击 AI 整理即可使用，无需重新登录。';
-    } catch (error) { this.adminMessage = error.message; }
+      this.aiConfigMessage = '公司 AI 设置已保存，员工再次点击 AI 整理即可使用，无需重新登录。';
+    } catch (error) { this.aiConfigMessage = error.message; }
     finally { this.companyAI.key = ''; this.authBusy = false; }
   },
 };

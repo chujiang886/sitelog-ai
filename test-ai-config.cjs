@@ -15,14 +15,14 @@ async function save(page){await page.getByRole('button',{name:'验证并保存�
  await page.getByLabel('国内主流模型候选',{exact:true}).selectOption('deepseek-flash');assert.equal(await page.getByLabel('视觉模型名称',{exact:true}).inputValue(),'deepseek/deepseek-flash');await page.getByLabel('国内主流模型候选',{exact:true}).selectOption('MiniMax-M3');assert.equal(await page.getByLabel('视觉模型名称',{exact:true}).inputValue(),'minimax-m3');
  await page.getByLabel('公司 AI 服务方',{exact:true}).selectOption('custom');await page.getByLabel('服务商名称',{exact:true}).fill('公司兼容网关');await page.getByLabel('接口地址',{exact:true}).fill('https://gateway.example/v1');await page.getByLabel('公司 AI Key',{exact:true}).fill('isolated-custom-test');
  await page.getByRole('button',{name:'获取可用模型',exact:true}).click();await page.waitForFunction(()=>Alpine.$data(document.body).availableAIModels.length===10);await page.getByLabel('服务商返回的模型',{exact:true}).selectOption('test-vision-model');await save(page);
- assert.ok(await page.evaluate(()=>Alpine.$data(document.body).adminMessage.includes('已保存')));assert.equal(await page.getByLabel('公司 AI Key',{exact:true}).inputValue(),'');
+ assert.ok(await page.evaluate(()=>Alpine.$data(document.body).aiConfigMessage.includes('已保存')));assert.equal(await page.getByLabel('公司 AI Key',{exact:true}).inputValue(),'');
  // 修改目标地址但留空密钥不能将原密钥发往新地址。
- await page.getByLabel('接口地址',{exact:true}).fill('https://other.example/v1');await save(page);assert.ok(await page.evaluate(()=>Alpine.$data(document.body).adminMessage.includes('重新填写')));
- await page.getByLabel('接口地址',{exact:true}).fill('https://gateway.example/v1');await page.getByLabel('公司 AI Key',{exact:true}).fill('rejected-test-key');await save(page);assert.ok(await page.evaluate(()=>Alpine.$data(document.body).adminMessage.includes('鉴权失败')));
+ await page.getByLabel('接口地址',{exact:true}).fill('https://other.example/v1');await save(page);assert.ok(await page.evaluate(()=>Alpine.$data(document.body).aiConfigMessage.includes('重新填写')));
+ await page.getByLabel('接口地址',{exact:true}).fill('https://gateway.example/v1');await page.getByLabel('公司 AI Key',{exact:true}).fill('rejected-test-key');await save(page);assert.ok(await page.evaluate(()=>Alpine.$data(document.body).aiConfigMessage.includes('鉴权失败')));
  let current=await page.evaluate(()=>Alpine.$data(document.body).accountJSON('/admin/ai'));assert.equal(current.ai.model,'test-vision-model');assert.equal(current.ai.protocol,'openai');assert.ok(!('key' in current.ai));
  // 第二协议使用真实后端适配，模拟上游响应，成功后重复打开可恢复。
  await page.getByLabel('接口协议',{exact:true}).selectOption('anthropic');await page.getByLabel('接口地址',{exact:true}).fill('https://gateway.example/v1');await page.getByLabel('公司 AI Key',{exact:true}).fill('isolated-native-test');await page.getByLabel('视觉模型名称',{exact:true}).fill('test-native-vision');await save(page);
- assert.ok(await page.evaluate(()=>Alpine.$data(document.body).adminMessage.includes('已保存')));
+ assert.ok(await page.evaluate(()=>Alpine.$data(document.body).aiConfigMessage.includes('已保存')));
  await page.getByLabel('关闭管理员面板',{exact:true}).click();await page.evaluate(()=>Alpine.$data(document.body).openAdmin());await page.waitForFunction(()=>Alpine.$data(document.body).companyAILoaded);assert.equal(await page.getByLabel('视觉模型名称',{exact:true}).inputValue(),'test-native-vision');
  await page.getByLabel('公司 AI 服务方',{exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,'多服务商配置.png')});
  await page.getByLabel('国内主流模型候选',{exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,'国内模型与接口配置.png')});await page.getByLabel('关闭管理员面板',{exact:true}).click();
