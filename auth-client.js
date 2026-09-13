@@ -7,6 +7,7 @@ window.accountFeatures = {
   passwordForm: { current: '', next: '', confirm: '' },
   employeeForm: { username: '', display_name: '', password: '', role: 'staff' },
   employeeList: [], editingUser: null, editForm: {}, auditItems: [],
+  operations: null, operationsBusy: false, operationsError: '',
   companyAI: { provider: 'qwen', name: '', protocol: 'openai', base_url: '', model: '', key: '' },
   aiPresets: [], companyAILoaded: false, companyAIModel: '',
   availableAIModels: [], aiModelMessage: '', aiConfigMessage: '',
@@ -135,8 +136,19 @@ window.accountFeatures = {
       this.companyAI = { ...data.ai, key: '' };
       this.companyAILoaded = true;
     } catch (error) { this.adminMessage = error.message; }
-    await this.loadEmployees();
+    await Promise.all([this.loadEmployees(), this.refreshOperations()]);
   },
+
+  async refreshOperations() {
+    if (this.operationsBusy || this.accountUser?.role !== 'admin') return;
+    this.operationsBusy = true; this.operationsError = '';
+    try { this.operations = await this.accountJSON('/admin/operations'); }
+    catch (error) { this.operationsError = error.message; }
+    finally { this.operationsBusy = false; }
+  },
+
+  operationLevel(level) { return ({normal:'正常',warning:'需关注',critical:'异常',recovered:'已恢复'})[level] || '待检查'; },
+  operationTime(value) { return value ? new Date(value * 1000).toLocaleString('zh-CN', {hour12:false}) : '暂无记录'; },
 
   selectAIProvider() {
     const preset = this.aiPresets.find(item => item.provider === this.companyAI.provider);

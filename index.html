@@ -628,7 +628,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v5.2.0</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v5.3.0</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -863,6 +863,19 @@
     <div class="bg-white rounded-xl p-5 sm:p-7 w-full max-w-4xl max-h-[94vh] overflow-y-auto shadow-2xl">
       <div class="flex justify-between items-center mb-5"><h2 class="text-xl font-bold">员工与公司设置</h2><button @click="showAdmin = false" class="text-2xl" aria-label="关闭管理员面板">×</button></div>
       <p role="status" x-show="adminMessage" x-text="adminMessage" class="bg-blue-50 text-blue-900 rounded-lg p-3 mb-4 text-sm"></p>
+      <section aria-label="运行监控与告警" class="border rounded-xl p-4 mb-6 bg-slate-50" x-init="setInterval(() => { if (showAdmin && accountUser?.role === 'admin') refreshOperations(); }, 60000)">
+        <div class="flex items-center justify-between gap-3"><h3 class="font-semibold">运行监控与告警</h3><button type="button" @click="refreshOperations()" :disabled="operationsBusy" class="border rounded px-3 py-1 text-sm disabled:opacity-50" x-text="operationsBusy ? '检查中…' : '刷新运行状态'"></button></div>
+        <p x-show="operationsError" x-text="operationsError" role="alert" class="text-red-700 text-sm mt-3"></p>
+        <template x-if="operations"><div>
+          <p class="text-sm mt-3"><b x-text="operationLevel(operations.level)"></b> · 采集时间：<span x-text="operationTime(operations.checked_at)"></span></p>
+          <p class="text-xs text-slate-600 mt-1">监控每 5 分钟采集，面板打开时每分钟刷新。状态只代表最近一次检查。</p>
+          <div class="grid sm:grid-cols-2 gap-2 my-3"><template x-for="check in operations.checks" :key="check.id"><div class="border rounded-lg p-3" :class="check.level === 'critical' ? 'bg-red-50 border-red-300' : check.level === 'warning' ? 'bg-amber-50 border-amber-300' : 'bg-white'"><p class="text-sm font-semibold"><span x-text="check.label"></span> · <span x-text="operationLevel(check.level)"></span></p><p class="text-sm mt-1" x-text="check.summary"></p></div></template></div>
+          <p class="text-xs text-slate-600">最近异地校验：<span x-text="operationTime(operations.metrics?.backup_success_at)"></span></p>
+          <p class="text-xs text-slate-600 mt-1">公司模型：<span x-text="operations.metrics?.ai_model || '暂无模型信息'"></span></p>
+          <p class="text-sm mt-2" x-text="operations.notification?.status || '通知状态未知'"></p>
+          <details class="mt-3"><summary class="text-sm cursor-pointer">最近告警与恢复记录</summary><p x-show="!operations.events?.length" class="text-xs text-slate-500 mt-2">暂无状态变化记录</p><template x-for="(event, index) in operations.events || []" :key="index"><p class="text-xs border-b py-2"><span x-text="operationTime(event.at)"></span> · <span x-text="event.label"></span> · <span x-text="operationLevel(event.state)"></span></p></template></details>
+        </div></template>
+      </section>
       <h3 class="font-semibold mb-3">新增员工</h3>
       <form @submit.prevent="createEmployee()" class="grid sm:grid-cols-2 gap-3 mb-6">
         <label class="text-sm">员工姓名<input x-model="employeeForm.display_name" required maxlength="40" class="block w-full border rounded-lg px-3 py-2 mt-1" aria-label="新增员工姓名"></label>
