@@ -12,6 +12,7 @@ async function save(page){await page.getByRole('button',{name:'验证并保存�
  await open(page);assert.equal(await page.getByLabel('公司 AI 服务方',{exact:true}).locator('option').count(),15);
  assert.equal(await page.getByLabel('国内主流模型候选',{exact:true}).locator('option').count(),11);
  assert.equal(await page.getByLabel('公司 AI Key',{exact:true}).inputValue(),'');assert.equal(await page.getByLabel('视觉模型名称',{exact:true}).inputValue(),'HY-Vision-2.0-Instruct');
+ await page.getByLabel('国内主流模型候选',{exact:true}).selectOption('deepseek-flash');assert.equal(await page.getByLabel('视觉模型名称',{exact:true}).inputValue(),'deepseek/deepseek-flash');await page.getByLabel('国内主流模型候选',{exact:true}).selectOption('MiniMax-M3');assert.equal(await page.getByLabel('视觉模型名称',{exact:true}).inputValue(),'minimax-m3');
  await page.getByLabel('公司 AI 服务方',{exact:true}).selectOption('custom');await page.getByLabel('服务商名称',{exact:true}).fill('公司兼容网关');await page.getByLabel('接口地址',{exact:true}).fill('https://gateway.example/v1');await page.getByLabel('公司 AI Key',{exact:true}).fill('isolated-custom-test');
  await page.getByRole('button',{name:'获取可用模型',exact:true}).click();await page.waitForFunction(()=>Alpine.$data(document.body).availableAIModels.length===10);await page.getByLabel('服务商返回的模型',{exact:true}).selectOption('test-vision-model');await save(page);
  assert.ok(await page.evaluate(()=>Alpine.$data(document.body).adminMessage.includes('已保存')));assert.equal(await page.getByLabel('公司 AI Key',{exact:true}).inputValue(),'');

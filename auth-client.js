@@ -156,6 +156,12 @@ window.accountFeatures = {
     finally { this.authBusy = false; }
   },
 
+  selectModelReference(id) {
+    if (!id) return;
+    const tencentAliases = {'deepseek-flash':'deepseek/deepseek-flash','MiniMax-M3':'minimax-m3'};
+    this.companyAI.model = this.companyAI.provider === 'tencent' ? (tencentAliases[id] || id) : id;
+  },
+
   async loadEmployees() {
     try { this.employeeList = (await this.accountJSON('/admin/users')).items; }
     catch (error) { this.adminMessage = error.message; }
