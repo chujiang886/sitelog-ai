@@ -628,7 +628,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v5.1.1</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v5.2.0</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -892,9 +892,23 @@
         <summary class="font-semibold cursor-pointer">公司 AI 服务（管理员统一配置，可选）</summary>
         <p class="text-sm text-slate-500 my-3">配置后员工无需填写 AI Key。密钥保存在服务器，页面不会回显。识别照片会发送给所选服务方。</p>
         <form @submit.prevent="saveCompanyAI()" class="space-y-3">
-          <label class="block text-sm">服务方<select x-model="companyAI.provider" class="block w-full border rounded-lg px-3 py-2 mt-1"><option value="qwen">通义千问</option><option value="openai">OpenAI</option><option value="tencent">腾讯混元视觉</option></select></label>
-          <label class="block text-sm">公司 AI Key<input type="password" x-model="companyAI.key" autocomplete="off" class="block w-full border rounded-lg px-3 py-2 mt-1" placeholder="已有配置时留空保留原值"></label>
-          <button type="submit" :disabled="authBusy" class="bg-slate-800 text-white rounded-lg px-4 py-2">保存公司 AI 配置</button>
+          <fieldset :disabled="authBusy || !companyAILoaded" class="space-y-3">
+          <label class="block text-sm">服务方<select x-model="companyAI.provider" @change="selectAIProvider()" aria-label="公司 AI 服务方" class="block w-full border rounded-lg px-3 py-2 mt-1"><template x-for="preset in aiPresets" :key="preset.provider"><option :value="preset.provider" x-text="preset.name"></option></template></select></label>
+          <label class="block text-sm">服务商名称<input x-model="companyAI.name" maxlength="80" required aria-label="服务商名称" class="block w-full border rounded-lg px-3 py-2 mt-1" placeholder="例如：公司 AI 网关"></label>
+          <label class="block text-sm">接口协议<select x-model="companyAI.protocol" @change="availableAIModels=[]; aiModelMessage=''" aria-label="接口协议" class="block w-full border rounded-lg px-3 py-2 mt-1"><option value="openai">OpenAI 兼容（Chat Completions）</option><option value="anthropic">Anthropic 兼容（Messages）</option></select></label>
+          <label class="block text-sm">接口地址<input type="url" x-model="companyAI.base_url" @input="availableAIModels=[]; aiModelMessage=''" required maxlength="2048" aria-label="接口地址" class="block w-full border rounded-lg px-3 py-2 mt-1" placeholder="https://服务商域名/v1"></label>
+          <p class="text-xs text-slate-500">可填写基础地址或完整接口地址；必须使用公网 HTTPS。按服务商文档选择协议，地址中不要填写密钥。</p>
+          <label class="block text-sm">视觉模型名称 / 推理接入点 ID<input x-model="companyAI.model" required maxlength="200" aria-label="视觉模型名称" class="block w-full border rounded-lg px-3 py-2 mt-1" placeholder="粘贴服务商控制台中的模型名称或接入点 ID"></label>
+          <div class="rounded-lg bg-slate-50 border p-3"><label class="block text-sm font-semibold">国内主流模型候选<select aria-label="国内主流模型候选" @change="if ($event.target.value) companyAI.model=$event.target.value" class="block w-full border rounded-lg px-3 py-2 mt-1 font-normal"><option value="">选择候选，也可自行填写任意模型</option><template x-for="item in aiModelReferences" :key="item.id"><option :value="item.id" x-text="item.name + '（需验证）'"></option></template></select></label><p class="text-xs text-slate-500 mt-2">选择候选仅填写模型 ID，不会切换服务商。不同平台的 ID 和开通范围可能不同，请以下方服务商列表或控制台为准；全部候选均需通过图片验证。</p></div>
+          <p class="text-xs text-slate-500">预设帮助填写地址，不保证该平台所有模型都能识图。请选择支持图片输入的模型；未列出的服务商可选“其他服务商 / 自定义接口”。专有协议需经兼容网关接入。</p>
+          <label class="block text-sm">公司 AI Key<input type="password" x-model="companyAI.key" autocomplete="off" maxlength="4096" aria-label="公司 AI Key" class="block w-full border rounded-lg px-3 py-2 mt-1" placeholder="地址、协议和服务方不变时，可留空沿用"></label>
+          <button type="button" @click="loadAIModels()" class="border rounded-lg px-4 py-2">获取可用模型</button>
+          <p role="status" class="text-sm text-slate-600" x-text="aiModelMessage"></p>
+          <label x-show="availableAIModels.length" class="block text-sm">服务商返回的模型<select aria-label="服务商返回的模型" @change="if ($event.target.value) companyAI.model=$event.target.value" class="block w-full border rounded-lg px-3 py-2 mt-1"><option value="">请选择模型，也可在上方手动填写</option><template x-for="model in availableAIModels" :key="model"><option :value="model" x-text="model"></option></template></select></label>
+          <p class="text-xs text-slate-500">保存前会发送一张合成色块图片验证，可能产生少量调用费用。验证失败保留原配置；更改服务方、地址或协议需重新填写密钥。</p>
+          <button type="submit" class="bg-slate-800 text-white rounded-lg px-4 py-2" x-text="authBusy ? '正在验证…' : '验证并保存公司 AI 配置'">验证并保存公司 AI 配置</button>
+          </fieldset>
+          <p aria-live="polite" class="text-sm text-slate-700 whitespace-pre-wrap" x-text="adminMessage"></p>
         </form>
       </details>
       <details class="border-t pt-4"><summary @click="loadAudit()" class="font-semibold cursor-pointer">最近操作记录</summary><div class="mt-3 space-y-2"><template x-for="event in auditItems" :key="event.id"><p class="text-sm border-b pb-2"><span x-text="new Date(event.created_at * 1000).toLocaleString('zh-CN')"></span> · <span x-text="event.display_name || '服务接口'"></span> · <span x-text="auditLabel(event.action)"></span> <span x-text="event.target"></span></p></template></div></details>
@@ -1573,7 +1587,7 @@
         },
 
         async analyzeImage(img) {
-          const model = this.apiProvider === 'tencent' ? 'HY-Vision-2.0-Instruct' : this.apiProvider === 'openai' ? 'gpt-4o-mini' : 'qwen-vl-plus';
+          const model = this.companyAIModel;
           const result = await this.callVisionAPI(img.dataUrl, this.buildAnalysisPrompt(img.section || 'construction'), model);
           if (result._noJson || !result.desc) throw Error('AI 返回内容不完整，请保留照片并重试');
           const categories = ['框架施工','玻扇施工','五金安装','密封收口','成品保护','其他'];
@@ -1581,7 +1595,7 @@
           img.title = result.title || '待核实节点';img.desc = result.desc;img.stage = result.stage || '';
           img.highlights = Array.isArray(result.highlights) ? result.highlights : [];
           img.uncertainties = Array.isArray(result.uncertainties) ? result.uncertainties : ['尺寸、安装精度与验收结论需结合现场记录核实'];
-          img.aiConfirmed = false;img._analyzed = true;img.aiError = '';img.aiSource = {model,generatedAt:new Date().toISOString(),kind:'AI 建议，待人工确认'};
+          img.aiConfirmed = false;img._analyzed = true;img.aiError = '';img.aiSource = {model:result._model || model,generatedAt:new Date().toISOString(),kind:'AI 建议，待人工确认'};
         },
 
         buildAnalysisPrompt(section = 'construction') {
@@ -1711,7 +1725,7 @@
         // 简单的像素统计：检测玻璃反光（高亮像素比例）、深色框体像素、暖色（室内）冷色（室外）
         async callVisionAPI(imageDataUrl, prompt, modelOverride) {
           if (imageDataUrl.length > 400 * 1024) imageDataUrl = await this.compressDataUrl(imageDataUrl);
-          const config = { model: modelOverride || (this.apiProvider === 'tencent' ? 'HY-Vision-2.0-Instruct' : this.apiProvider === 'openai' ? 'gpt-4o-mini' : 'qwen-vl-plus') };
+          const config = { model: this.companyAIModel || modelOverride };
           const data = await this.runAIJob(imageDataUrl, prompt, config.model);
           const rawContent = data.choices[0].message.content;
 
@@ -1723,7 +1737,7 @@
             parsed.category = parsed.category.trim();
           }
           // 挂模型名用于调试追踪
-          parsed._model = modelOverride || config.model || 'unknown';
+          parsed._model = data.model || config.model || 'unknown';
           return parsed;
         },
 

@@ -7,7 +7,17 @@ window.accountFeatures = {
   passwordForm: { current: '', next: '', confirm: '' },
   employeeForm: { username: '', display_name: '', password: '', role: 'staff' },
   employeeList: [], editingUser: null, editForm: {}, auditItems: [],
-  companyAI: { provider: 'qwen', key: '' },
+  companyAI: { provider: 'qwen', name: '', protocol: 'openai', base_url: '', model: '', key: '' },
+  aiPresets: [], companyAILoaded: false, companyAIModel: '',
+  availableAIModels: [], aiModelMessage: '',
+  aiModelReferences: [
+    {name:'Hy4 preview',id:'hy4-preview'}, {name:'Hy3',id:'hy3'},
+    {name:'DeepSeek-V4.1-Flash',id:'deepseek-flash'},
+    {name:'GLM-5.3',id:'glm-5.3'}, {name:'GLM-5.3-Flash',id:'glm-5.3-flash'},
+    {name:'GLM-5.2',id:'glm-5.2'}, {name:'GLM-5.1',id:'glm-5.1'},
+    {name:'GLM-5V-Turbo',id:'glm-5v-turbo'}, {name:'MiniMax-M3',id:'MiniMax-M3'},
+    {name:'通义千问 Qwen3 VL Plus',id:'qwen3-vl-plus'},
+  ],
 
   async sessionRequest(path, options = {}) {
     const headers = { ...(options.headers || {}) };
@@ -40,6 +50,7 @@ window.accountFeatures = {
     this.csrf = data.csrf;
     this.aiConfigured = !!data.ai.configured;
     this.apiProvider = data.ai.provider;
+    this.companyAIModel = data.ai.model || ({qwen:'qwen-vl-plus',openai:'gpt-4o-mini',tencent:'HY-Vision-2.0-Instruct'}[data.ai.provider] || '');
     if (!this.showAdmin) this.companyAI.provider = data.ai.provider;
     this.showLogin = false;
     this.showPassword = !!data.user.must_change_password;
@@ -115,8 +126,34 @@ window.accountFeatures = {
   },
 
   async openAdmin() {
-    this.companyAI.provider = this.apiProvider;this.showAdmin = true; this.adminMessage = '';
+    this.showAdmin = true; this.adminMessage = ''; this.companyAILoaded = false;
+    this.availableAIModels = []; this.aiModelMessage = '';
+    this.companyAI.key = '';
+    try {
+      const data = await this.accountJSON('/admin/ai');
+      this.aiPresets = data.presets;
+      this.companyAI = { ...data.ai, key: '' };
+      this.companyAILoaded = true;
+    } catch (error) { this.adminMessage = error.message; }
     await this.loadEmployees();
+  },
+
+  selectAIProvider() {
+    const preset = this.aiPresets.find(item => item.provider === this.companyAI.provider);
+    if (preset) this.companyAI = { ...preset, key: '' };
+    this.availableAIModels = []; this.aiModelMessage = '';
+    this.adminMessage = '';
+  },
+
+  async loadAIModels() {
+    if (this.authBusy || !this.companyAILoaded) return;
+    this.authBusy = true; this.availableAIModels = []; this.aiModelMessage = '正在读取服务商模型列表…';
+    try {
+      const data = await this.accountJSON('/admin/ai/models', this.companyAI);
+      this.availableAIModels = data.models;
+      this.aiModelMessage = '已获取 ' + data.models.length + ' 个模型。列表不代表均支持识图，选定后仍需验证。';
+    } catch (error) { this.aiModelMessage = error.message; }
+    finally { this.authBusy = false; }
   },
 
   async loadEmployees() {
@@ -164,13 +201,14 @@ window.accountFeatures = {
   },
 
   async saveCompanyAI() {
-    this.authBusy = true;
+    if (this.authBusy || !this.companyAILoaded) return;
+    this.authBusy = true; this.adminMessage = '正在验证接口与图片识别能力，请稍候…';
     try {
-      await this.accountJSON('/admin/ai', this.companyAI);
-      this.companyAI.key = '';
+      const saved = await this.accountJSON('/admin/ai', this.companyAI);
+      this.companyAI = { ...saved, key: '' };
       await this.refreshSession();
       this.adminMessage = '公司 AI 设置已保存，员工再次点击 AI 整理即可使用，无需重新登录。';
     } catch (error) { this.adminMessage = error.message; }
-    finally { this.authBusy = false; }
+    finally { this.companyAI.key = ''; this.authBusy = false; }
   },
 };
