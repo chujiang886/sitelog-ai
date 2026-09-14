@@ -42,7 +42,7 @@ window.accountFeatures = {
   async accountJSON(path, payload) {
     const response = await this.sessionRequest(path, payload === undefined ? {} : { method: 'POST', body: JSON.stringify(payload) });
     const data = await response.json();
-    if (!response.ok || data.ok === false) throw new Error(data.error || '操作未完成，请重试');
+    if (!response.ok || data.ok === false) {const error=new Error(data.error || '操作未完成，请重试');error.status=response.status;throw error;}
     return data;
   },
 

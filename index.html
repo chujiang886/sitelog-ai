@@ -15,6 +15,7 @@
   <script src="project-client.js"></script>
   <script src="legacy-client.js"></script>
   <script src="field-client.js"></script>
+  <script src="workflow-client.js"></script>
   <script src="vendor/alpine.min.js" defer></script>
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="vendor/html2canvas.min.js"></script>
@@ -634,7 +635,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v5.3.1</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v5.4.0</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -670,8 +671,11 @@
     <button @click="saveLocalDraft()" :disabled="draftWriting || !draftOwner || draftConflict" class="border rounded px-3 py-1 disabled:opacity-50">保存本机草稿</button>
     <button @click="openProjects()" class="border rounded px-3 py-1">项目工作区</button>
     <button @click="openField()" class="border rounded px-3 py-1">现场助手</button>
-    <button @click="projectAction(() => saveCloudProject())" :disabled="cloudBusy || !accountUser" class="border rounded px-3 py-1">保存云端工程</button>
-    <span class="text-xs" x-text="cloudMessage"></span>
+    <button @click="projectAction(() => saveCloudProject())" :disabled="cloudBusy || draftHydrating || !accountUser" class="border rounded px-3 py-1">保存云端工程</button>
+    <span class="text-xs" role="status" x-text="cloudMessage"></span>
+    <button x-show="cloudBusy" @click="uploadPaused=true" class="border rounded px-3 py-1">当前照片完成后暂停</button>
+    <button x-show="uploadPending && !cloudBusy" @click="projectAction(()=>saveCloudProject())" class="border rounded px-3 py-1">继续同步</button>
+    <button x-show="cloudConflict" @click="cloudConflict.visible=true" class="border rounded px-3 py-1">处理修改冲突</button>
     <span x-show="aiJobId" class="text-xs" x-text="aiJobStatus"></span><button x-show="aiJobId" @click="cancelAIJob()" class="border rounded px-3 py-1">取消识别</button>
     <button @click="loadAIUsage()" class="border rounded px-3 py-1">识别用量</button>
     <span x-show="aiUsage" class="text-xs" x-text="aiUsage ? '今日'+(aiUsage.scope==='company'?'公司':'个人')+'任务 '+aiUsage.items.reduce((n,x)=>n+x.count,0)+' 次；令牌 '+aiUsage.items.reduce((n,x)=>n+(x.tokens||0),0) : ''"></span>
@@ -1255,6 +1259,8 @@
         ...window.accountFeatures,
         ...window.editorFeatures,
         ...window.projectFeatures,
+        ...window.workflowFeatures,
+        legacyOrigin:'',
         ...window.legacyFeatures,
         ...window.fieldFeatures,
         // ===== 状态 =====
@@ -1473,6 +1479,7 @@
                 const candidate={...img,highlights:[...(img.highlights||[])]};await this.analyzeImage(candidate);
                 if(before===JSON.stringify([img.title,img.desc,img.highlights,img._manual])){
                   for(const key of ['title','desc','category','stage','highlights','uncertainties','aiConfirmed','_analyzed','aiError','aiSource'])img[key]=candidate[key];
+                  img.aiBaseline={title:candidate.title,desc:candidate.desc,category:candidate.category,highlights:[...(candidate.highlights||[])],source:candidate.aiSource||{},capturedAt:new Date().toISOString()};
                 }else{this.proposeAI(img,candidate);this.showToast('识别期间你修改了文字，新建议需确认后才会采用');}
               } catch (e) {
                 console.error('分析失败', img.file && img.file.name, e);
@@ -3138,12 +3145,18 @@
   <div x-show="projectPanel" x-cloak class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" role="dialog" aria-label="项目工作区">
     <div class="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-auto" @click.stop>
       <div class="flex justify-between items-center"><h2 class="text-xl font-bold">项目工作区</h2><button @click="projectPanel=false" aria-label="关闭项目工作区" class="text-2xl">×</button></div>
-      <div class="flex flex-wrap gap-2 my-4"><input x-model="projectQuery" placeholder="搜索项目名称或阶段" class="border rounded p-2"><button @click="projectPage=1;projectAction(()=>loadProjects())" class="border rounded p-2">搜索工程</button><button @click="newLocalProject()" class="border rounded p-2">新建空白工程</button></div>
-      <div class="grid gap-2"><template x-for="item in projectItems" :key="item.id"><button @click="openCloudProject(item.id)" class="border rounded p-3 text-left hover:bg-slate-50"><b x-text="item.title"></b><span class="ml-2 text-sm text-slate-500" x-text="item.stage+' · '+statusLabel(item.status)+' · 修订 '+item.revision"></span></button></template><p x-show="!projectItems.length" class="text-slate-500">尚无可访问工程。编辑后点击“保存云端工程”即可建立。</p></div>
+      <div class="flex flex-wrap gap-2 my-4"><input x-model="projectQuery" placeholder="搜索项目、阶段或归档人" class="border rounded p-2"><button @click="projectPage=1;projectAction(()=>loadProjects())" class="border rounded p-2">搜索工程</button><button @click="newLocalProject()" class="border rounded p-2">新建空白工程</button></div>
+      <div class="flex flex-wrap gap-2 my-3">
+<select x-model="archiveKind" aria-label="档案类型" class="border rounded p-2"><option value="">全部档案</option><option value="cloud">云端工程</option><option value="legacy">历史档案</option></select>
+<select x-model="archiveStage" aria-label="施工阶段筛选" class="border rounded p-2"><option value="">全部阶段</option><option>框架施工</option><option>玻扇施工</option><option>五金安装</option><option>离场自检</option></select>
+<input x-model="archivePersonFilter" placeholder="归档人筛选" class="border rounded p-2">
+<label>记录日期从 <input type="date" x-model="archiveAfter" class="border rounded p-2"></label><label>至 <input type="date" x-model="archiveBefore" class="border rounded p-2"></label>
+</div><p class="text-xs text-slate-500 mb-3">云端按最近保存日期、历史档案按创建日期筛选。历史复制来源在新工程中保留。</p>
+<div class="grid gap-2"><template x-for="item in projectItems" :key="item.kind+item.id"><div class="border rounded p-3"><button @click="item.kind==='legacy'?projectAction(()=>copyLegacyProject(item.id)):openCloudProject(item.id)" class="text-left hover:bg-slate-50"><b x-text="item.title"></b><span class="ml-2 text-sm text-slate-500" x-text="item.stage+' · '+(item.kind==='legacy'?'历史档案 · 复制为新工程':statusLabel(item.status)+' · 修订 '+item.revision)"></span></button><p class="text-xs my-2" x-text="item.person+' · '+item.date"></p><p x-show="item.source" class="text-xs text-slate-500" x-text="'来源：历史档案 '+item.source"></p><button x-show="item.kind==='cloud'" @click="previewArchive(item)" class="border rounded p-2 text-sm">预览照片</button></div></template><p x-show="!projectItems.length" class="text-slate-500">没有符合条件的可访问档案。</p></div>
       <div class="flex gap-3 my-3"><button :disabled="projectPage<=1" @click="projectPage--;projectAction(()=>loadProjects())">上一页</button><span x-text="projectPage+' / '+Math.max(1,Math.ceil(projectTotal/20))"></span><button :disabled="projectPage*20>=projectTotal" @click="projectPage++;projectAction(()=>loadProjects())">下一页</button></div>
       <details class="my-3"><summary>本机保存的工程草稿</summary><template x-for="draft in localDraftItems" :key="draft.key"><button @click="projectAction(()=>openLocalDraft(draft.key))" class="block border rounded p-2 my-2 w-full text-left" x-text="draft.title+' · '+draft.savedAt"></button></template><p class="text-xs text-slate-500">本机草稿按账号和工程隔离，仅在此浏览器可见。其他设备请使用云端工程或工程包。</p></details>
       <section x-show="cloudProjectId" class="border-t mt-5 pt-4">
-        <h3 class="font-bold" x-text="'当前工程：'+projectName+' · '+statusLabel(cloudStatus)"></h3>
+        <h3 class="font-bold" x-text="'当前工程：'+projectName+' · '+statusLabel(cloudStatus)"></h3><button @click="openFeedback()" class="border rounded p-2 my-2">AI 质量反馈</button><button @click="projectAction(async()=>{changeItems=(await accountJSON('/projects/'+cloudProjectId+'/changes')).items})" class="border rounded p-2 ml-2">查看修改记录</button><template x-for="change in changeItems" :key="change.revision"><p class="text-xs" x-text="'修订 '+change.revision+' · '+change.display_name+' · '+new Date(change.created*1000).toLocaleString('zh-CN')"></p></template>
         <p class="text-sm text-slate-500 my-2">提交审核会保存当前内容。负责人可自行审核；多人复核可添加“审核人”。审核后再修改，需重新提交。</p>
         <label class="block my-2">审核备注<input x-model="reviewNote" placeholder="退回时必须说明原因" class="border rounded p-2 ml-2"></label>
         <div class="flex gap-2"><button @click="reviewProject('submit')" :disabled="cloudBusy" class="border rounded p-2">提交审核</button><button @click="reviewProject('approve')" :disabled="cloudStatus!=='review'" class="border rounded p-2">审核通过</button><button @click="reviewProject('reject')" :disabled="cloudStatus!=='review'" class="border rounded p-2">退回修改</button><button @click="projectPanel=false;openShareDialog()" class="border rounded p-2">发布分享码</button></div>
@@ -3168,6 +3181,11 @@
 <template x-for="issue in issueItems" :key="issue.id"><div class="border rounded p-3 my-3"><b x-text="issue.title"></b><p class="text-sm" x-text="issue.assignee_name+' · '+(issue.severity==='critical'?'关键问题':'一般问题')+' · '+({open:'待整改',resolved:'待复核',closed:'已关闭'}[issue.status])"></p><template x-for="event in issue.events" :key="event.id"><p class="text-xs my-2" x-text="event.display_name+' · '+({create:'登记',resolve:'提交整改',close:'复核关闭',reopen:'重新打开'}[event.action])+'：'+event.note+' · 留底照片 '+event.media.length+' 张'"></p></template><input x-model="issueNotes[issue.id]" placeholder="整改或复核说明" class="border rounded p-2 w-full"><select x-model="issuePhotos[issue.id]" class="border rounded p-2 my-2"><option value="">选择整改照片</option><template x-for="photo in allPhotos().filter(p=>p.mediaId)" :key="photo.id"><option :value="photo.mediaId" x-text="photo.title"></option></template></select><div class="flex gap-2"><button x-show="issue.status==='open'" @click="changeIssue(issue,'resolve')" class="border rounded p-2">提交整改结果</button><button x-show="issue.status==='resolved'" @click="changeIssue(issue,'close')" class="border rounded p-2">复核关闭</button><button x-show="issue.status!=='open'" @click="changeIssue(issue,'reopen')" class="border rounded p-2">重新打开问题</button></div></div></template>
 <h3 class="font-bold mt-6">公司培训案例</h3><p class="text-sm text-slate-500 my-2">只收录人工编写的脱敏文字，不复制客户项目名、房号或照片。另一位管理员审核通过后，公司账号可查阅。</p><div class="grid gap-2"><input x-model="caseForm.title" placeholder="脱敏案例标题" class="border rounded p-2"><textarea x-model="caseForm.problem" placeholder="通用问题与判断依据" class="border rounded p-2"></textarea><textarea x-model="caseForm.resolution" placeholder="处理方法与复核要点" class="border rounded p-2"></textarea><label><input type="checkbox" x-model="caseForm.redacted"> 已移除姓名、地址、联系方式等客户资料</label><button @click="submitCase()" class="border rounded p-2">提交培训案例审核</button></div><input x-show="accountUser?.role==='admin'" x-model="caseNote" placeholder="案例审核意见" class="border rounded p-2 my-3 w-full"><template x-for="item in caseItems" :key="item.id"><div class="border rounded p-3 my-2"><b x-text="item.title"></b><span class="text-xs ml-2" x-text="{pending:'待审核',approved:'已通过',rejected:'已退回',withdrawn:'已撤回'}[item.status]"></span><p class="whitespace-pre-wrap my-2" x-text="item.problem"></p><p class="whitespace-pre-wrap my-2" x-text="item.resolution"></p><p class="text-xs" x-text="item.review_note"></p><div class="flex gap-2"><button x-show="accountUser?.role==='admin'&&item.status==='pending'" @click="reviewCase(item,'approve')" class="border rounded p-2">通过案例</button><button x-show="accountUser?.role==='admin'&&item.status==='pending'" @click="reviewCase(item,'reject')" class="border rounded p-2">退回案例</button><button x-show="item.status!=='withdrawn'" @click="reviewCase(item,'withdraw')" class="border rounded p-2">撤回案例</button></div></div></template>
 </div></div>
+
+
+<div x-show="archiveGalleryOpen" x-cloak class="fixed inset-0 z-[80] bg-black/50 flex items-center justify-center p-4"><section role="dialog" aria-label="照片预览" class="bg-white rounded-xl p-5 w-full max-w-4xl max-h-[90vh] overflow-auto"><button @click="archiveGalleryOpen=false" class="float-right border rounded p-2">关闭照片预览</button><h2 class="text-xl font-bold">照片预览</h2><div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5"><template x-for="photo in archiveGallery" :key="photo.id"><figure><img :src="photo.src" loading="lazy" class="w-full rounded" :alt="photo.title"><figcaption class="text-sm" x-text="photo.title"></figcaption></figure></template></div></section></div>
+<div x-show="cloudConflict && cloudConflict.visible!==false" x-cloak class="fixed inset-0 z-[80] bg-black/50 flex items-center justify-center p-4"><section role="dialog" aria-label="修改冲突对比" class="bg-white rounded-xl p-5 w-full max-w-5xl max-h-[90vh] overflow-auto"><h2 class="text-xl font-bold">比较并保留修改</h2><p class="my-3">另一设备已保存新内容。逐项选择后保存为新修订；合并前的本机内容会额外留存一份草稿。</p><p class="text-sm" x-text="'服务器当前修订：'+(cloudConflict?.revision||0)"></p><template x-for="change in changeItems" :key="change.revision"><p class="text-xs" x-text="'修订 '+change.revision+' · '+change.display_name"></p></template><template x-for="row in (cloudConflict?.rows||[])" :key="row.key"><div class="border rounded p-3 my-3"><h3 class="font-bold" x-text="row.label"></h3><div class="grid md:grid-cols-2 gap-3"><label><input type="radio" :name="'conflict-'+row.key" value="local" x-model="row.choice"> 保留本机<pre class="text-sm whitespace-pre-wrap max-h-40 overflow-auto" x-text="differenceText(row.local)"></pre></label><label><input type="radio" :name="'conflict-'+row.key" value="remote" x-model="row.choice"> 保留服务器<pre class="text-sm whitespace-pre-wrap max-h-40 overflow-auto" x-text="differenceText(row.remote)"></pre></label></div></div></template><button @click="cloudConflict.visible=false" class="border rounded p-2">稍后处理</button><button @click="resolveConflict()" :disabled="cloudBusy" class="bg-green-900 text-white rounded p-2 ml-3">保存选择后的新修订</button></section></div>
+<div x-show="feedbackPanel" x-cloak class="fixed inset-0 z-[85] bg-black/50 flex items-center justify-center p-4"><section role="dialog" aria-label="AI质量反馈" class="bg-white rounded-xl p-5 w-full max-w-4xl max-h-[90vh] overflow-auto"><button @click="feedbackPanel=false" class="float-right border rounded p-2">关闭质量反馈</button><h2 class="text-xl font-bold">AI 质量反馈</h2><p class="text-sm my-3">保留 AI 原建议与当前修改，填写现场依据。另一位有审核权限的人员确认后才进入评测集；修改本身不代表正确答案。</p><select x-model="feedbackPhoto" aria-label="反馈照片" class="border rounded p-2 w-full"><option value="">选择保留了 AI 原建议的照片</option><template x-for="photo in allPhotos().filter(p=>p.aiBaseline)" :key="photo.id"><option :value="photo.id" x-text="photo.title"></option></template></select><textarea x-model="feedbackReason" placeholder="修改原因，例如将看不清的尺寸改为待核实" class="border rounded p-2 w-full my-2"></textarea><textarea x-model="feedbackEvidence" placeholder="核实依据，例如实测记录、材料单据或现场复核" class="border rounded p-2 w-full"></textarea><button @click="submitFeedback()" :disabled="feedbackBusy||cloudBusy" class="border rounded p-2 my-2">提交质量反馈</button><button @click="exportFeedback()" class="border rounded p-2 ml-2">导出已审核反馈集</button><template x-for="item in feedbackItems" :key="item.id"><article class="border rounded p-3 my-3"><p x-text="item.display_name+' · '+({pending:'待独立审核',approved:'已核实纳入',rejected:'退回'}[item.status])"></p><div class="grid md:grid-cols-2 gap-3"><div><h3>AI 原建议</h3><p class="whitespace-pre-wrap" x-text="item.body.suggested.desc"></p></div><div><h3>提交时的人工修改</h3><p class="whitespace-pre-wrap" x-text="item.body.corrected.desc"></p></div></div><p x-text="'原因：'+item.reason"></p><p x-text="'依据：'+item.evidence"></p><p x-text="item.review_note"></p><div x-show="item.status==='pending' && item.creator!==accountUser?.id"><textarea x-model="feedbackNotes[item.id]" placeholder="独立核实说明" class="border rounded p-2 w-full"></textarea><button @click="reviewFeedback(item,'approve')" class="border rounded p-2">核实通过</button><button @click="reviewFeedback(item,'reject')" class="border rounded p-2 ml-2">退回反馈</button></div></article></template></section></div>
 
 </body>
 </html>

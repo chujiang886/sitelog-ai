@@ -42,7 +42,7 @@
     draftRevision: 0, draftConflict: false, draftRestored: false, draftTimer: null, draftWriting: false,
     activeTemplate: '框架施工', documentId: '', undoSnapshot: null, aiCandidate: null, aiCandidateId: null,
     aiPrevious: null, editorReady: false, backgroundSyncError: '',
-    draftStorageKey:'',localDraftItems:[],
+    draftStorageKey:'',localDraftItems:[],draftHydrating:false,
 
     async initializeEditor() {
       if (this.editorReady) return;
@@ -99,7 +99,7 @@
         if (this.draftDirty && !await this.saveLocalDraft()) { this.showLogin = true; this.showToast('上个账号的草稿尚未保存，请先导出工程包', 'error'); return; }
         await this.clearEditorForAccount();
       }
-      this.draftOwner = next;this.draftRevision = 0;this.draftConflict = false;
+      this.draftHydrating=true;this.draftOwner = next;this.draftRevision = 0;this.draftConflict = false;
       try {
         const pointer=await transaction('readonly',store=>store.get('active:'+next));
         const stored = await transaction('readonly', store => store.get(pointer?.activeKey||'account:'+next));
@@ -113,7 +113,7 @@
           this.draftSavedAt = stored.savedAt;this.draftRestored = true;
           this.draftStatus = '已恢复本机草稿';
         } else { this.draftStatus = '本机自动保存已就绪'; if (this.allPhotos().length || this.projectName) this.markDraftDirty(); }
-      } catch (error) { this.draftStatus = '本机草稿不可用，请导出工程包留底';this.showToast(this.draftStatus, 'error'); }
+      } catch (error) { this.draftStatus = '本机草稿不可用，请导出工程包留底';this.showToast(this.draftStatus, 'error'); } finally {this.draftHydrating=false;}
     },
     snapshot() {
       this.syncCoverMeta();
@@ -133,10 +133,11 @@
       });
       if (this.projectSnapshotExtras) result.project = this.projectSnapshotExtras();
       if (this.fieldSnapshot) result.field = this.fieldSnapshot();
+      if(this.legacyOrigin)result.origin={legacy:this.legacyOrigin};
       return result;
     },
     async restoreSnapshot(snapshot) {
-      validateSnapshot(snapshot);this.draftLoading = true;
+      validateSnapshot(snapshot);this.draftLoading = true;this.legacyOrigin=snapshot.origin?.legacy||'';
       try {
         for (const key of metadata) if (['string','boolean'].includes(typeof snapshot.meta[key])) this[key] = snapshot.meta[key];
         for (const key of collections) this[key] = snapshot[key].map(photo => ({ ...photo, analyzing: false, file: { name: photo.filename || '施工照片' } }));
@@ -211,7 +212,7 @@
     async clearEditorForAccount() {
       clearTimeout(this.draftTimer);this.draftLoading = true;
       for (const key of collections) this[key] = [];
-      this.projectName = '';this.siteLocation = '';this.archivePerson = '';this.pdfFilename = '';this.documentId = '';
+      this.legacyOrigin='';this.projectName = '';this.siteLocation = '';this.archivePerson = '';this.pdfFilename = '';this.documentId = '';
       this.draftOwner = null;this.undoSnapshot = null;this.aiCandidate = null;
       this.draftStorageKey='';this.draftRevision=0;this.draftConflict=false;
       this.reportHtml = this.getTemplateHtml();await this.$nextTick();this.syncToReport();await this.$nextTick();
@@ -225,6 +226,7 @@
     },
     proposeAI(img, result) {
       this.aiCandidateId = img.id;this.aiCandidate = Object.fromEntries(['title','desc','category','stage','highlights','uncertainties','aiConfirmed','_analyzed','aiError','aiSource'].filter(key=>result[key]!==undefined).map(key=>[key,result[key]]));
+      img.aiBaseline={title:result.title,desc:result.desc,category:result.category,highlights:[...(result.highlights||[])],source:result.aiSource||{},capturedAt:new Date().toISOString()};this.markDraftDirty();
       this.aiPrevious = { title: img.title || '', desc: img.desc || '', highlights: [...(img.highlights || [])] };
     },
     acceptAICandidate() {

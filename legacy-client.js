@@ -37,7 +37,7 @@
     if(root.querySelectorAll('img').length!==assigned.size)throw Error('有照片不属于可识别章节，未创建不完整副本');
     if(!seen.has('施工节点'))throw Error('缺少可编辑施工章节，暂不能自动转换');
     root.querySelectorAll('.pdf-editable-box,.node-card-desc,.node-card h3').forEach(n=>n.setAttribute('contenteditable','true'));
-    snapshot.report=holder.innerHTML;
+    snapshot.report=holder.innerHTML;snapshot.origin={legacy:record.id||''};
     return sitelogEditor.validateSnapshot(snapshot);
   }
   window.sitelogLegacy={convert};
