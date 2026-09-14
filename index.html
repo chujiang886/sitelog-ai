@@ -937,7 +937,6 @@
   <!-- ========== 导出 PDF 指引弹窗（方案1：浏览器原生另存为 PDF） ========== -->
   <div
     x-show="exportGuideOpen"
-    x-transition.opacity.duration.150ms
     class="no-print fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
     @click.self="closeExportGuide()"
     @keydown.escape.window="closeExportGuide()"
@@ -988,7 +987,6 @@
   <!-- ========== 分享弹窗（v4.4：确认完成 → 二维码 → 业主扫码看） ========== -->
   <div
     x-show="shareDialogOpen"
-    x-transition.opacity.duration.150ms
     class="no-print fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
     @click.self="shareDialogOpen = false"
     @keydown.escape.window="if(shareDialogOpen && !shareBusy) shareDialogOpen = false"
@@ -1062,7 +1060,6 @@
   <!-- ========== 分享管理面板（已分享清单 / 查看次数 / 作废） ========== -->
   <div
     x-show="shareManageOpen"
-    x-transition.opacity.duration.150ms
     class="no-print fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
     @click.self="shareManageOpen = false"
     @keydown.escape.window="if(shareManageOpen) shareManageOpen = false"
@@ -1105,7 +1102,6 @@
   <!-- ========== 全局通知 ========== -->
   <div
     x-show="toast.show"
-    x-transition
     class="no-print fixed bottom-6 right-6 z-50 px-5 py-3 rounded-lg shadow-2xl text-white"
     :class="toast.type === 'error' ? 'bg-red-600' : 'bg-slate-900'"
   >
