@@ -13,3 +13,9 @@ test('显式移除与顺序选择不生成重复照片，也不修改输入快�
  const a={meta:{},images:[{id:'a'},{id:'b'}],arrivalImages:[],finishImages:[],sopImages:[],report:'A'},b=copy(a);b.images=[{id:'b'},{id:'c'}];b.report='B';const rows=differences(a,b);for(const row of rows)row.choice='remote';
  assert.deepEqual(copy(merge(a,b,rows)),b);assert.equal(a.images.length,2);
 });
+test('切换工程或账号时清除旧反馈和预览，迟到的旧账号查询不回填',async()=>{
+ const features=context.window.workflowFeatures;
+ const state={...features,feedbackItems:[{reason:'旧账号内容'}],archiveGallery:[{src:'旧照片'}],projectItems:[{title:'旧工程'}]};
+ state.restoreProjectExtras(null);assert.equal(state.feedbackItems.length,0);assert.equal(state.archiveGallery.length,0);assert.equal(state.projectItems.length,0);
+ let finish;state.accountUser={id:1};state.accountJSON=()=>new Promise(r=>finish=r);const pending=state.loadProjects();state.accountUser={id:2};finish({items:[{title:'迟到的旧工程'}],total:1});await pending;assert.equal(state.projectItems.length,0);
+});
