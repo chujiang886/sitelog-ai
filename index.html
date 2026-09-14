@@ -667,12 +667,12 @@
   </header>
 
   <div class="no-print max-w-7xl mx-auto px-4 py-3 flex flex-wrap gap-3 items-center text-sm bg-white border-b">
-    <span role="status" x-text="draftStatus" :class="draftConflict ? 'text-red-700' : 'text-slate-600'"></span>
+    <span role="status" aria-label="本机草稿状态" x-text="draftStatus" :class="draftConflict ? 'text-red-700' : 'text-slate-600'"></span>
     <button @click="saveLocalDraft()" :disabled="draftWriting || !draftOwner || draftConflict" class="border rounded px-3 py-1 disabled:opacity-50">保存本机草稿</button>
     <button @click="openProjects()" class="border rounded px-3 py-1">项目工作区</button>
     <button @click="openField()" class="border rounded px-3 py-1">现场助手</button>
     <button @click="projectAction(() => saveCloudProject())" :disabled="cloudBusy || draftHydrating || !accountUser" class="border rounded px-3 py-1">保存云端工程</button>
-    <span class="text-xs" role="status" x-text="cloudMessage"></span>
+    <span class="text-xs" role="status" aria-label="云端同步状态" x-text="cloudMessage"></span>
     <button x-show="cloudBusy" @click="uploadPaused=true" class="border rounded px-3 py-1">当前照片完成后暂停</button>
     <button x-show="uploadPending && !cloudBusy" @click="projectAction(()=>saveCloudProject())" class="border rounded px-3 py-1">继续同步</button>
     <button x-show="cloudConflict" @click="cloudConflict.visible=true" class="border rounded px-3 py-1">处理修改冲突</button>
