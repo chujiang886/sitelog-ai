@@ -7,6 +7,14 @@ function makeApp(fetch){
  vm.createContext(context);vm.runInContext(fs.readFileSync('auth-client.js','utf8'),context);vm.runInContext(scripts.at(-1)[1],context);
  const app=context.siteLogApp();app.showToast=()=>{};return app;
 }
+
+test('推理区中的示例 JSON 不能覆盖模型最终结果',()=>{
+ const app=makeApp();const example=JSON.stringify({title:'推理中的草稿',category:'框架施工',desc:'短草稿',highlights:[]});
+ const final=JSON.stringify({title:'玻扇安装记录',category:'玻扇施工',desc:'玻扇位于框体内，边缘压线和接缝可见；实际尺寸及紧固状态需要结合现场测量核实。',highlights:['接缝待核实']});
+ const result=app.extractJSONRobust('<think>'+example+'</think>'+final);
+ assert.equal(result.title,'玻扇安装记录');assert.ok(result.desc.includes('现场测量核实'));assert.ok(!result._raw.includes('短草稿'));
+ assert.equal(app.extractJSONRobust('<think>'+example)._noJson,true);
+});
 test('分享请求使用同站点会话和 CSRF，不发送旧分享凭据',async()=>{
  let request;const app=makeApp(async(url,options)=>{request={url,options};return{status:200}});app.csrf='test-csrf';
  await app.shareRequest('',{method:'POST',body:'{}'});

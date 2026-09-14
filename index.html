@@ -13,6 +13,7 @@
   <script src="vendor/purify.min.js"></script>
   <script src="editor-state.js"></script>
   <script src="project-client.js"></script>
+  <script src="legacy-client.js"></script>
   <script src="field-client.js"></script>
   <script src="vendor/alpine.min.js" defer></script>
   <script src="vendor/jspdf.umd.min.js"></script>
@@ -276,7 +277,11 @@
       h2, .pdf-section-title { font-size: 13pt; page-break-after: avoid; }
       h3 { font-size: 11pt; page-break-after: avoid; }
       img { page-break-inside: avoid; max-width: 100%; }
-      .pdf-section { page-break-inside: avoid; }
+      .pdf-section, .pdf-sop-gallery, .node-cards-container { break-inside: auto !important; page-break-inside: auto !important; }
+      .pdf-section-header { break-after: avoid-page; page-break-after: avoid; }
+      .pdf-sop-gallery-title { break-after: avoid-page; page-break-after: avoid; }
+      .node-cards-container { display: block !important; }
+      .node-cards-container > .node-card { margin-bottom: 20px; }
       .node-card { page-break-inside: avoid; border: 1px solid #d8d0c0 !important; box-shadow: none !important; }
       .pdf-cover, .pdf-footer, .pdf-cover-band, .pdf-callout, .pdf-sop-gallery {
         -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
@@ -304,6 +309,7 @@
     }
 
     /* ═════ 封面 ═════ */
+    .node-card-desc { white-space: pre-wrap; overflow-wrap: anywhere; }
     .pdf-cover { margin-bottom: 36px; }
     .pdf-cover-band {
       background: linear-gradient(135deg, #1F3D2A 0%, #2D5A47 100%);
@@ -628,7 +634,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v5.3.0</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v5.3.1</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -1076,7 +1082,7 @@
 
       <div x-show="!shareListLoading && shareList.length > 0" class="space-y-2">
         <template x-for="item in shareList" :key="item.id">
-          <div class="border border-slate-200 rounded-lg p-3 flex items-center gap-3">
+          <div class="border border-slate-200 rounded-lg p-3 flex flex-wrap items-center gap-3">
             <div class="flex-1 min-w-0">
               <p class="text-sm font-semibold text-slate-900 truncate" x-text="item.title || item.id"></p>
               <p class="text-xs text-slate-500 truncate" x-text="(item.project || '') + ' · ' + item.created_at"></p>
@@ -1087,6 +1093,7 @@
               </div>
             </div>
             <button @click="copyText(item.url)" class="px-2 py-1 text-xs bg-slate-100 rounded hover:bg-slate-200 shrink-0">复制</button>
+            <button x-show="item.kind === 'legacy'" @click="copyLegacyProject(item.id)" :disabled="legacyBusy" class="px-2 py-1 text-xs bg-blue-50 text-blue-900 rounded shrink-0">复制为新工程</button>
             <button x-show="!item.revoked" @click="revokeShare(item.id)" class="px-2 py-1 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 shrink-0">作废</button>
             <button x-show="item.revoked" @click="restoreShare(item.id)" class="px-2 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100 shrink-0">恢复</button>
           </div>
@@ -1252,6 +1259,7 @@
         ...window.accountFeatures,
         ...window.editorFeatures,
         ...window.projectFeatures,
+        ...window.legacyFeatures,
         ...window.fieldFeatures,
         // ===== 状态 =====
         apiProvider: 'qwen',
@@ -1760,6 +1768,9 @@
         // 新实现：① 整段直解 ② 平衡花括号定位 ③ 容错修复 ④ 逐字段正则抠取。
         // 且 desc 做多键名归一化（desc/description/描述/工艺说明…），杜绝「键名不对就丢」。
         extractJSONRobust(raw) {
+          if (typeof raw !== 'string' || !raw) return { _raw: '', _noJson: true };
+          // 部分服务商将推理区和最终答案放在同一 content；推理中的示例不是工程结果。
+          raw = raw.replace(/<(think|thinking)>[\s\S]*?<\/\1>/gi, '').replace(/<(?:think|thinking)>[\s\S]*$/gi, '').trim();
           if (!raw) return { _raw: '', _noJson: true };
 
           // 1) 整段直接解析（纯 JSON 情况）
@@ -1796,7 +1807,7 @@
                 + (obj.desc || obj.description || obj['描述'] ? 1 : 0)
                 + (obj.category ? 1 : 0)
                 + (obj.highlights ? 1 : 0);
-              if (score > bestScore) { bestScore = score; best = obj; }
+              if (score >= bestScore) { bestScore = score; best = obj; }
             }
           }
           if (best) return this._normalizeParsed(best, raw);
