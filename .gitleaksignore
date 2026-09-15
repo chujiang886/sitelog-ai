@@ -1,0 +1,2 @@
+# 已核实：历史部署文档中测试拒绝非法 Basic 认证的虚构示例（解码为常见测试账号），不是密钥。
+1377e8b3fcbd92f6b0c9c5dd7e8a1b949f8d274a:docs/PRODUCTION_DEPLOYMENT_GUIDE.md:curl-auth-header:462

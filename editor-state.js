@@ -36,13 +36,22 @@
     }
     return snapshot;
   }
-  window.sitelogEditor = { collections, metadata, localDate, sanitizeReport, validateSnapshot, transaction };
+  // data URL 是内存中的照片，不能使用 fetch（生产 connect-src 仅允许同源网络请求）。
+  function photoBlob(dataUrl) {
+    if (typeof dataUrl !== 'string') throw Error('照片数据无法读取，请保留页面并导出工程包');
+    const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=\s]+)$/.exec(dataUrl);
+    if (!match) throw Error('照片数据格式无效，请保留页面并导出工程包');
+    const binary = atob(match[2]), bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type: match[1] });
+  }
+  window.sitelogEditor = { collections, metadata, localDate, sanitizeReport, validateSnapshot, transaction, photoBlob };
   window.editorFeatures = {
     draftStatus: '登录后自动保存本机草稿', draftSavedAt: '', draftDirty: false, draftOwner: null, draftLoading: false,
     draftRevision: 0, draftConflict: false, draftRestored: false, draftTimer: null, draftWriting: false,
     activeTemplate: '框架施工', documentId: '', undoSnapshot: null, aiCandidate: null, aiCandidateId: null,
     aiPrevious: null, editorReady: false, backgroundSyncError: '',
-    draftStorageKey:'',localDraftItems:[],draftHydrating:false,
+    draftStorageKey:'',localDraftItems:[],draftHydrating:false,draftLastError:'',
 
     async initializeEditor() {
       if (this.editorReady) return;
@@ -166,7 +175,7 @@
         const owner = this.draftOwner, key = this.draftKey(), snapshot = this.snapshot();
         this.draftDirty = false;
         for (const group of collections) for (const img of snapshot[group]) {
-          img.blob = await (await fetch(img.dataUrl)).blob();delete img.dataUrl;
+          img.blob = photoBlob(img.dataUrl);delete img.dataUrl;
         }
         const db = await database();
         const savedAt = new Date().toLocaleString('zh-CN', { hour12: false });
@@ -182,11 +191,16 @@
           tx.onerror = () => reject(tx.error);
         });
         if (owner === this.draftOwner) { this.draftRevision = revision;this.draftSavedAt = savedAt;this.draftConflict = false;this.draftStatus = '本机已保存 · ' + savedAt; }
-        success = true;
+        this.draftLastError = '';success = true;
       } catch (error) {
         this.draftDirty = true;this.draftConflict = /另一个窗口/.test(error.message);
-        this.draftStatus = this.draftConflict ? error.message : '保存失败：空间不足或浏览器限制，请导出工程包';
-        this.showToast(this.draftStatus, 'error');
+        this.draftStatus = this.draftConflict ? error.message
+          : error.name === 'QuotaExceededError' ? '本机存储空间不足，请先导出工程包留底'
+          : error.name === 'SecurityError' ? '浏览器未允许本机草稿存储，请先导出工程包留底'
+          : '本机草稿未保存，请保留页面并导出工程包留底';
+        // 同一次持续故障只提示一次；保留未保存标记，用户仍可保存或导出重试。
+        if (this.draftLastError !== this.draftStatus) this.showToast(this.draftStatus, 'error');
+        this.draftLastError = this.draftStatus;
       } finally { this.draftWriting = false; if (success && this.draftDirty) this.markDraftDirty(); }
       return success;
     },
@@ -214,7 +228,7 @@
       for (const key of collections) this[key] = [];
       this.legacyOrigin='';this.projectName = '';this.siteLocation = '';this.archivePerson = '';this.pdfFilename = '';this.documentId = '';
       this.draftOwner = null;this.undoSnapshot = null;this.aiCandidate = null;
-      this.draftStorageKey='';this.draftRevision=0;this.draftConflict=false;
+      this.draftStorageKey='';this.draftRevision=0;this.draftConflict=false;this.draftLastError='';
       this.reportHtml = this.getTemplateHtml();await this.$nextTick();this.syncToReport();await this.$nextTick();
       this.draftLoading = false;this.draftDirty = false;
       if (this.resetProjectContext) this.resetProjectContext();

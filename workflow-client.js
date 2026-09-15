@@ -66,7 +66,7 @@
       for(const photo of photos){
         same();if(this.uploadPaused)throw Error('同步已暂停，点击继续同步即可恢复');
         if(!photo.mediaId){
-          const bytes=await (await fetch(photo.dataUrl)).arrayBuffer();const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
+          const bytes=await sitelogEditor.photoBlob(photo.dataUrl).arrayBuffer();const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
           // 即便上传成功响应丢失或本机检查点没写入，也能通过服务端散列查询恢复。
           const lookup=await this.transferJSON('/projects/'+this.cloudProjectId+'/media-lookup?sha256='+hash);same();
           const uploaded=lookup.found?lookup.media:await this.transferJSON('/projects/'+this.cloudProjectId+'/media',{dataUrl:photo.dataUrl,filename:photo.filename});same();

@@ -635,7 +635,7 @@
       <div class="flex items-center gap-3">
         <div class="text-3xl">🏗️</div>
         <div>
-          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v5.4.0</span></h1>
+          <h1 class="text-lg font-bold tracking-wide">施格归档 <span class="text-xs font-normal opacity-80">SiteLog AI</span> <span class="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">v5.4.1</span></h1>
           <p class="text-xs opacity-80">门窗行业 · 现场施工归档 AI 助手</p>
         </div>
       </div>
@@ -1474,8 +1474,8 @@
             while (cursor < todo.length && !this.aiCancelRequested) {
               const img = todo[cursor++];
               img.analyzing = true;
+              const before=JSON.stringify([img.title,img.desc,img.highlights,img._manual]);
               try {
-                const before=JSON.stringify([img.title,img.desc,img.highlights,img._manual]);
                 const candidate={...img,highlights:[...(img.highlights||[])]};await this.analyzeImage(candidate);
                 if(before===JSON.stringify([img.title,img.desc,img.highlights,img._manual])){
                   for(const key of ['title','desc','category','stage','highlights','uncertainties','aiConfirmed','_analyzed','aiError','aiSource'])img[key]=candidate[key];
@@ -1485,8 +1485,10 @@
                 console.error('分析失败', img.file && img.file.name, e);
                 const sectionName = img.section === 'arrival' ? '进场照片' : (img.section === 'finish' ? '完工照片' : '施工节点');
                 const idx = img.section === 'arrival' ? this.arrivalImages.indexOf(img) + 1 : (img.section === 'finish' ? this.finishImages.indexOf(img) + 1 : this.images.indexOf(img) + 1);
-                img.title = `${sectionName} ${idx}`;
-                img.desc = `[AI 识别失败] ${e.message}\n\n当前照片已保留，可稍后重试或手动填写。`;
+                if(before===JSON.stringify([img.title,img.desc,img.highlights,img._manual])) {
+                  img.title = `${sectionName} ${idx}`;
+                  img.desc = `[AI 识别失败] ${e.message}\n\n当前照片已保留，可稍后重试或手动填写。`;
+                }
                 img.aiError = e.message;
                 failures.push({ name: (img.file && img.file.name) || img.id, error: e.message });
               } finally {
@@ -1751,6 +1753,7 @@
           if (imageDataUrl.length > 400 * 1024) imageDataUrl = await this.compressDataUrl(imageDataUrl);
           const config = { model: this.companyAIModel || modelOverride };
           const data = await this.runAIJob(imageDataUrl, prompt, config.model);
+          if (['length','max_tokens'].includes(data.choices?.[0]?.finish_reason)) throw Error('AI 输出达到长度上限，结果已截断；照片已保留，请稍后重试');
           const rawContent = data.choices[0].message.content;
 
           // 智能提取 JSON（兼容 markdown 代码块、前后废话、键名差异、多余花括号等）

@@ -15,6 +15,18 @@ test('推理区中的示例 JSON 不能覆盖模型最终结果',()=>{
  assert.equal(result.title,'玻扇安装记录');assert.ok(result.desc.includes('现场测量核实'));assert.ok(!result._raw.includes('短草稿'));
  assert.equal(app.extractJSONRobust('<think>'+example)._noJson,true);
 });
+
+test('截断返回即使包含完整 JSON 也不能当作完成结果',async()=>{
+ const app=makeApp();app.runAIJob=async()=>({choices:[{finish_reason:'length',message:{content:'{"desc":"这是一个看似完整但整条结果被截断的工程记录。"}'}}]});
+ await assert.rejects(app.callVisionAPI('data:image/png;base64,AA==','测试'),/截断/);
+});
+
+test('识别失败期间的人工编辑不会被错误占位文字覆盖',async()=>{
+ const app=makeApp();app.ensureCompanyAI=async()=>true;app.syncToReport=()=>{};
+ app.images=[{id:'a',title:'原始节点',desc:'待整理',highlights:[]}];
+ app.analyzeImage=async()=>{app.images[0].desc='识别等待期间人工输入的记录';app.images[0]._manual={desc:true};throw Error('上游中断')};
+ await app.aiOrganizeAll();assert.equal(app.images[0].desc,'识别等待期间人工输入的记录');assert.equal(app.images[0].title,'原始节点');assert.equal(app.images[0].aiError,'上游中断');
+});
 test('分享请求使用同站点会话和 CSRF，不发送旧分享凭据',async()=>{
  let request;const app=makeApp(async(url,options)=>{request={url,options};return{status:200}});app.csrf='test-csrf';
  await app.shareRequest('',{method:'POST',body:'{}'});
