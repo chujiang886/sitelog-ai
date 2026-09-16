@@ -41,7 +41,7 @@
   archiveStage:'',archivePersonFilter:'',archiveAfter:'',archiveBefore:'',archiveKind:'',archiveGallery:[],archiveGalleryOpen:false,
   cloudConflict:null,changeItems:[],feedbackPanel:false,feedbackItems:[],feedbackPhoto:'',feedbackReason:'',feedbackEvidence:'',feedbackNotes:{},feedbackBusy:false,
   projectSnapshotExtras(){return {id:this.cloudProjectId,revision:this.cloudRevision,status:this.cloudStatus,uploadKey:this.uploadKey,uploadPending:this.uploadPending}},
-  restoreProjectExtras(value){this.cloudProjectId=value?.id||'';this.cloudRevision=value?.revision||0;this.cloudStatus=value?.status||'draft';this.uploadKey=value?.uploadKey||'';this.uploadPending=value?.uploadPending===true;this.cloudConflict=null;this.feedbackPanel=false;this.feedbackItems=[];this.feedbackPhoto='';this.feedbackReason='';this.feedbackEvidence='';this.feedbackNotes={};this.archiveGallery=[];this.archiveGalleryOpen=false;this.changeItems=[];this.projectItems=[];this.projectPanel=false;this.cloudMessage=this.cloudProjectId?'云端修订 '+this.cloudRevision+' · 本机恢复，可继续同步':'尚未保存云端';this.projectDetail=null;this.publicationAttempt=null},
+  restoreProjectExtras(value){this.cloudProjectId=value?.id||'';this.cloudRevision=value?.revision||0;this.cloudStatus=value?.status||'draft';this.uploadKey=value?.uploadKey||'';this.uploadPending=value?.uploadPending===true;this.cloudConflict=null;this.feedbackPanel=false;this.feedbackItems=[];this.feedbackPhoto='';this.feedbackReason='';this.feedbackEvidence='';this.feedbackNotes={};this.archiveGallery=[];this.archiveGalleryOpen=false;this.changeItems=[];this.projectItems=[];this.projectPanel=false;this.cloudMessage=this.cloudProjectId?'云端修订 '+this.cloudRevision+' · 本机恢复，可继续同步':'尚未保存云端';this.projectDetail=null;this.publicationAttempt=null;this.reviewMessage='';this.shareStep=''},
   async durableDraft(){for(let n=0;this.draftWriting&&n<100;n++)await sleep(50);this.markDraftDirty();if(!await this.saveLocalDraft())throw Error('本机草稿尚未保存，请先导出工程包后重试')},
   async transferJSON(path,payload){
     for(let attempt=0;;attempt++){
@@ -78,7 +78,7 @@
         this.uploadProgress.done++;this.cloudMessage='正在同步照片 '+this.uploadProgress.done+'/'+photos.length+' · 已复用 '+this.uploadProgress.reused+' 张';
       }
       const saved=await this.transferJSON('/projects/'+this.cloudProjectId+'/draft',{revision:this.cloudRevision,body:cloudBody(snapshot),acknowledge_unchanged:true});same();
-      this.cloudRevision=saved.revision;this.cloudStatus=saved.status;this.uploadPending=false;this.cloudMessage='云端已保存 · 修订 '+saved.revision;await this.durableDraft();return saved;
+      this.cloudRevision=saved.revision;this.cloudStatus=saved.status;this.uploadPending=false;this.cloudMessage='云端已保存 · 修订 '+saved.revision;await this.durableDraft();return {...saved,bodyKey:canonical(cloudBody(snapshot))};
     }catch(error){same();this.cloudMessage=error.message;if(error.status===409)await this.prepareConflict();throw error}finally{if(this.accountUser?.id===owner)this.cloudBusy=false}
   },
   async hydrateSnapshot(snapshot){

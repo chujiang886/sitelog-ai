@@ -3,7 +3,7 @@ window.projectFeatures = {
   cloudProjectId:'',cloudRevision:0,cloudStatus:'draft',cloudBusy:false,cloudMessage:'尚未保存云端',
   projectPanel:false,projectItems:[],projectQuery:'',projectPage:1,projectTotal:0,projectDetail:null,
   colleagues:[],memberUser:'',memberRole:'editor',reviewNote:'',shareAudience:'public',shareDays:30,shareCode:'',
-  publicationAttempt:null,
+  publicationAttempt:null,reviewBusy:false,reviewMessage:'',shareStep:'',
   aiJobId:'',aiJobStatus:'',aiCancelRequested:false,aiUsage:null,aiBudget:{user_daily:100,company_daily:500},
   async cancelAIJob(){this.aiCancelRequested=true;if(this.aiJobId)await this.projectAction(()=>this.accountJSON('/ai/jobs/'+this.aiJobId+'/cancel',{}));this.aiJobStatus='已请求取消；已提交的上游请求可能仍计费'},
   async loadAIUsage(){await this.projectAction(async()=>{this.aiUsage=await this.accountJSON('/ai/usage');this.aiBudget={...this.aiUsage.limits}})},
@@ -14,7 +14,7 @@ window.projectFeatures = {
     finally{this.aiJobId='';this.aiJobStatus='';}
   },
   projectSnapshotExtras(){return {id:this.cloudProjectId,revision:this.cloudRevision,status:this.cloudStatus}},
-  restoreProjectExtras(value){this.cloudProjectId=value?.id||'';this.cloudRevision=value?.revision||0;this.cloudStatus=value?.status||'draft';this.cloudMessage=this.cloudProjectId?'云端修订 '+this.cloudRevision+' · 本机恢复':'尚未保存云端';this.projectDetail=null;this.publicationAttempt=null},
+  restoreProjectExtras(value){this.cloudProjectId=value?.id||'';this.cloudRevision=value?.revision||0;this.cloudStatus=value?.status||'draft';this.cloudMessage=this.cloudProjectId?'云端修订 '+this.cloudRevision+' · 本机恢复':'尚未保存云端';this.projectDetail=null;this.publicationAttempt=null;this.reviewMessage='';this.shareStep=''},
   resetProjectContext(){this.restoreProjectExtras(null)},
   statusLabel(status){return {draft:'整理中',review:'待审核',approved:'已审核'}[status]||status},
   async projectAction(action){try{return await action()}catch(error){this.cloudMessage=error.message;this.showToast(error.message,'error',8000);return null}},
@@ -52,14 +52,49 @@ window.projectFeatures = {
       this.cloudRevision=saved.revision;this.cloudStatus=saved.status;this.cloudMessage='云端已保存 · 修订 '+saved.revision;this.markDraftDirty();await this.saveLocalDraft();return saved;
     }catch(error){this.cloudMessage=error.message;throw error}finally{this.cloudBusy=false}
   },
-  async reviewProject(decision){await this.projectAction(async()=>{if(decision==='submit')await this.saveCloudProject();const result=await this.accountJSON('/projects/'+this.cloudProjectId+'/review',{revision:this.cloudRevision,decision,note:this.reviewNote});this.cloudStatus=result.status;this.reviewNote='';await this.loadProjectDetails();this.markDraftDirty();this.showToast('审核状态：'+this.statusLabel(result.status))})},
+  async prepareConfirmedProject(forShare=false){
+    if(this.draftLoading||this.draftHydrating)throw Error('工程正在恢复，请等待照片加载完成后再确认');
+    if(this.processing||this.aiChecking||this.allPhotos().some(p=>p.analyzing))throw Error('照片仍在识别，请等待完成后核对文字再确认');
+    const actor=this.accountUser?.id;if(!actor)throw Error('请先登录');
+    const detail=this.cloudProjectId?await this.loadProjectDetails():null;
+    if(this.accountUser?.id!==actor)throw Error('账号已切换，本次操作停止');
+    const canReview=!detail||this.accountUser.role==='admin'||detail.owner===actor||detail.members?.some(m=>m.user_id===actor&&m.role==='reviewer');
+    if(!canReview&&!forShare)throw Error('当前账号只有编辑权限，请由工程负责人或审核人确认');
+    // 用户点击“审核通过”或“确认完成”明确确认当前照片与文字；无需另到现场助手重复勾选。
+    if(canReview){for(const photo of this.allPhotos())if(photo._analyzed)photo.aiConfirmed=true;this.markDraftDirty();}
+    this.shareStep='1/3 正在保存当前工程…';this.reviewMessage=this.shareStep;
+    const saved=await this.saveCloudProject(),pid=this.cloudProjectId;
+    const unchanged=()=>{
+      if(this.accountUser?.id!==actor||this.cloudProjectId!==pid)throw Error('账号或工程已切换，本次操作停止');
+      if(saved.bodyKey!==sitelogWorkflow.canonical(sitelogWorkflow.cloudBody(this.snapshot())))throw Error('保存期间内容有修改，请核对后再次确认；本次未发布');
+    };
+    unchanged();
+    this.shareStep='2/3 正在记录人工确认…';this.reviewMessage=this.shareStep;
+    if(this.cloudStatus!=='approved'){
+      if(this.cloudStatus!=='review'){
+        const submitted=await this.accountJSON('/projects/'+pid+'/review',{revision:saved.revision,decision:'submit',note:this.reviewNote});this.cloudStatus=submitted.status;
+      }
+      unchanged();
+      if(!canReview)throw Error('已保存并提交审核，请工程负责人或审核人确认后生成分享码；无需填写现场助手');
+      const result=await this.accountJSON('/projects/'+pid+'/review',{revision:saved.revision,decision:'approve',note:this.reviewNote});this.cloudStatus=result.status;
+    }
+    unchanged();this.reviewNote='';await this.loadProjectDetails();unchanged();await this.durableDraft();unchanged();return saved;
+  },
+  async reviewProject(decision){
+    if(this.reviewBusy||this.shareBusy||this.cloudBusy)return;this.reviewBusy=true;this.reviewMessage='正在处理…';
+    try{
+      if(decision==='approve')await this.prepareConfirmedProject();
+      else{if(decision==='submit')await this.saveCloudProject();const result=await this.accountJSON('/projects/'+this.cloudProjectId+'/review',{revision:this.cloudRevision,decision,note:this.reviewNote});this.cloudStatus=result.status;this.reviewNote='';await this.loadProjectDetails();await this.durableDraft();}
+      this.reviewMessage='审核状态：'+this.statusLabel(this.cloudStatus);this.showToast(this.reviewMessage);
+    }catch(error){this.reviewMessage=error.message;this.cloudMessage=error.message;this.showToast(error.message,'error',8000)}finally{this.reviewBusy=false;}
+  },
   async updateProjectMember(){await this.projectAction(async()=>{await this.accountJSON('/projects/'+this.cloudProjectId+'/members',{user_id:Number(this.memberUser),role:this.memberRole});await this.loadProjectDetails();this.showToast('项目成员权限已更新')})},
   async changePublication(sid,revoked){await this.projectAction(async()=>{await this.accountJSON('/publication/'+sid+(revoked?'/revoke':'/restore'),{});await this.loadProjectDetails();this.showToast(revoked?'链接及照片访问已撤回':'分享已恢复；原有效期仍生效')})},
   async publishCloudProject(){
     // 失败重试先重放相同发布请求；避免网络响应丢失创建重复档案。
     if(this.publicationAttempt){const previous=this.publicationAttempt;return await this.accountJSON('/projects/'+previous.pid+'/publish',previous.payload)}
-    await this.saveCloudProject();
-    if(this.cloudStatus!=='approved')throw Error('请先在「项目工作区」提交审核并通过，再生成分享码');
+    await this.prepareConfirmedProject(true);
+    this.shareStep='3/3 正在生成分享码…';
     const clone=document.getElementById('report-content').cloneNode(true);
     clone.querySelectorAll('button,input,details.debug-panel,.sop-upload-zone,.sop-grid-top-row,.sop-remove-btn').forEach(el=>el.remove());clone.querySelectorAll('[contenteditable]').forEach(el=>el.removeAttribute('contenteditable'));
     for(const image of clone.querySelectorAll('img')){const photo=this.allPhotos().find(p=>p.dataUrl===image.getAttribute('src'));if(!photo?.mediaId)throw Error('有照片尚未保存，请重新保存云端工程');image.src='/api/share/media/'+photo.mediaId;}

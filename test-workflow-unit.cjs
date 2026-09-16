@@ -2,6 +2,18 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 const context={window:{},sitelogEditor:{collections:['images','arrivalImages','finishImages','sopImages']},URLSearchParams,setTimeout};vm.createContext(context);vm.runInContext(fs.readFileSync('workflow-client.js','utf8'),context);
 const {differences,merge}=context.window.sitelogWorkflow;
 const copy=x=>JSON.parse(JSON.stringify(x));
+vm.runInContext(fs.readFileSync('project-client.js','utf8'),context);context.sitelogWorkflow=context.window.sitelogWorkflow;
+
+test('保存期间继续编辑时停止审核发布，保留新文字',async()=>{
+ const body={meta:{projectName:'原名称'},images:[],arrivalImages:[],finishImages:[],sopImages:[],report:'原正文'};let reviews=0;
+ const app={...context.window.projectFeatures,accountUser:{id:1,role:'staff'},cloudProjectId:'project',cloudStatus:'draft',allPhotos:()=>[],markDraftDirty(){},loadProjectDetails:async()=>({owner:1}),snapshot:()=>copy(body),accountJSON:async()=>{reviews++},saveCloudProject:async()=>{const bodyKey=context.window.sitelogWorkflow.canonical(body);body.report='保存请求期间用户新输入';return {revision:1,bodyKey}}};
+ await assert.rejects(app.prepareConfirmedProject(true),/内容有修改/);assert.equal(reviews,0);assert.equal(body.report,'保存请求期间用户新输入');
+});
+
+test('账号在保存等待期间切换时不得继续审核',async()=>{
+ let calls=0;const app={...context.window.projectFeatures,accountUser:{id:1,role:'staff'},cloudProjectId:'project',allPhotos:()=>[],markDraftDirty(){},loadProjectDetails:async()=>({owner:1}),accountJSON:async()=>{calls++},saveCloudProject:async()=>{app.accountUser={id:2,role:'staff'};return {revision:1,bodyKey:''}}};
+ await assert.rejects(app.prepareConfirmedProject(true),/账号或工程已切换/);assert.equal(calls,0);
+});
 test('合并要求逐项选择，保留两端不同修改和新增照片',()=>{
  const local={meta:{projectName:'本机名称'},images:[{id:'a',desc:'本机说明',mediaId:'m1'}],arrivalImages:[],finishImages:[],sopImages:[],report:'正文'},remote=copy(local);
  remote.meta.projectName='同事名称';remote.images[0].desc='同事说明';remote.images.push({id:'b',desc:'同事新增',mediaId:'m2'});
