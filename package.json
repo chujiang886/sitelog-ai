@@ -1,6 +1,6 @@
 {
   "name": "sitelog-ai",
-  "version": "5.4.3",
+  "version": "5.4.4",
   "description": "闂ㄧ獥鏂藉伐褰掓。 AI 鍔╂墜",
   "scripts": {
     "build": "tailwindcss -i app.css -o vendor/app.css --minify --content ./index.html,./auth-client.js",

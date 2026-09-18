@@ -17,13 +17,13 @@ const base=process.env.TEST_BASE,out=process.env.TEST_OUTPUT;if(!/^http:\/\/127\
  for(const item of versions){
   await view.goto(item.share.url);await view.locator('#document').waitFor({state:'visible'});await view.frameLocator('#document').getByText(item.title+'已确认内容',{exact:true}).waitFor();
   assert.equal(await view.locator('nav').count(),0);assert.equal(await view.locator('a[href^="/s/"]').count(),0);
-  const root=base+'/api/share/publication/'+item.share.id,metadata=await(await guest.request.get(root)).json();assert.equal(metadata.title,item.title);assert.equal('stages' in metadata,false);
-  const document=await(await guest.request.get(root+'/document')).text();
+  const root=base+'/api/share/publication/'+item.share.id,metadata=await(await guest.request.get(root)).json();assert.equal(metadata.title,item.title);assert.deepEqual(Object.keys(metadata).sort(),['ok','id','title','audience','expires','published_at'].sort());assert.equal(await view.locator('#status').innerText(),item.title);
+  const document=await(await guest.request.get(root+'/document')).text();assert.equal(document.includes('已审核版本'),false);assert.ok(document.includes('已确认工程档案'));
   for(const other of versions.filter(x=>x!==item)){assert.equal(JSON.stringify(metadata).includes(other.share.id),false);assert.equal(document.includes(other.title),false);assert.equal((await guest.request.get(root+'/media/'+other.media.id)).status(),403)}
   const f=view.frames().find(f=>f.url().includes('/document'));assert.equal(await f.evaluate(async()=>{await Promise.all([...document.images].map(i=>i.decode()));return document.images[0].naturalWidth>0}),true);
  }
  for(const suffix of ['/projects','/projects/'+project.id,'/archives','/list'])assert.equal((await guest.request.get(base+'/api/share'+suffix)).status(),401);
  assert.equal((await api('/projects/'+project.id)).versions.length,3);assert.deepEqual(errors,[]);
- await view.screenshot({path:path.join(out,'客户扫码单版本.png')});fs.writeFileSync(path.join(out,'扫码隔离验收.json'),JSON.stringify({passed:true,customers:3,legacyTimelineTrue:true,noHistoryLinks:true,noRelatedIdsInAPI:true,foreignMediaBlocked:true,internalHistoryRetained:true,errors},null,2));console.log('通过：三个不同客户复用工程，旧时间线开启时仍仅展示当前二维码内容，接口与照片权限隔离。');
+ await view.screenshot({path:path.join(out,'客户扫码单版本.png')});fs.writeFileSync(path.join(out,'扫码隔离验收.json'),JSON.stringify({passed:true,customers:3,legacyTimelineTrue:true,noVersionInformation:true,noHistoryLinks:true,noRelatedIdsInAPI:true,foreignMediaBlocked:true,internalHistoryRetained:true,errors},null,2));console.log('通过：三个不同客户复用工程，旧时间线开启时仍仅展示当前二维码内容，接口与照片权限隔离。');
 })().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{if(browser)await browser.close()});
 
