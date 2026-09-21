@@ -938,9 +938,10 @@
         <summary class="font-semibold cursor-pointer">客户 LOGO 库（管理员）</summary>
         <p class="text-sm text-slate-500 my-2">上传各客户的公司 LOGO（PNG / JPG / WebP，≤ 2MB）。员工在「确认完成」时可选择是否加入报告封面，分享卡也会显示。</p>
         <form @submit.prevent="uploadClientLogo()" class="space-y-2 my-2">
-          <label class="block text-sm">LOGO 名称（客户公司名）<input x-model="clientLogoName" maxlength="60" required class="block w-full border rounded-lg px-3 py-2 mt-1" placeholder="如：津福世家" aria-label="客户LOGO名称"></label>
-          <input type="file" accept="image/png,image/jpeg,image/webp" @change="onClientLogoFile($event)" class="block text-sm" aria-label="选择客户LOGO文件">
-          <button type="submit" :disabled="!clientLogoFile || authBusy" class="bg-[#1F3D2A] text-white rounded-lg px-4 py-2 disabled:opacity-50">上传 LOGO</button>
+          <label class="block text-sm">LOGO 名称（客户公司名）<span class="text-slate-500">批量上传时留空则自动用文件名</span><input x-model="clientLogoName" maxlength="60" class="block w-full border rounded-lg px-3 py-2 mt-1" placeholder="如：津福世家" aria-label="客户LOGO名称"></label>
+          <input type="file" accept="image/png,image/jpeg,image/webp" multiple @change="onClientLogoFile($event)" class="block text-sm" aria-label="选择客户LOGO文件">
+          <p class="text-xs text-slate-600" x-show="clientLogoFiles.length > 1">已选 <b x-text="clientLogoFiles.length"></b> 个文件，将以各自文件名作为客户名称。</p>
+          <button type="submit" :disabled="!clientLogoFiles.length || clientLogoBusy" class="bg-[#1F3D2A] text-white rounded-lg px-4 py-2 disabled:opacity-50" x-text="clientLogoBusy ? '正在上传…' : (clientLogoFiles.length > 1 ? '批量上传 ' + clientLogoFiles.length + ' 个 LOGO' : '上传 LOGO')">上传 LOGO</button>
         </form>
         <div class="space-y-2">
           <template x-for="logo in clientLogos" :key="logo.id">
@@ -1325,7 +1326,8 @@
         clientLogoId: '',
         clientLogos: [],             // 管理员上传的客户 LOGO 库
         clientLogoName: '',
-        clientLogoFile: null,
+        clientLogoFiles: [],         // 支持一次多选多个文件
+        clientLogoBusy: false,
         // 项目信息（用于 PDF 封面 / 归档抬头）
         projectName: '',
         siteLocation: '',
@@ -2539,17 +2541,32 @@
         async loadClientLogos() {
           try { this.clientLogos = (await this.accountJSON('/client-logos')).items || []; } catch (e) { /* 非关键，静默 */ }
         },
-        onClientLogoFile(event) { this.clientLogoFile = event.target.files[0] || null; event.target.value = ''; },
+        onClientLogoFile(event) { this.clientLogoFiles = Array.from(event.target.files || []); event.target.value = ''; },
+        // 支持一次多选多个文件：单文件用填写的名称，多文件默认用各自文件名（去扩展名）
         async uploadClientLogo() {
-          if (!this.clientLogoFile) return;
-          if (!this.clientLogoName.trim()) { this.showToast('请填写 LOGO 名称（客户公司名）', 'error', 6000); return; }
+          const files = this.clientLogoFiles || [];
+          if (!files.length || this.clientLogoBusy) return;
+          const single = files.length === 1;
+          if (single && !this.clientLogoName.trim()) { this.showToast('请填写 LOGO 名称（客户公司名）', 'error', 6000); return; }
+          this.clientLogoBusy = true;
+          let ok = 0; const failed = [];
           try {
-            const dataUrl = await this.fileToDataUrl(this.clientLogoFile);
-            await this.accountJSON('/admin/client-logos', { name: this.clientLogoName.trim(), dataUrl });
-            this.clientLogoName = ''; this.clientLogoFile = null;
+            for (const file of files) {
+              let name = this.clientLogoName.trim();
+              if (!single || !name) name = String(file.name || '').replace(/\.[^.]+$/, '').trim();
+              if (!name) { failed.push((file.name || '未命名') + '（无法确定名称）'); continue; }
+              name = name.slice(0, 60);
+              try {
+                const dataUrl = await this.fileToDataUrl(file);
+                await this.accountJSON('/admin/client-logos', { name, dataUrl });
+                ok++;
+              } catch (e) { failed.push((file.name || '未命名') + '：' + (e.message || '失败')); }
+            }
+            this.clientLogoName = ''; this.clientLogoFiles = [];
             await this.loadClientLogos();
-            this.showToast('✅ 客户 LOGO 已上传');
-          } catch (e) { this.showToast(e.message || '上传失败', 'error', 8000); }
+            if (!failed.length) this.showToast(ok > 1 ? `✅ 已上传 ${ok} 个客户 LOGO` : '✅ 客户 LOGO 已上传');
+            else this.showToast(`成功 ${ok} 个，失败 ${failed.length} 个：${failed.join('；')}`, 'error', 10000);
+          } finally { this.clientLogoBusy = false; }
         },
         async deleteClientLogo(id) {
           if (!confirm('确定删除该客户 LOGO？已发布的报告中若使用了它仍将显示，直到重新发布。')) return;
@@ -2747,7 +2764,7 @@
           ctx.closePath();
         },
 
-        retryShareCard() {
+        async retryShareCard() {
           if (!this.shareResult) return;
           try {
             await this.drawShareCard(this.shareResult.url, this.shareResult.id);
