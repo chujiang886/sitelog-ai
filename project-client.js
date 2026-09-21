@@ -95,6 +95,7 @@ window.projectFeatures = {
     if(this.publicationAttempt){const previous=this.publicationAttempt;return await this.accountJSON('/projects/'+previous.pid+'/publish',previous.payload)}
     await this.prepareConfirmedProject(true);
     this.shareStep='3/3 正在生成分享码…';
+    this.applyClientLogo();
     const clone=document.getElementById('report-content').cloneNode(true);
     clone.querySelectorAll('button,input,details.debug-panel,.sop-upload-zone,.sop-grid-top-row,.sop-remove-btn').forEach(el=>el.remove());clone.querySelectorAll('[contenteditable]').forEach(el=>el.removeAttribute('contenteditable'));
     for(const image of clone.querySelectorAll('img')){const photo=this.allPhotos().find(p=>p.dataUrl===image.getAttribute('src'));if(!photo?.mediaId)throw Error('有照片尚未保存，请重新保存云端工程');image.src='/api/share/media/'+photo.mediaId;}

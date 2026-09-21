@@ -934,6 +934,24 @@
           <p aria-live="polite" class="text-sm text-slate-700 whitespace-pre-wrap" x-text="aiConfigMessage"></p>
         </form>
       </details>
+      <details class="border-t pt-4" x-show="accountUser && accountUser.role==='admin'">
+        <summary class="font-semibold cursor-pointer">客户 LOGO 库（管理员）</summary>
+        <p class="text-sm text-slate-500 my-2">上传各客户的公司 LOGO（PNG / JPG / WebP，≤ 2MB）。员工在「确认完成」时可选择是否加入报告封面，分享卡也会显示。</p>
+        <form @submit.prevent="uploadClientLogo()" class="space-y-2 my-2">
+          <label class="block text-sm">LOGO 名称（客户公司名）<input x-model="clientLogoName" maxlength="60" required class="block w-full border rounded-lg px-3 py-2 mt-1" placeholder="如：津福世家" aria-label="客户LOGO名称"></label>
+          <input type="file" accept="image/png,image/jpeg,image/webp" @change="onClientLogoFile($event)" class="block text-sm" aria-label="选择客户LOGO文件">
+          <button type="submit" :disabled="!clientLogoFile || authBusy" class="bg-[#1F3D2A] text-white rounded-lg px-4 py-2 disabled:opacity-50">上传 LOGO</button>
+        </form>
+        <div class="space-y-2">
+          <template x-for="logo in clientLogos" :key="logo.id">
+            <div class="flex items-center justify-between gap-2 border rounded-lg p-2">
+              <div class="flex items-center gap-2 min-w-0"><img :src="'/api/share/client-logo/'+logo.id" class="h-8 border rounded bg-white p-1 shrink-0" alt="LOGO"><span class="text-sm truncate" x-text="logo.name"></span></div>
+              <button @click="deleteClientLogo(logo.id)" class="text-sm text-red-700 underline shrink-0">删除</button>
+            </div>
+          </template>
+          <p class="text-xs text-slate-500" x-show="!clientLogos.length">暂无客户 LOGO。</p>
+        </div>
+      </details>
       <details class="border-t pt-4"><summary @click="loadAudit()" class="font-semibold cursor-pointer">最近操作记录</summary><div class="mt-3 space-y-2"><template x-for="event in auditItems" :key="event.id"><p class="text-sm border-b pb-2"><span x-text="new Date(event.created_at * 1000).toLocaleString('zh-CN')"></span> · <span x-text="event.display_name || '服务接口'"></span> · <span x-text="auditLabel(event.action)"></span> <span x-text="event.target"></span></p></template></div></details>
     </div>
   </div>
@@ -1026,6 +1044,22 @@
           <label class="block">分享范围<select aria-label="分享范围" x-model="shareAudience" class="border rounded p-2 ml-2"><option value="public">持链接可查看</option><option value="internal">仅公司登录账号</option><option value="code">访问码保护</option></select></label>
           <label class="block">有效期<select aria-label="分享有效期" x-model="shareDays" class="border rounded p-2 ml-2"><option value="7">7 天</option><option value="30">30 天</option><option value="90">90 天</option><option value="0">长期有效</option></select></label>
           <label class="block" x-show="shareAudience==='code'">访问码<input aria-label="分享访问码" x-model="shareCode" maxlength="24" autocomplete="off" class="border rounded p-2 ml-2" placeholder="6–24 位字母或数字"></label>
+          <details class="border-t pt-3 mt-3">
+            <summary class="text-sm cursor-pointer font-semibold">客户 LOGO（可选）</summary>
+            <div class="mt-2 space-y-2">
+              <label class="flex items-center gap-2 text-sm"><input type="checkbox" x-model="addClientLogo" @change="applyClientLogo()"> 在报告封面加入客户公司 LOGO</label>
+              <template x-if="addClientLogo">
+                <div class="space-y-2">
+                  <select aria-label="选择客户LOGO" x-model="clientLogoId" @change="applyClientLogo()" class="border rounded p-2 w-full">
+                    <option value="">— 请选择客户 LOGO —</option>
+                    <template x-for="logo in clientLogos" :key="logo.id"><option :value="logo.id" x-text="logo.name"></option></template>
+                  </select>
+                  <template x-if="clientLogoId"><img :src="'/api/share/client-logo/'+clientLogoId" class="h-12 border rounded bg-white p-1" alt="客户LOGO预览"></template>
+                  <p class="text-xs text-slate-500" x-show="!clientLogos.length">管理员尚未上传客户 LOGO，请在管理后台「客户 LOGO 库」中添加。</p>
+                </div>
+              </template>
+            </div>
+          </details>
         </div>
 
         <div class="flex justify-end gap-2 pt-4 mt-4 border-t border-slate-200">
@@ -1286,6 +1320,12 @@
         shareManageOpen: false,      // 分享管理面板（已分享清单）
         shareList: [],               // 已分享清单数据
         shareListLoading: false,
+        // 客户 LOGO（可选加入报告封面）
+        addClientLogo: false,
+        clientLogoId: '',
+        clientLogos: [],             // 管理员上传的客户 LOGO 库
+        clientLogoName: '',
+        clientLogoFile: null,
         // 项目信息（用于 PDF 封面 / 归档抬头）
         projectName: '',
         siteLocation: '',
@@ -2492,6 +2532,69 @@
           this.shareError = '';
           this.shareCardReady = false;
           this.shareDialogOpen = true;
+          this.loadClientLogos();
+        },
+
+        // ===== 客户 LOGO 库 =====
+        async loadClientLogos() {
+          try { this.clientLogos = (await this.accountJSON('/client-logos')).items || []; } catch (e) { /* 非关键，静默 */ }
+        },
+        onClientLogoFile(event) { this.clientLogoFile = event.target.files[0] || null; event.target.value = ''; },
+        async uploadClientLogo() {
+          if (!this.clientLogoFile) return;
+          if (!this.clientLogoName.trim()) { this.showToast('请填写 LOGO 名称（客户公司名）', 'error', 6000); return; }
+          try {
+            const dataUrl = await this.fileToDataUrl(this.clientLogoFile);
+            await this.accountJSON('/admin/client-logos', { name: this.clientLogoName.trim(), dataUrl });
+            this.clientLogoName = ''; this.clientLogoFile = null;
+            await this.loadClientLogos();
+            this.showToast('✅ 客户 LOGO 已上传');
+          } catch (e) { this.showToast(e.message || '上传失败', 'error', 8000); }
+        },
+        async deleteClientLogo(id) {
+          if (!confirm('确定删除该客户 LOGO？已发布的报告中若使用了它仍将显示，直到重新发布。')) return;
+          try {
+            await this.sessionRequest('/admin/client-logos/' + id, { method: 'DELETE' });
+            await this.loadClientLogos();
+            if (this.clientLogoId === id) { this.clientLogoId = ''; this.addClientLogo = false; this.applyClientLogo(); }
+            this.showToast('已删除');
+          } catch (e) { this.showToast(e.message || '删除失败', 'error', 8000); }
+        },
+        // 在报告封面注入/移除客户 LOGO（发布前确保已就位）
+        applyClientLogo() {
+          const root = document.getElementById('report-content');
+          if (!root) return;
+          const existing = root.querySelector('.client-logo');
+          if (existing) existing.remove();
+          if (!this.addClientLogo || !this.clientLogoId) { this.clientLogoId = ''; this.markDraftDirty(); return; }
+          const img = document.createElement('img');
+          img.className = 'client-logo';
+          img.setAttribute('alt', '客户LOGO');
+          img.setAttribute('src', '/api/share/client-logo/' + this.clientLogoId);
+          img.setAttribute('data-client-logo', this.clientLogoId);
+          img.style.maxHeight = '72px';
+          img.style.margin = '0 auto 10px';
+          img.style.display = 'block';
+          const cover = root.querySelector('.pdf-cover');
+          if (cover) cover.insertBefore(img, cover.firstChild);
+          else root.insertBefore(img, root.firstChild);
+          this.markDraftDirty();
+        },
+        drawClientLogoOnCard(ctx, W, H) {
+          return new Promise((resolve) => {
+            if (!this.addClientLogo || !this.clientLogoId) return resolve();
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+              const maxW = 160, maxH = 70;
+              let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+              if (w && h) { const ratio = Math.min(maxW / w, maxH / h, 1); w = Math.round(w * ratio); h = Math.round(h * ratio); }
+              try { ctx.drawImage(img, W - 30 - w, 40, w, h); } catch (e) { /* 绘制失败不阻塞 */ }
+              resolve();
+            };
+            img.onerror = () => resolve();
+            img.src = '/api/share/client-logo/' + this.clientLogoId;
+          });
         },
 
         async doShare() {
@@ -2507,7 +2610,7 @@
             const data = await this.publishCloudProject();
             this.shareResult = { id: data.id, url: data.url };
             await this.$nextTick();
-            this.drawShareCard(data.url, data.id);
+            await this.drawShareCard(data.url, data.id);
             this.shareCardReady = true;
             this.showToast('✅ 分享码已生成，保存分享卡发到客户群即可');
           } catch (e) {
@@ -2568,7 +2671,7 @@
         },
 
         // 品牌分享卡：墨绿底 + 项目名 + 二维码（canvas 绘制，可保存为图片发群）
-        drawShareCard(url, id) {
+        async drawShareCard(url, id) {
           const canvas = document.getElementById('share-card-canvas');
           if (!canvas || typeof window.qrcode !== 'function') {
             throw new Error('二维码组件未就绪，请稍后重绘，或先复制分享链接');
@@ -2620,6 +2723,7 @@
           ctx.fillText('汕头市初匠门窗科技有限公司', W / 2, H - 96);
           ctx.font = '17px "PingFang SC","Microsoft YaHei",sans-serif';
           ctx.fillText('记录编号 ' + id + ' · 粤ICP备2024297744号-2', W / 2, H - 62);
+          await this.drawClientLogoOnCard(ctx, W, H);
         },
 
         wrapCanvasText(ctx, text, maxWidth) {
@@ -2646,7 +2750,7 @@
         retryShareCard() {
           if (!this.shareResult) return;
           try {
-            this.drawShareCard(this.shareResult.url, this.shareResult.id);
+            await this.drawShareCard(this.shareResult.url, this.shareResult.id);
             this.shareCardReady = true;
             this.shareError = '';
           } catch (error) { this.shareError = error.message; }

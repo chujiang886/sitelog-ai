@@ -1,7 +1,7 @@
 // 编辑内容以数据为准；正文输入即时回写，渲染不再读取旧 DOM 覆盖新数据。
 (() => {
   const collections = ['images', 'arrivalImages', 'finishImages', 'sopImages'];
-  const metadata = ['projectName', 'siteLocation', 'archiveDate', 'archivePerson', 'templateType', 'reportTitle', 'pdfFilename', 'pdfFilenameTouched', 'documentId'];
+  const metadata = ['projectName', 'siteLocation', 'archiveDate', 'archivePerson', 'templateType', 'reportTitle', 'pdfFilename', 'pdfFilenameTouched', 'documentId', 'clientLogoId'];
   const databases = new Map();
   async function database() {
     if (!databases.has('drafts')) databases.set('drafts', new Promise((resolve, reject) => {
@@ -149,6 +149,7 @@
       validateSnapshot(snapshot);this.draftLoading = true;this.legacyOrigin=snapshot.origin?.legacy||'';
       try {
         for (const key of metadata) if (['string','boolean'].includes(typeof snapshot.meta[key])) this[key] = snapshot.meta[key];
+        this.addClientLogo = !!this.clientLogoId;
         for (const key of collections) this[key] = snapshot[key].map(photo => ({ ...photo, analyzing: false, file: { name: photo.filename || '施工照片' } }));
         this.activeTemplate = this.templateType;
         this.reportHtml = sanitizeReport(snapshot.report);
