@@ -516,6 +516,13 @@
       opacity: 0; transition: opacity 0.15s;
     }
     .sop-photo-card:hover .sop-remove-btn, .node-card:hover .sop-remove-btn { opacity: 1; }
+    /* 触摸设备没有 hover，靠 :hover 显示等于「删不掉照片」——师傅在现场就是用手
+       机，而且常常戴手套。用 (hover: none) 判断而不是屏幕宽度：平板和触屏笔记本
+       也是宽屏，按宽度写会漏掉它们。顺带把点击目标从 22px 放到 28px，
+       22px 在手机上本来就很难点准（按钮是绝对定位，放大不会影响卡片排版）。 */
+    @media (hover: none) {
+      .sop-remove-btn { opacity: 1; width: 28px; height: 28px; line-height: 28px; font-size: 17px; }
+    }
 
     /* Callout 框（其他声明类仍保留） */
     .pdf-callout {
