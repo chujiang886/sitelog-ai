@@ -31,3 +31,34 @@ test('切换工程或账号时清除旧反馈和预览，迟到的旧账号查�
  state.restoreProjectExtras(null);assert.equal(state.feedbackItems.length,0);assert.equal(state.archiveGallery.length,0);assert.equal(state.projectItems.length,0);
  let finish;state.accountUser={id:1};state.accountJSON=()=>new Promise(r=>finish=r);const pending=state.loadProjects();state.accountUser={id:2};finish({items:[{title:'迟到的旧工程'}],total:1});await pending;assert.equal(state.projectItems.length,0);
 });
+
+test('按门洞分组必须进冲突行，否则本地刚分好的框会被静默丢掉',()=>{
+ // frames 原先不在 differences() 的比对范围内。冲突合并时 merge() 从远端整体
+ // 克隆，于是本机刚把照片分好的门洞分组会被远端那份悄悄覆盖 —— 师傅看到的是
+ // 「我明明分好了，怎么又乱回来了」。只对两个 1 对 1 阶段有意义，但一旦有意义
+ // 就是整份留档的结构。
+ const local={meta:{},images:[],arrivalImages:[],finishImages:[],sopImages:[],report:'正文',
+   frames:[{id:'f1',label:'主卧窗',arrivalIds:[],nodeIds:['n1']}]};
+ const remote=copy(local);remote.frames=[{id:'f1',label:'主卧窗',arrivalIds:[],nodeIds:[]}];
+ const rows=differences(local,remote);
+ const row=rows.find(r=>r.path[0]==='frames');
+ assert.ok(row,'frames 不同必须产生一行，让用户明确选哪一份');
+ assert.equal(row.label,'按门洞分组（1 对 1 阶段）');
+ row.choice='local';
+ const result=copy(merge(local,remote,rows));
+ assert.deepEqual(result.frames,local.frames,'选本机时必须保留本机的分组');
+ assert.equal(remote.frames[0].nodeIds.length,0,'不改远端入参');
+});
+
+test('老工程没有 frames 键时不产生冲突行（「键不存在」等同空数组）',()=>{
+ // frames 是后加字段：老版本云端工程存下来的 body 里没有这个键，而新版本前端
+ // 恒发空数组。若直接按 canonical 比对，师傅每次冲突都会多出一行「（此项不存在）
+ // vs []」要选，纯属噪音。
+ const local={meta:{},images:[],arrivalImages:[],finishImages:[],sopImages:[],report:'正文',frames:[]};
+ const remote=copy(local);delete remote.frames;
+ assert.equal(differences(local,remote).filter(r=>r.path[0]==='frames').length,0);
+ assert.equal(differences(remote,local).filter(r=>r.path[0]==='frames').length,0);
+ // 真有分组时两边都发数组，正常比对。
+ const withFrames=copy(local);withFrames.frames=[{id:'f1',label:'主卧窗',arrivalIds:[],nodeIds:[]}];
+ assert.equal(differences(withFrames,remote).filter(r=>r.path[0]==='frames').length,1);
+});
