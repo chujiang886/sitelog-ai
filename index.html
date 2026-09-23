@@ -649,6 +649,34 @@
     }
     .addr-item-main { word-break: break-word; }
 
+    /* 阶段分组：一个施工阶段一个分组头，同阶段的多次留档（售后保养来过两次）
+       在组内按「第 1 次 / 第 2 次」逐条列出。不分组的后果是两行看不出先后的记录，
+       员工分不清哪条是哪次上门，也就不知道「再留一次」会落到第几次。 */
+    .addr-stage-head {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      padding: 8px 12px; background: #f8fafc;
+      font-size: 12px; font-weight: 600; color: #475569;
+    }
+    .addr-stage-rows > * + * { border-top: 1px dashed #e5e7eb; }
+    .addr-times-badge {
+      padding: 1px 6px; border-radius: 99px;
+      background: rgba(184, 146, 74, 0.16); color: #8E6B2E;
+      font-size: 10px; font-weight: 600;
+    }
+    .addr-nth {
+      display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 4px;
+      background: #e2e8f0; color: #475569; font-size: 10px; font-weight: 600;
+    }
+    .addr-group-add {
+      margin-left: auto; padding: 2px 8px; border-radius: 6px;
+      background: #fff; border: 1px solid #e2e8f0; color: #475569;
+      font-size: 11px; font-weight: 400; cursor: pointer;
+    }
+    .addr-group-add:hover { border-color: rgba(184, 146, 74, 0.6); color: #8E6B2E; }
+    /* 「本次将作为第 N 次留档」提示文字。用内联类而不是 Tailwind 的
+       text-[#8E6B2E]——任意值工具类不在预构建 CSS 里，写了等于没写。 */
+    .addr-hint { color: #8E6B2E; }
+
     @media screen and (max-width: 767px) {
       #report-content:not(.pdf-exporting) { padding: 12px; }
       .pdf-cover-band { padding: 18px 14px; gap: 12px; }
@@ -1112,7 +1140,7 @@
             </label>
             <template x-if="addressPickOn">
               <div class="space-y-2">
-                <select aria-label="归属地址" x-model="addressPickId" class="border rounded p-2 w-full text-sm">
+                <select aria-label="归属地址" x-model="addressPickId" @change="refreshAddressPickHint()" class="border rounded p-2 w-full text-sm">
                   <option value="">— 请选择地址 —</option>
                   <template x-for="a in addressOptions" :key="a.id">
                     <option :value="a.id" x-text="a.label + (a.client_name ? '（' + a.client_name + '）' : '')"></option>
@@ -1120,7 +1148,7 @@
                 </select>
                 <label class="block text-xs text-slate-600">归档阶段
                   <!-- 同「挂到阶段」：静态 6 项，不用 x-for，避免显示值与 addressStage 不符 -->
-                  <select aria-label="归档阶段" x-model="addressStage" class="border rounded p-2 ml-2 text-sm">
+                  <select aria-label="归档阶段" x-model="addressStage" @change="refreshAddressPickHint()" class="border rounded p-2 ml-2 text-sm">
                     <option value="吊装施工">吊装施工归档</option>
                     <option value="框架施工">框架归档记录</option>
                     <option value="玻扇施工">玻扇施工归档</option>
@@ -1132,6 +1160,9 @@
                 <p class="text-xs text-slate-500" x-show="addressOptionsLoading">正在读取地址…</p>
                 <p class="text-xs text-slate-500" x-show="!addressOptionsLoading && !addressOptions.length">还没有地址，请先到顶部「🏠 地址管理」新建。</p>
                 <p class="text-xs text-[#1F3D2A] leading-relaxed" x-show="addressPickId">业主扫该地址的二维码，就能在「<span class="font-semibold" x-text="ADDRESS_STAGE_DISPLAY[addressStage]"></span>」里看到这一份。同一地址的多个阶段会自动聚合成同一张码。</p>
+                <!-- 说明「这会是第几次」。不提示的话，售后第二次上门时员工会以为
+                     自己在覆盖上一次的记录而不敢点，或反过来选错阶段。 -->
+                <p class="text-xs addr-hint leading-relaxed" x-show="addressPickHint" x-text="addressPickHint"></p>
               </div>
             </template>
           </div>
@@ -1265,7 +1296,7 @@
               <p class="text-xs opacity-70">工程地址</p>
               <p class="font-semibold text-lg" x-text="addressDetail.label"></p>
               <p class="text-xs opacity-80 mt-1" x-text="(addressDetail.client_name || '未填客户') + (addressDetail.note ? ' · ' + addressDetail.note : '')"></p>
-              <p class="text-xs opacity-60 mt-2" x-text="'已归档 ' + (addressDetail.stages || []).filter(s => s.visible).length + ' 个阶段 · 地址编号 ' + addressDetail.id"></p>
+              <p class="text-xs opacity-60 mt-2" x-text="'已归档 ' + addressDoneStages + ' 个阶段 · 地址编号 ' + addressDetail.id"></p>
               <div class="flex flex-wrap gap-2 mt-3">
                 <button @click="openAddressForm(addressDetail)" class="addr-ghost-btn px-3 py-1.5 text-xs rounded">编辑地址</button>
                 <button @click="renderAddressCard()" class="px-3 py-1.5 text-xs bg-[#B8924A] rounded hover:opacity-90">生成二维码卡片</button>
@@ -1324,7 +1355,7 @@
                                发生在 x-for 插入 <option> 之前，找不到匹配项就回落显示第一项，
                                出现「显示吊装施工、实际存五金安装」的错位。阶段固定 6 个，
                                静态写死最稳，也便于 test-stage-parity.cjs 一起校验。 -->
-                          <select x-model="addressAttachStage" class="border rounded p-2 w-full text-sm mt-1">
+                          <select x-model="addressAttachStage" @change="onAddressAttachStageChange()" class="border rounded p-2 w-full text-sm mt-1">
                             <option value="吊装施工">吊装施工归档</option>
                             <option value="框架施工">框架归档记录</option>
                             <option value="玻扇施工">玻扇施工归档</option>
@@ -1333,6 +1364,29 @@
                             <option value="售后保养">售后保养施工归档</option>
                           </select>
                         </label>
+                        <label class="block text-xs text-slate-600">留档方式
+                          <select x-model="addressAttachSlotMode" class="border rounded p-2 w-full text-sm mt-1">
+                            <option value="auto">新增一次留档（推荐，不会覆盖旧的）</option>
+                            <template x-if="addressAttachExisting.length">
+                              <option value="replace">替换已有的某一次</option>
+                            </template>
+                          </select>
+                        </label>
+                        <p class="text-xs text-slate-500 leading-relaxed" x-text="addressAttachExisting.length
+                          ? '该阶段已有 ' + addressAttachExisting.length + ' 次留档。' + (addressAttachSlotMode === 'auto' ? '本次将作为第 ' + (addressAttachExisting.length + 1) + ' 次保留，旧的不会被覆盖。' : '')
+                          : '该阶段还没有留档，本次是第 1 次。'"></p>
+                        <template x-if="addressAttachSlotMode === 'replace'">
+                          <div>
+                            <label class="block text-xs text-slate-600">替换哪一次
+                              <select x-model.number="addressAttachSlot" class="border rounded p-2 w-full text-sm mt-1">
+                                <template x-for="s in addressAttachExisting" :key="s.slot">
+                                  <option :value="s.slot" x-text="'第 ' + (s.slot + 1) + ' 次 · ' + addressStamp(s.created)"></option>
+                                </template>
+                              </select>
+                            </label>
+                            <p class="text-xs text-amber-700 leading-relaxed mt-1">替换会把原来那一份从地址页移除（直链仍然有效）。若只是新增一次上门记录，请退回选「新增一次留档」。</p>
+                          </div>
+                        </template>
                         <div class="flex gap-2">
                           <button @click="submitAddressAttach()" :disabled="addressBusy" class="px-4 py-2 text-sm bg-[#1F3D2A] text-white rounded disabled:opacity-50">确认挂接</button>
                           <button @click="addressAttachOpen = false" class="px-4 py-2 text-sm bg-white border rounded">取消</button>
@@ -1348,21 +1402,43 @@
                 <p class="text-sm text-slate-500 border border-dashed rounded-lg p-6 text-center leading-relaxed">还没有挂接任何阶段。<br>发布归档时勾选「归到某个地址」，或点上面的「从已有工程补挂」。</p>
               </template>
               <div x-show="(addressDetail.stages || []).length" class="addr-list border rounded-lg">
-                <template x-for="stage in (addressDetail.stages || [])" :key="stage.stage_key + '-' + stage.slot">
-                  <div class="addr-stage flex items-center gap-3 px-3 py-2">
-                    <span class="addr-dot rounded-full shrink-0" :class="stage.visible ? 'bg-[#B8924A]' : 'bg-slate-300'"></span>
-                    <div class="addr-stage-main flex-1 min-w-0">
-                      <p class="text-sm font-medium text-slate-900" x-text="ADDRESS_STAGE_DISPLAY[stage.stage_key] || stage.stage_key"></p>
-                      <p class="text-xs text-slate-500" x-text="addressStamp(stage.created) + ' · ' + (stage.audience === 'public' ? '公开' : stage.audience) + (stage.revoked ? ' · 已撤回' : '') + (stage.slot ? ' · 第 ' + (stage.slot + 1) + ' 次' : '')"></p>
+                <!-- 两级：施工阶段 → 该阶段的每一次留档。
+                     售后保养一年来两次，两条记录要能分清「第 1 次 / 第 2 次」，
+                     而不是两行看不出先后的日期。 -->
+                <template x-for="group in addressStageGroups" :key="group.key">
+                  <div>
+                    <div class="addr-stage-head">
+                      <span x-text="group.label"></span>
+                      <span x-show="group.items.length > 1" class="addr-times-badge" x-text="group.items.length + ' 次留档'"></span>
+                      <button @click="openAddressAttach(group.key)" class="addr-group-add">＋ 再留一次</button>
                     </div>
-                    <div class="addr-stage-actions flex items-center gap-2 shrink-0">
-                      <a :href="'/s/' + stage.publication_id" target="_blank" rel="noopener" class="text-xs underline text-slate-600 shrink-0">查看</a>
-                      <button @click="toggleStageVisible(stage)" class="text-xs px-2 py-1 bg-slate-100 rounded shrink-0" x-text="stage.visible ? '隐藏' : '显示'"></button>
-                      <button @click="detachStage(stage)" class="text-xs px-2 py-1 bg-red-50 text-red-600 rounded shrink-0">移除</button>
+                    <div class="addr-stage-rows">
+                      <template x-for="stage in group.items" :key="group.key + '-' + stage.slot">
+                        <div class="addr-stage flex items-center gap-3 px-3 py-2">
+                          <span class="addr-dot rounded-full shrink-0" :class="stage.visible ? 'bg-[#B8924A]' : 'bg-slate-300'"></span>
+                          <div class="addr-stage-main flex-1 min-w-0">
+                            <p class="text-sm font-medium text-slate-900">
+                              <span x-show="group.items.length > 1" class="addr-nth" x-text="'第 ' + (stage.slot + 1) + ' 次'"></span>
+                              <span x-text="addressStamp(stage.created) + ' 归档'"></span>
+                            </p>
+                            <p class="text-xs text-slate-500" x-text="(stage.audience === 'public' ? '公开范围' : stage.audience) + (stage.revoked ? ' · 已撤回' : '') + (stage.visible ? '' : ' · 地址页已隐藏')"></p>
+                          </div>
+                          <div class="addr-stage-actions flex items-center gap-2 shrink-0">
+                            <a :href="'/s/' + stage.publication_id" target="_blank" rel="noopener" class="text-xs underline text-slate-600 shrink-0">查看</a>
+                            <button @click="toggleStageVisible(stage)" class="text-xs px-2 py-1 bg-slate-100 rounded shrink-0" x-text="stage.visible ? '隐藏' : '显示'"></button>
+                            <button @click="detachStage(stage)" class="text-xs px-2 py-1 bg-red-50 text-red-600 rounded shrink-0">移除</button>
+                          </div>
+                        </div>
+                      </template>
                     </div>
                   </div>
                 </template>
               </div>
+              <!-- 还没开始的阶段不占列表空间，用一行文字交代清楚，
+                   员工一眼知道「还差哪几步、下一步该做什么」。 -->
+              <p x-show="addressPendingStages.length" class="text-xs text-slate-500 mt-2 leading-relaxed">
+                还没留档：<span class="font-medium text-slate-600" x-text="addressPendingStages.map(k => ADDRESS_STAGE_DISPLAY[k] || k).join('、')"></span>。施工推进到哪一步，就点该阶段的「＋ 再留一次」补挂哪一步。
+              </p>
             </div>
           </div>
         </template>

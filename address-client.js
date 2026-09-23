@@ -23,6 +23,9 @@ window.addressFeatures = {
   addressItems: [], addressQuery: '', addressPage: 1, addressTotal: 0,
   addressLoading: false,
   addressDetail: null,          // 打开某个地址后的详情（含 stages）
+  addressStageGroups: [],       // 详情按施工阶段分组（同阶段的多次留档归到一组，只含已有留档的阶段）
+  addressPendingStages: [],     // 还没留档的阶段名，列表下方做一行提示
+  addressDoneStages: 0,         // 已留档的**阶段数**（去重；售后来过两次仍算一个阶段）
   addressForm: { label: '', client_name: '', note: '' },
   addressEditingId: '',         // 正在编辑的地址 id；空=新建
   addressFormOpen: false,
@@ -32,9 +35,12 @@ window.addressFeatures = {
   addressAttachQuery: '', addressAttachProjects: [], addressAttachSearching: false,
   addressAttachPid: '', addressAttachProjectTitle: '',
   addressAttachVersions: [], addressAttachPick: '', addressAttachStage: '',
+  // 留档方式：auto = 新增一次（后端自动分配槽位，绝不覆盖已有）；replace = 替换已有的第 N 次
+  addressAttachSlotMode: 'auto', addressAttachSlot: 0, addressAttachExisting: [],
   // 分享弹窗里的「归属地址」
   addressOptions: [], addressOptionsLoading: false,
   addressPickOn: false, addressPickId: '', addressStage: '', addressAttachNote: '',
+  addressPickHint: '',          // 「该地址的这个阶段已有 N 次留档」提示
   addressCardReady: false,
 
   // ===== 工具 =====
@@ -49,6 +55,47 @@ window.addressFeatures = {
   addressUrl(address) {
     if (typeof address === 'string') return location.origin + '/a/' + address;
     return (address && address.url) || (location.origin + '/a/' + (address && address.id));
+  },
+  // 某个阶段在当前地址下的全部留档，按 slot 递增。
+  // slot 0 → 「第 1 次」，slot 1 → 「第 2 次」……业主看到的序号就来自这里。
+  addressStageRecords(stageKey) {
+    return ((this.addressDetail && this.addressDetail.stages) || [])
+      .filter(s => s.stage_key === stageKey)
+      .slice()
+      .sort((a, b) => a.slot - b.slot);
+  },
+  // 把详情里的阶段记录按施工阶段分组，供界面按「阶段 → 多次留档」两级展示。
+  //
+  // 【只保留有留档的阶段】面板回答的是「这个地址上已经挂了什么」。
+  // 若把 6 个阶段全列出来，会有 4 个「0 次留档」的空分组带按钮，把真正的内容
+  // 挤到屏幕外。还没开始的阶段在列表下方用一行文字提示即可（见 addressPendingStages）。
+  buildAddressStageGroups(stages) {
+    const groups = [];
+    for (const stage of stages || []) {
+      let group = groups.find(g => g.key === stage.stage_key);
+      // 兜底：后端出现前端清单没覆盖的历史阶段名时，照样建组，绝不在界面上凭空消失。
+      if (!group) {
+        group = { key: stage.stage_key, label: this.ADDRESS_STAGE_DISPLAY[stage.stage_key] || stage.stage_key, items: [] };
+        groups.push(group);
+      }
+      group.items.push(stage);
+    }
+    groups.sort((a, b) => this.addressStageOrder(a.key) - this.addressStageOrder(b.key));
+    for (const group of groups) group.items.sort((a, b) => a.slot - b.slot);
+    return groups;
+  },
+  // 还没留档的阶段名。放在阶段列表下方做一行提示，让员工知道「还差哪几步」。
+  // 写成状态字段而不是在模板里调方法：x-for 里调方法每次渲染都会返回新数组，
+  // 白白触发一轮重渲染。
+  buildAddressPendingStages(stages) {
+    const done = new Set((stages || []).map(s => s.stage_key));
+    return this.ADDRESS_STAGE_KEYS.filter(key => !done.has(key));
+  },
+  // 已留档的**阶段数**，不是留档条数。
+  // 售后保养来过两次仍然只算一个阶段——用条数会让「已归档 5 个阶段 / 共 6 个」
+  // 这种自相矛盾的文案冒出来（总共只有 6 个阶段，哪来的 5 个？其实是 4 个阶段 5 条留档）。
+  addressDoneStageCount(stages) {
+    return new Set((stages || []).filter(s => s.visible).map(s => s.stage_key)).size;
   },
 
   // ===== 列表 =====
@@ -104,11 +151,17 @@ window.addressFeatures = {
       detail.stages = (detail.stages || []).slice().sort((a, b) =>
         this.addressStageOrder(a.stage_key) - this.addressStageOrder(b.stage_key) || (a.slot - b.slot));
       this.addressDetail = detail;
+      this.addressStageGroups = this.buildAddressStageGroups(detail.stages);
+      this.addressPendingStages = this.buildAddressPendingStages(detail.stages);
+      this.addressDoneStages = this.addressDoneStageCount(detail.stages);
       this.addressAttachOpen = false;
     } catch (e) { this.showToast(e.message || '地址读取失败', 'error', 8000); }
   },
   closeAddressDetail() {
     this.addressDetail = null;
+    this.addressStageGroups = [];
+    this.addressPendingStages = [];
+    this.addressDoneStages = 0;
     this.addressAttachOpen = false;
     this.addressCardReady = false;
   },
@@ -137,7 +190,9 @@ window.addressFeatures = {
   // ===== 阶段操作 =====
   async detachStage(stage) {
     if (!this.addressDetail) return;
-    if (!confirm('从地址页移除「' + this.addressStageLabel(stage.stage_key) + '」？\n\n只影响地址页展示，/s/' + String(stage.publication_id).slice(0, 8) + '… 这条直链仍然有效。')) return;
+    const times = this.addressStageRecords(stage.stage_key).length > 1
+      ? '的第 ' + (stage.slot + 1) + ' 次留档' : '';
+    if (!confirm('从地址页移除「' + this.addressStageLabel(stage.stage_key) + '」' + times + '？\n\n只影响地址页展示，/s/' + String(stage.publication_id).slice(0, 8) + '… 这条直链仍然有效。')) return;
     try {
       await this.accountJSON('/addresses/' + this.addressDetail.id + '/detach',
         { stage_key: stage.stage_key, slot: stage.slot });
@@ -151,12 +206,13 @@ window.addressFeatures = {
       await this.accountJSON('/addresses/' + this.addressDetail.id + '/visible',
         { stage_key: stage.stage_key, slot: stage.slot, visible: !stage.visible });
       await this.refreshAddressDetail();
-      this.showToast(stage.visible ? '已在地址页隐藏该阶段' : '已恢复显示');
+      const times = this.addressStageRecords(stage.stage_key).length > 1 ? '第 ' + (stage.slot + 1) + ' 次' : '';
+      this.showToast(stage.visible ? '已在地址页隐藏该阶段' + times : '已恢复显示' + times);
     } catch (e) { this.showToast(e.message || '操作失败', 'error', 8000); }
   },
 
   // ===== 补挂：从已有工程里挑一版 =====
-  openAddressAttach() {
+  openAddressAttach(stageKey) {
     this.addressAttachOpen = true;
     this.addressAttachQuery = '';
     this.addressAttachProjects = [];
@@ -164,7 +220,15 @@ window.addressFeatures = {
     this.addressAttachProjectTitle = '';
     this.addressAttachVersions = [];
     this.addressAttachPick = '';
-    this.addressAttachStage = this.addressStageDefault();
+    this.addressAttachStage = stageKey || this.addressStageDefault();
+    this.onAddressAttachStageChange();
+  },
+  // 换阶段后重算「这个阶段已有几次留档」，并把留档方式复位成「新增一次」。
+  // 复位很关键：换阶段后还停在「替换第 3 次」上，是最容易误覆盖的状态。
+  onAddressAttachStageChange() {
+    this.addressAttachExisting = this.addressStageRecords(this.addressAttachStage);
+    this.addressAttachSlotMode = 'auto';
+    this.addressAttachSlot = this.addressAttachExisting.length;
   },
   async searchAttachProjects() {
     this.addressAttachSearching = true;
@@ -196,11 +260,22 @@ window.addressFeatures = {
   },
   async submitAddressAttach() {
     if (!this.addressDetail || !this.addressAttachPick) { this.showToast('请先选择要挂接的分享码', 'error', 6000); return; }
+    const label = this.addressStageLabel(this.addressAttachStage);
+    // 不传 slot = 后端自动追加一次，绝不覆盖已有留档。
+    const body = { stage_key: this.addressAttachStage, publication_id: this.addressAttachPick };
+    if (this.addressAttachSlotMode === 'replace') {
+      // 覆盖是这套数据里唯一会丢东西的操作，必须让员工明确确认一次再动手。
+      const target = this.addressAttachExisting.find(s => s.slot === this.addressAttachSlot);
+      if (!target) { this.showToast('要替换的那一次已不存在，请重新选择留档方式', 'error', 8000); return; }
+      if (!confirm('「' + label + '」的第 ' + (target.slot + 1) + ' 次留档（' + this.addressStamp(target.created) + '）将被替换，\n原来那一份会从地址页移除。\n\n确定替换？')) return;
+      body.slot = target.slot;
+    }
     this.addressBusy = true;
     try {
-      await this.accountJSON('/addresses/' + this.addressDetail.id + '/attach',
-        { stage_key: this.addressAttachStage, publication_id: this.addressAttachPick });
-      this.showToast('✅ 已挂接到「' + this.addressStageLabel(this.addressAttachStage) + '」');
+      const result = await this.accountJSON('/addresses/' + this.addressDetail.id + '/attach', body);
+      const receipt = (result && result.attached) || null;
+      const times = receipt && receipt.count > 1 ? '（第 ' + (receipt.slot + 1) + ' 次留档）' : '';
+      this.showToast('✅ 已挂接到「' + label + '」' + times);
       this.addressAttachOpen = false;
       await this.refreshAddressDetail();
     } catch (e) { this.showToast(e.message || '挂接失败', 'error', 8000); }
@@ -229,15 +304,34 @@ window.addressFeatures = {
     this.addressPickId = '';
     this.addressStage = this.addressStageDefault();
     this.addressAttachNote = '';
+    this.addressPickHint = '';
+  },
+  // 告诉员工「这一份会变成第几次留档」。不提示的话，售后第二次上门时
+  // 员工会以为自己在覆盖上一次的记录，不敢点；或者反过来以为无所谓而选错阶段。
+  async refreshAddressPickHint() {
+    this.addressPickHint = '';
+    if (!this.addressPickOn || !this.addressPickId) return;
+    try {
+      const detail = await this.accountJSON('/addresses/' + this.addressPickId);
+      const label = this.addressStageLabel(this.addressStage);
+      const same = (detail.stages || []).filter(s => s.stage_key === this.addressStage);
+      this.addressPickHint = same.length
+        ? '该地址的「' + label + '」已有 ' + same.length + ' 次留档，本次会作为第 ' + (same.length + 1) + ' 次保留，旧的不会被覆盖。'
+        : '该地址的「' + label + '」还没有留档，本次是第 1 次。';
+    } catch (e) { this.addressPickHint = ''; }
   },
   // 发布成功后挂接。挂接失败不能影响「分享码已生成」这个既成事实，所以单独提示。
   async attachAfterPublish() {
     if (!this.addressPickId || !this.shareResult) return;
     try {
-      await this.accountJSON('/addresses/' + this.addressPickId + '/attach',
+      // 不传 slot：后端自动追加一次。第二次售后保养不会覆盖第一次。
+      const result = await this.accountJSON('/addresses/' + this.addressPickId + '/attach',
         { stage_key: this.addressStage, publication_id: this.shareResult.id });
+      const receipt = (result && result.attached) || null;
       const target = this.addressOptions.find(a => a.id === this.addressPickId);
-      this.addressAttachNote = '✅ 已挂到「' + (target ? target.label : '所选地址') + '」的「' + this.addressStageLabel(this.addressStage) + '」。业主扫该地址的二维码即可看到这一份。';
+      const times = receipt && receipt.count > 1
+        ? '（该阶段第 ' + (receipt.slot + 1) + ' 次留档）' : '';
+      this.addressAttachNote = '✅ 已挂到「' + (target ? target.label : '所选地址') + '」的「' + this.addressStageLabel(this.addressStage) + '」' + times + '。业主扫该地址的二维码即可看到这一份。';
       this.showToast(this.addressAttachNote);
     } catch (e) {
       this.addressAttachNote = '⚠️ 分享码已生成，但挂到地址失败：' + (e.message || '未知原因') + '。可在「地址管理」里补挂。';
@@ -283,7 +377,9 @@ window.addressFeatures = {
       ctx.fillText('业主：' + address.client_name, W / 2, y);
       y += 34;
     }
-    const done = (address.stages || []).filter(s => s.visible).length;
+    // 同样是「阶段数」口径：卡片是要打印贴门口、交业主的，
+    // 写成留档条数会出现「已归档 5 个阶段」而总共只有 6 个阶段的困惑。
+    const done = this.addressDoneStageCount(address.stages);
     ctx.fillStyle = 'rgba(255,255,255,0.62)';
     ctx.font = '20px "PingFang SC","Microsoft YaHei",sans-serif';
     ctx.fillText('已归档 ' + done + ' 个阶段 · 施工推进中会自动更新', W / 2, y);
