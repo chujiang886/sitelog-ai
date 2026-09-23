@@ -13,6 +13,7 @@
   <script src="vendor/purify.min.js"></script>
   <script src="editor-state.js"></script>
   <script src="project-client.js"></script>
+  <script src="address-client.js"></script>
   <script src="legacy-client.js"></script>
   <script src="field-client.js"></script>
   <script src="workflow-client.js"></script>
@@ -614,6 +615,40 @@
     }
     @keyframes pdfspin { to { transform: rotate(360deg); } }
     header button, header select { white-space: nowrap; flex-shrink: 0; }
+
+    /* ========== 地址管理面板（一址一码）==========
+       这里的样式不用 Tailwind 工具类，原因是 vendor/app.css 是预构建产物：
+       它只包含「构建那一刻 index.html 里出现过」的类。新写的标记若用了当时不存在的
+       工具类（如 px-6 / divide-y / z-10），CSS 里根本没有对应规则，浏览器不报错、
+       只是少了样式——静默失效。所以面板自己的样式在这里显式写死，
+       不依赖任何构建步骤。改动后可用 check_tailwind_classes.py 复核。 */
+    .addr-panel-head {
+      position: sticky; top: 0; z-index: 10;
+      padding: 1rem 1.5rem;
+    }
+    /* 列表分隔线。Tailwind 的 divide-y 只给非首个子元素加 border-top，
+       这里用同样的语义，避免最后一行多出一条线。 */
+    .addr-list > * + * { border-top: 1px solid #e5e7eb; }
+    .addr-search-input { min-width: 180px; }
+    .addr-dot { width: 0.5rem; height: 0.5rem; }
+    /* 深墨绿卡片上的浅色按钮 */
+    .addr-ghost-btn { background: rgba(255, 255, 255, 0.12); }
+    .addr-ghost-btn:hover { background: rgba(255, 255, 255, 0.22); }
+    /* 分享弹窗里「归到某个地址」的金色提示框 */
+    .addr-gold-box {
+      background: rgba(184, 146, 74, 0.05);
+      border-color: rgba(184, 146, 74, 0.4);
+    }
+
+    /* 地址管理面板的行布局。
+       桌面端空间宽裕：地址名/元信息超长就省略号截断，保持列表紧凑。
+       窄屏必须换行显示，绝不能截断——门牌号（2201 / 2202）是区分同栋不同户的
+       唯一标识，被截掉就分不清是哪一户，属于会引发实际错单的问题。 */
+    .addr-item-label, .addr-item-meta {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .addr-item-main { word-break: break-word; }
+
     @media screen and (max-width: 767px) {
       #report-content:not(.pdf-exporting) { padding: 12px; }
       .pdf-cover-band { padding: 18px 14px; gap: 12px; }
@@ -623,6 +658,23 @@
       .pdf-cover-badge { white-space: nowrap; }
       .pdf-meta-grid { grid-template-columns: 1fr; gap: 1px; }
       .pdf-cover-tagline { font-size: 14px; letter-spacing: 1px; }
+
+      /* 地址列表：文字占满整行，操作按钮移到下一行右对齐 */
+      .addr-item { flex-direction: column; align-items: stretch; gap: 8px; }
+      .addr-item-label, .addr-item-meta {
+        overflow: visible; text-overflow: clip; white-space: normal; line-height: 1.45;
+      }
+      .addr-item-actions { justify-content: flex-end; }
+
+      /* 阶段行：阶段名占满整行，查看/隐藏/移除移到下一行 */
+      .addr-stage { flex-wrap: wrap; }
+      .addr-stage-main { flex-basis: calc(100% - 20px); }
+      .addr-stage-actions { margin-left: 20px; }
+
+      /* 搜索栏：输入框独占一行，两个按钮在下一行平分宽度。
+         否则「＋ 新建地址」会被挤到第三行，工具栏看起来是散的。 */
+      .addr-toolbar > .addr-search-input { flex-basis: 100%; }
+      .addr-toolbar > button { flex: 1 1 0; }
     }
 
   </style>
@@ -641,10 +693,14 @@
       </div>
       <div class="flex flex-wrap items-center gap-2 min-w-0">
         <select x-model="templateType" @change="switchTemplate" class="text-slate-900 text-sm px-3 py-1.5 rounded border-0">
+          <!-- 阶段顺序 = 施工顺序。此处 6 项必须与 address-client.js 的 ADDRESS_STAGE_KEYS
+               以及后端 stages.py 的 STAGE_KEYS 完全一致，由 test-stage-parity.cjs 守护。 -->
+          <option value="吊装施工">🏗️ 吊装施工归档</option>
           <option value="框架施工">🔲 框架施工归档</option>
           <option value="玻扇施工">🪟 玻扇施工归档</option>
           <option value="五金安装">🔧 五金安装归档</option>
           <option value="离场自检">🚪 离场前自检留底</option>
+          <option value="售后保养">🧰 售后保养施工归档</option>
         </select>
         <button @click="openSettings()" class="px-3 py-1.5 text-sm hover:bg-white/10 rounded transition flex items-center gap-1.5" title="账号与公司设置">
           <span>👤 账号</span>
@@ -664,6 +720,9 @@
         </button>
         <button @click="openShareManage()" class="px-3 py-1.5 text-sm hover:bg-white/10 rounded transition" title="查看已分享清单、查看次数、作废链接">
           📤 分享管理
+        </button>
+        <button @click="openAddressPanel()" class="px-3 py-1.5 text-sm hover:bg-white/10 rounded transition" title="一址一码：一个地址一张二维码，业主扫码看该户全部阶段归档">
+          🏠 地址管理
         </button>
       </div>
     </div>
@@ -1045,6 +1104,37 @@
             <p class="mt-2">拍摄清单和现场补录可选；不能确认的施工事实请保留“待核实”。已登记的关键整改问题仍须复核关闭。</p>
             <p class="mt-2">分享内容为本次确认的固定版本，后续编辑不会改变已发出的二维码内容。只有编辑权限时，将提交给工程负责人或审核人确认。</p>
           </div>
+          <!-- 一址一码：把本次归档挂到某个地址，业主扫该地址的二维码即可看到 -->
+          <div class="addr-gold-box border rounded-lg p-3 space-y-2">
+            <label class="flex items-center gap-2 text-sm font-semibold text-[#1F3D2A]">
+              <input type="checkbox" x-model="addressPickOn" @change="addressPickOn && loadAddressOptions()">
+              🏠 归到某个地址（一址一码）
+            </label>
+            <template x-if="addressPickOn">
+              <div class="space-y-2">
+                <select aria-label="归属地址" x-model="addressPickId" class="border rounded p-2 w-full text-sm">
+                  <option value="">— 请选择地址 —</option>
+                  <template x-for="a in addressOptions" :key="a.id">
+                    <option :value="a.id" x-text="a.label + (a.client_name ? '（' + a.client_name + '）' : '')"></option>
+                  </template>
+                </select>
+                <label class="block text-xs text-slate-600">归档阶段
+                  <!-- 同「挂到阶段」：静态 6 项，不用 x-for，避免显示值与 addressStage 不符 -->
+                  <select aria-label="归档阶段" x-model="addressStage" class="border rounded p-2 ml-2 text-sm">
+                    <option value="吊装施工">吊装施工归档</option>
+                    <option value="框架施工">框架归档记录</option>
+                    <option value="玻扇施工">玻扇施工归档</option>
+                    <option value="五金安装">五金安装归档</option>
+                    <option value="离场自检">离场前自检留底</option>
+                    <option value="售后保养">售后保养施工归档</option>
+                  </select>
+                </label>
+                <p class="text-xs text-slate-500" x-show="addressOptionsLoading">正在读取地址…</p>
+                <p class="text-xs text-slate-500" x-show="!addressOptionsLoading && !addressOptions.length">还没有地址，请先到顶部「🏠 地址管理」新建。</p>
+                <p class="text-xs text-[#1F3D2A] leading-relaxed" x-show="addressPickId">业主扫该地址的二维码，就能在「<span class="font-semibold" x-text="ADDRESS_STAGE_DISPLAY[addressStage]"></span>」里看到这一份。同一地址的多个阶段会自动聚合成同一张码。</p>
+              </div>
+            </template>
+          </div>
           <label class="block">分享范围<select aria-label="分享范围" x-model="shareAudience" class="border rounded p-2 ml-2"><option value="public">持链接可查看</option><option value="internal">仅公司登录账号</option><option value="code">访问码保护</option></select></label>
           <label class="block">有效期<select aria-label="分享有效期" x-model="shareDays" class="border rounded p-2 ml-2"><option value="7">7 天</option><option value="30">30 天</option><option value="90">90 天</option><option value="0">长期有效</option></select></label>
           <label class="block" x-show="shareAudience==='code'">访问码<input aria-label="分享访问码" x-model="shareCode" maxlength="24" autocomplete="off" class="border rounded p-2 ml-2" placeholder="6–24 位字母或数字"></label>
@@ -1090,6 +1180,11 @@
         <div class="bg-green-50 border-l-4 border-green-500 rounded p-3 text-xs text-green-900 mb-3 leading-relaxed">
           <p>👆 长按或右键保存这张分享卡，直接发到客户群即可。</p>
           <p class="mt-1 break-all"><span class="font-mono text-[11px]" x-text="shareResult ? shareResult.url : ''"></span></p>
+        </div>
+
+        <div x-show="addressAttachNote" class="rounded p-3 text-xs mb-3 leading-relaxed border-l-4"
+             :class="addressAttachNote.indexOf('⚠️') === 0 ? 'bg-amber-50 border-amber-500 text-amber-900' : 'bg-[#1F3D2A]/5 border-[#1F3D2A] text-[#1F3D2A]'">
+          <p x-text="addressAttachNote"></p>
         </div>
 
         <div class="flex justify-center gap-2">
@@ -1138,6 +1233,188 @@
             <button x-show="item.revoked" @click="restoreShare(item.id)" class="px-2 py-1 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100 shrink-0">恢复</button>
           </div>
         </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 地址管理面板（一址一码：一个地址一张二维码，业主扫码看全程） ========== -->
+  <div
+    x-show="addressPanel"
+    x-cloak
+    class="no-print fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+    @click.self="addressPanel = false"
+    @keydown.escape.window="addressFormOpen ? (addressFormOpen = false) : (addressPanel = false)"
+  >
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" @click.stop>
+      <div class="addr-panel-head bg-white border-b flex items-start justify-between gap-4">
+        <div>
+          <h3 class="font-bold text-lg text-[#1F3D2A]">🏠 地址管理 · 一址一码</h3>
+          <p class="text-xs text-slate-500 mt-1 leading-relaxed">一个地址一张二维码。施工推进到哪个阶段就把该阶段归档挂上去，业主扫同一张码看全程；完工后回头再扫还是全套。</p>
+        </div>
+        <button @click="addressPanel = false" class="text-slate-400 hover:text-slate-600 text-2xl leading-none shrink-0" aria-label="关闭地址管理">×</button>
+      </div>
+
+      <div class="p-6">
+
+        <!-- ===== 地址详情 ===== -->
+        <template x-if="addressDetail">
+          <div class="space-y-3">
+            <button @click="closeAddressDetail()" class="text-sm text-slate-500 hover:text-slate-600">← 返回地址列表</button>
+
+            <div class="bg-[#1F3D2A] text-white rounded-lg p-4">
+              <p class="text-xs opacity-70">工程地址</p>
+              <p class="font-semibold text-lg" x-text="addressDetail.label"></p>
+              <p class="text-xs opacity-80 mt-1" x-text="(addressDetail.client_name || '未填客户') + (addressDetail.note ? ' · ' + addressDetail.note : '')"></p>
+              <p class="text-xs opacity-60 mt-2" x-text="'已归档 ' + (addressDetail.stages || []).filter(s => s.visible).length + ' 个阶段 · 地址编号 ' + addressDetail.id"></p>
+              <div class="flex flex-wrap gap-2 mt-3">
+                <button @click="openAddressForm(addressDetail)" class="addr-ghost-btn px-3 py-1.5 text-xs rounded">编辑地址</button>
+                <button @click="renderAddressCard()" class="px-3 py-1.5 text-xs bg-[#B8924A] rounded hover:opacity-90">生成二维码卡片</button>
+                <button @click="copyAddressUrl()" class="addr-ghost-btn px-3 py-1.5 text-xs rounded">复制链接</button>
+                <button @click="archiveAddress(addressDetail)" class="addr-ghost-btn px-3 py-1.5 text-xs rounded">归档地址</button>
+              </div>
+            </div>
+
+            <!-- 二维码卡片 -->
+            <div x-show="addressCardReady" class="flex flex-col items-center gap-3 border rounded-lg p-4">
+              <canvas id="address-card-canvas" class="rounded-lg shadow border border-slate-200 max-w-full"></canvas>
+              <div class="flex gap-2">
+                <button @click="downloadAddressCard()" class="px-4 py-2 bg-[#1F3D2A] text-white rounded-lg text-sm">💾 保存二维码卡片</button>
+                <button @click="copyAddressUrl()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm">🔗 复制地址链接</button>
+              </div>
+              <p class="text-xs text-slate-500 text-center leading-relaxed">打印出来贴门口或转发到客户群。业主扫码即可查看该户全部阶段的施工归档，施工推进中内容会自动更新，二维码本身不变。</p>
+            </div>
+
+            <!-- 阶段列表 -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <h4 class="font-semibold text-slate-900">已挂接的阶段归档</h4>
+                <button @click="openAddressAttach()" class="px-3 py-1.5 text-xs bg-slate-100 rounded hover:bg-slate-200">＋ 从已有工程补挂</button>
+              </div>
+
+              <div x-show="addressAttachOpen" class="border border-dashed rounded-lg p-3 mb-3 space-y-2 bg-slate-50">
+                <p class="text-xs text-slate-600">搜索工程 → 选一版「公开」分享码 → 选阶段 → 挂接</p>
+                <div class="flex gap-2">
+                  <input x-model="addressAttachQuery" @keydown.enter="searchAttachProjects()" placeholder="输入工程名称关键字" class="border rounded p-2 text-sm flex-1 min-w-0">
+                  <button @click="searchAttachProjects()" :disabled="addressAttachSearching" class="px-3 py-1.5 text-sm bg-[#1F3D2A] text-white rounded disabled:opacity-50 shrink-0">搜索</button>
+                </div>
+                <template x-if="addressAttachProjects.length">
+                  <div class="addr-list border rounded bg-white max-h-40 overflow-y-auto">
+                    <template x-for="p in addressAttachProjects" :key="p.id">
+                      <button @click="pickAttachProject(p)" class="w-full text-left px-3 py-2 text-sm hover:bg-slate-50">
+                        <span x-text="p.title"></span>
+                        <span class="text-xs text-slate-400 ml-2" x-text="'修订 ' + p.revision"></span>
+                      </button>
+                    </template>
+                  </div>
+                </template>
+                <template x-if="addressAttachPid">
+                  <div class="space-y-2">
+                    <p class="text-xs text-slate-600">工程：<b x-text="addressAttachProjectTitle"></b></p>
+                    <template x-if="addressAttachVersions.length">
+                      <div class="space-y-2">
+                        <label class="block text-xs text-slate-600">选择分享码
+                          <select x-model="addressAttachPick" class="border rounded p-2 w-full text-sm mt-1">
+                            <template x-for="v in addressAttachVersions" :key="v.share_id">
+                              <option :value="v.share_id" x-text="'第 ' + v.number + ' 版 · 修订 ' + v.revision + ' · ' + new Date(v.created * 1000).toLocaleDateString('zh-CN')"></option>
+                            </template>
+                          </select>
+                        </label>
+                        <label class="block text-xs text-slate-600">挂到阶段
+                          <!-- 静态列出 6 个阶段，不用 x-for：x-model 在 <select> 上的初始赋值
+                               发生在 x-for 插入 <option> 之前，找不到匹配项就回落显示第一项，
+                               出现「显示吊装施工、实际存五金安装」的错位。阶段固定 6 个，
+                               静态写死最稳，也便于 test-stage-parity.cjs 一起校验。 -->
+                          <select x-model="addressAttachStage" class="border rounded p-2 w-full text-sm mt-1">
+                            <option value="吊装施工">吊装施工归档</option>
+                            <option value="框架施工">框架归档记录</option>
+                            <option value="玻扇施工">玻扇施工归档</option>
+                            <option value="五金安装">五金安装归档</option>
+                            <option value="离场自检">离场前自检留底</option>
+                            <option value="售后保养">售后保养施工归档</option>
+                          </select>
+                        </label>
+                        <div class="flex gap-2">
+                          <button @click="submitAddressAttach()" :disabled="addressBusy" class="px-4 py-2 text-sm bg-[#1F3D2A] text-white rounded disabled:opacity-50">确认挂接</button>
+                          <button @click="addressAttachOpen = false" class="px-4 py-2 text-sm bg-white border rounded">取消</button>
+                        </div>
+                      </div>
+                    </template>
+                    <p x-show="!addressAttachVersions.length" class="text-xs text-amber-700 leading-relaxed">该工程还没有「公开」范围的分享码。请先到「项目工作区」发布一版（内部档案和访问码档案不能挂到公开地址页）。</p>
+                  </div>
+                </template>
+              </div>
+
+              <template x-if="!(addressDetail.stages || []).length">
+                <p class="text-sm text-slate-500 border border-dashed rounded-lg p-6 text-center leading-relaxed">还没有挂接任何阶段。<br>发布归档时勾选「归到某个地址」，或点上面的「从已有工程补挂」。</p>
+              </template>
+              <div x-show="(addressDetail.stages || []).length" class="addr-list border rounded-lg">
+                <template x-for="stage in (addressDetail.stages || [])" :key="stage.stage_key + '-' + stage.slot">
+                  <div class="addr-stage flex items-center gap-3 px-3 py-2">
+                    <span class="addr-dot rounded-full shrink-0" :class="stage.visible ? 'bg-[#B8924A]' : 'bg-slate-300'"></span>
+                    <div class="addr-stage-main flex-1 min-w-0">
+                      <p class="text-sm font-medium text-slate-900" x-text="ADDRESS_STAGE_DISPLAY[stage.stage_key] || stage.stage_key"></p>
+                      <p class="text-xs text-slate-500" x-text="addressStamp(stage.created) + ' · ' + (stage.audience === 'public' ? '公开' : stage.audience) + (stage.revoked ? ' · 已撤回' : '') + (stage.slot ? ' · 第 ' + (stage.slot + 1) + ' 次' : '')"></p>
+                    </div>
+                    <div class="addr-stage-actions flex items-center gap-2 shrink-0">
+                      <a :href="'/s/' + stage.publication_id" target="_blank" rel="noopener" class="text-xs underline text-slate-600 shrink-0">查看</a>
+                      <button @click="toggleStageVisible(stage)" class="text-xs px-2 py-1 bg-slate-100 rounded shrink-0" x-text="stage.visible ? '隐藏' : '显示'"></button>
+                      <button @click="detachStage(stage)" class="text-xs px-2 py-1 bg-red-50 text-red-600 rounded shrink-0">移除</button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- ===== 地址列表 ===== -->
+        <template x-if="!addressDetail">
+          <div class="space-y-3">
+            <div class="addr-toolbar flex flex-wrap gap-2 items-center">
+              <input x-model="addressQuery" @keydown.enter="addressSearch()" placeholder="搜索地址名称或客户" class="addr-search-input border rounded p-2 text-sm flex-1">
+              <button @click="addressSearch()" class="px-3 py-2 text-sm bg-slate-100 rounded hover:bg-slate-200 shrink-0">搜索</button>
+              <button @click="openAddressForm(null)" class="px-4 py-2 text-sm bg-[#1F3D2A] text-white rounded hover:opacity-90 shrink-0">＋ 新建地址</button>
+            </div>
+
+            <div x-show="addressFormOpen" class="border rounded-lg p-4 bg-slate-50 space-y-2">
+              <h4 class="font-semibold text-sm" x-text="addressEditingId ? '编辑地址' : '新建地址'"></h4>
+              <label class="block text-xs text-slate-600">地址名称（建议写到门牌）
+                <input x-model="addressForm.label" maxlength="120" placeholder="例：汕头市龙湖区观海花园 3 栋 2201" class="border rounded p-2 w-full text-sm mt-1">
+              </label>
+              <label class="block text-xs text-slate-600">客户称呼（可选）
+                <input x-model="addressForm.client_name" maxlength="60" placeholder="例：林先生" class="border rounded p-2 w-full text-sm mt-1">
+              </label>
+              <label class="block text-xs text-slate-600">备注（可选）
+                <input x-model="addressForm.note" maxlength="500" placeholder="例：二期、含阳台改造" class="border rounded p-2 w-full text-sm mt-1">
+              </label>
+              <div class="flex gap-2">
+                <button @click="saveAddressForm()" :disabled="addressBusy" class="px-4 py-2 text-sm bg-[#1F3D2A] text-white rounded disabled:opacity-50" x-text="addressEditingId ? '保存修改' : '创建地址'"></button>
+                <button @click="closeAddressForm()" class="px-4 py-2 text-sm bg-white border rounded">取消</button>
+              </div>
+            </div>
+
+            <p x-show="addressLoading" class="text-sm text-slate-500">正在读取…</p>
+            <p x-show="!addressLoading && !addressItems.length" class="text-sm text-slate-500 border border-dashed rounded-lg p-6 text-center leading-relaxed">还没有地址。<br>点「＋ 新建地址」创建第一个，之后每户一张二维码。</p>
+
+            <div x-show="addressItems.length" class="addr-list border rounded-lg">
+              <template x-for="a in addressItems" :key="a.id">
+                <div class="addr-item flex items-center gap-3 px-3 py-3">
+                  <div class="addr-item-main flex-1 min-w-0 cursor-pointer" @click="openAddress(a.id)">
+                    <p class="addr-item-label text-sm font-medium text-slate-900" x-text="a.label"></p>
+                    <p class="addr-item-meta text-xs text-slate-500" x-text="(a.client_name || '未填客户') + ' · ' + a.stage_count + ' 个阶段已归档 · 更新于 ' + addressStamp(a.updated)"></p>
+                  </div>
+                  <div class="addr-item-actions flex items-center gap-2 shrink-0">
+                    <span x-show="a.status === 'archived'" class="text-xs text-slate-400 shrink-0">已归档</span>
+                    <button @click="openAddress(a.id)" class="px-3 py-1.5 text-xs bg-slate-100 rounded hover:bg-slate-200 shrink-0">管理</button>
+                    <button x-show="a.status !== 'archived'" @click="archiveAddress(a)" class="px-3 py-1.5 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 shrink-0">归档</button>
+                    <button x-show="a.status === 'archived'" @click="restoreAddress(a)" class="px-3 py-1.5 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100 shrink-0">恢复</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
       </div>
     </div>
   </div>
@@ -1298,6 +1575,7 @@
         ...window.accountFeatures,
         ...window.editorFeatures,
         ...window.projectFeatures,
+        ...window.addressFeatures,
         ...window.workflowFeatures,
         legacyOrigin:'',
         ...window.legacyFeatures,
@@ -1384,10 +1662,12 @@
 
         getTemplateHtml() {
           let html = '';
-          if (this.templateType === '框架施工') html = TEMPLATES.frame();
+          if (this.templateType === '吊装施工') html = TEMPLATES.lifting();
+          else if (this.templateType === '框架施工') html = TEMPLATES.frame();
           else if (this.templateType === '玻扇施工') html = TEMPLATES.glass();
           else if (this.templateType === '五金安装') html = TEMPLATES.hardware();
           else if (this.templateType === '离场自检') html = TEMPLATES.departure();
+          else if (this.templateType === '售后保养') html = TEMPLATES.aftercare();
           else html = TEMPLATES.frame();
 
           // 所有模板均保留四个照片分区，避免换版式后照片仍在数据中却不可见。
@@ -2537,6 +2817,7 @@
           this.shareError = '';
           this.shareCardReady = false;
           this.shareDialogOpen = true;
+          this.resetAddressPick();
           this.loadClientLogos();
         },
 
@@ -2621,6 +2902,7 @@
           if (this.shareBusy || this.reviewBusy || this.cloudBusy) return;
           const totalPhotos = this.images.length + this.arrivalImages.length + this.finishImages.length + this.sopImages.length;
           if (totalPhotos === 0 && !confirm('当前还没有上传任何照片，确定要分享吗？')) return;
+          if (this.addressPickOn && !this.addressPickId) { this.showToast('请选择归属地址，或取消勾选「归到某个地址」', 'error', 8000); return; }
 
           this.shareBusy = true;
           this.shareError = '';
@@ -2632,6 +2914,8 @@
             await this.$nextTick();
             await this.drawShareCard(data.url, data.id);
             this.shareCardReady = true;
+            // 一址一码：发布成功后挂到所选地址。挂接失败不影响已生成的分享码，单独提示。
+            await this.attachAfterPublish();
             this.showToast('✅ 分享码已生成，保存分享卡发到客户群即可');
           } catch (e) {
             console.error('[share] 上传失败:', e);
@@ -2746,14 +3030,33 @@
           await this.drawClientLogoOnCard(ctx, W, H);
         },
 
+        // 折行。中文没有词边界，只能逐片量宽；但门牌号、栋号这类连续数字/字母
+        // 必须整体不拆——否则「…3 栋 2201」会被断成「…3 栋 220」+「1」，
+        // 二维码卡片上看起来就像地址写错了，业主扫之前先起了疑心。
+        // 所以先把文本切成「不可分割片段」：连续 [0-9A-Za-z]（含中间的 - _ / #）
+        // 算一片，其余每个字算一片。单片自身超宽时再按字符硬拆，避免顶出画布。
+        // 地址卡片与分享卡片共用这个方法，两处都受益。
         wrapCanvasText(ctx, text, maxWidth) {
+          const chunks = String(text == null ? '' : text)
+            .match(/[0-9A-Za-z]+(?:[-_/#][0-9A-Za-z]+)*|\s+|[\s\S]/g) || [];
           const lines = []; let cur = '';
-          for (const ch of String(text)) {
-            const test = cur + ch;
-            if (ctx.measureText(test).width > maxWidth && cur) { lines.push(cur); cur = ch; }
-            else cur = test;
+          for (const chunk of chunks) {
+            if (cur && ctx.measureText(cur + chunk).width > maxWidth) {
+              const done = cur.replace(/\s+$/, '');
+              if (done) lines.push(done);
+              cur = /^\s+$/.test(chunk) ? '' : chunk;
+            } else {
+              cur += chunk;
+            }
+            while (ctx.measureText(cur).width > maxWidth && cur.length > 1) {
+              let cut = cur.length - 1;
+              while (cut > 1 && ctx.measureText(cur.slice(0, cut)).width > maxWidth) cut--;
+              lines.push(cur.slice(0, cut));
+              cur = cur.slice(cut);
+            }
           }
-          if (cur) lines.push(cur);
+          const tail = cur.replace(/\s+$/, '');
+          if (tail) lines.push(tail);
           return lines;
         },
 
@@ -3258,6 +3561,246 @@
         <footer class="pdf-footer">
           <div class="pdf-footer-line-gold"></div>
           <p class="pdf-footer-slogan">「安全离场 · 责任交接 · 凭证留底」</p>
+          <p class="pdf-footer-company">汕头市初匠门窗科技有限公司 · CHUJIANG</p>
+          <p class="pdf-footer-sub">施格归档 · SITELOG AI 出品 · ICP备2024297744号-2</p>
+          <div class="pdf-footer-links">
+            <span>服务热线：待填写</span>
+            <span>官网：chujiang.中国</span>
+            <span>地址：广东省汕头市</span>
+          </div>
+        </footer>
+      `,
+
+      // ═══ 吊装施工（P2 新增）═══
+      // 大件型材/整窗吊装就位阶段的归档。风险点是高处作业与成品磕碰，
+      // 所以版式把「安全交底」和「成品保护」单独成节，不并进施工节点。
+      lifting: () => `
+        <!-- ═══ 封面 ═══ -->
+        <div class="pdf-cover">
+          <div class="pdf-cover-band">
+            <span class="pdf-cover-brand">CHUJIANG 初匠门窗</span>
+            <span class="pdf-cover-badge">高处作业留证</span>
+          </div>
+          <div class="pdf-cover-body">
+            <p class="pdf-cover-eng">HOISTING &amp; LIFTING</p>
+            <h1 class="pdf-cover-main-title">吊装施工归档</h1>
+            <p class="pdf-cover-tagline">复核 · 试吊 · 就位 · 保护</p>
+            {{PROJECT_INFO}}
+          </div>
+        </div>
+
+        <!-- ═══ 一、吊装作业概况 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">一</span>
+            <span class="pdf-section-title">吊装作业概况</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-editable-box" contenteditable="true">
+本次吊装施工整体情况：吊装部位与楼层、构件规格与重量、使用吊具与设备、作业人数与分工、当日天气与风力、起吊与就位时间、总体安全与质量控制要点。建议 100-200 字。
+          </div>
+        </section>
+
+        <!-- ═══ 二、班组进场与安全交底 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">二</span>
+            <span class="pdf-section-title">班组进场与安全交底</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-sop-gallery" id="arrival-gallery">
+            <!-- syncArrivalGallery() 动态渲染：人员到位、吊具检查、警戒区设置、安全交底等 -->
+          </div>
+        </section>
+
+        <!-- ═══ 三、吊装作业节点 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">三</span>
+            <span class="pdf-section-title">吊装作业节点</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div id="images-container"></div>
+          <div class="pdf-grid-2 mt-6">
+            <div class="pdf-check-card pdf-check-gold">
+              <p class="pdf-check-title"><span>📐</span>洞口复核</p>
+              <p class="pdf-check-desc">吊装前复核洞口尺寸、垂直度与水平基准，误差控制在规范范围内</p>
+            </div>
+            <div class="pdf-check-card pdf-check-green">
+              <p class="pdf-check-title"><span>🪢</span>吊具检查</p>
+              <p class="pdf-check-desc">吊带 / 吸盘 / 吊点逐一检查，确认无破损、无超载</p>
+            </div>
+            <div class="pdf-check-card pdf-check-green">
+              <p class="pdf-check-title"><span>⬆️</span>试吊与就位</p>
+              <p class="pdf-check-desc">先离地试吊确认平衡，再缓慢提升就位，全程设专人指挥</p>
+            </div>
+            <div class="pdf-check-card pdf-check-neutral">
+              <p class="pdf-check-title"><span>🛡️</span>成品保护</p>
+              <p class="pdf-check-desc">型材表面贴膜保留，落地垫软性材料，防止磕碰划伤</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══ 四、就位固定与成品保护 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">四</span>
+            <span class="pdf-section-title">就位固定与成品保护</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-sop-gallery" id="finish-gallery">
+            <!-- syncFinishGallery() 动态渲染 -->
+          </div>
+        </section>
+
+        <!-- ═══ 五、班组离场 SOP ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">五</span>
+            <span class="pdf-section-title">班组离场 SOP</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-sop-gallery" id="sop-gallery">
+            <!-- syncSopGallery() 动态渲染 -->
+          </div>
+        </section>
+
+        <!-- ═══ 六、吊装安全提示 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">六</span>
+            <span class="pdf-section-title">吊装安全提示</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-editable-box" contenteditable="true">
+1. 风力超过 5 级或雨天禁止室外吊装作业<br>2. 吊装作业区下方设警戒，严禁人员穿行或停留<br>3. 构件就位后未固定完成前，不得松开吊具<br>📱 客服微信号：plf32118（售后咨询 · 预约保养）
+          </div>
+        </section>
+
+        <!-- ═══ 页脚 ═══ -->
+        <footer class="pdf-footer">
+          <div class="pdf-footer-line-gold"></div>
+          <p class="pdf-footer-slogan">「吊装稳一分，业主安十分」</p>
+          <p class="pdf-footer-company">汕头市初匠门窗科技有限公司 · CHUJIANG</p>
+          <p class="pdf-footer-sub">施格归档 · SITELOG AI 出品 · ICP备2024297744号-2</p>
+          <div class="pdf-footer-links">
+            <span>服务热线：待填写</span>
+            <span>官网：chujiang.中国</span>
+            <span>地址：广东省汕头市</span>
+          </div>
+        </footer>
+      `,
+
+      // ═══ 售后保养施工（P2 新增）═══
+      // 交付后回访保养阶段的归档。这是唯一会「同一阶段重复多次」的阶段，
+      // 后端用 address_stages.slot 区分第几次上门。
+      aftercare: () => `
+        <!-- ═══ 封面 ═══ -->
+        <div class="pdf-cover">
+          <div class="pdf-cover-band">
+            <span class="pdf-cover-brand">CHUJIANG 初匠门窗</span>
+            <span class="pdf-cover-badge">售后保养留底</span>
+          </div>
+          <div class="pdf-cover-body">
+            <p class="pdf-cover-eng">AFTER-SALES CARE</p>
+            <h1 class="pdf-cover-main-title">售后保养施工归档</h1>
+            <p class="pdf-cover-tagline">调试 · 密封 · 清洁 · 复检</p>
+            {{PROJECT_INFO}}
+          </div>
+        </div>
+
+        <!-- ═══ 一、本次保养概况 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">一</span>
+            <span class="pdf-section-title">本次保养概况</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-editable-box" contenteditable="true">
+本次售后保养情况：上门原因（定期保养 / 业主报修 / 竣工验收后回访）、保养范围与门窗数量、保养项目、更换配件、业主反馈与本阶段结论。建议 100-200 字。
+          </div>
+        </section>
+
+        <!-- ═══ 二、上门准备与业主交接 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">二</span>
+            <span class="pdf-section-title">上门准备与业主交接</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-sop-gallery" id="arrival-gallery">
+            <!-- syncArrivalGallery() 动态渲染：上门预约、工具材料、现场交接、业主沟通等 -->
+          </div>
+        </section>
+
+        <!-- ═══ 三、保养作业节点 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">三</span>
+            <span class="pdf-section-title">保养作业节点</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div id="images-container"></div>
+          <div class="pdf-grid-2 mt-6">
+            <div class="pdf-check-card pdf-check-green">
+              <p class="pdf-check-title"><span>🔧</span>五金调试</p>
+              <p class="pdf-check-desc">执手、传动器、合页润滑与松紧调整，开合顺畅无异响</p>
+            </div>
+            <div class="pdf-check-card pdf-check-gold">
+              <p class="pdf-check-title"><span>🌧️</span>密封检查</p>
+              <p class="pdf-check-desc">胶条老化情况、打胶开裂修补、排水孔疏通</p>
+            </div>
+            <div class="pdf-check-card pdf-check-neutral">
+              <p class="pdf-check-title"><span>🧽</span>清洁保养</p>
+              <p class="pdf-check-desc">型材与玻璃表面清洁、轨道除尘、边缝清理</p>
+            </div>
+            <div class="pdf-check-card pdf-check-green">
+              <p class="pdf-check-title"><span>✅</span>功能复检</p>
+              <p class="pdf-check-desc">逐扇开合锁闭、密封性复检，与业主当面确认</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══ 四、保养后复检与清洁 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">四</span>
+            <span class="pdf-section-title">保养后复检与清洁</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-sop-gallery" id="finish-gallery">
+            <!-- syncFinishGallery() 动态渲染 -->
+          </div>
+        </section>
+
+        <!-- ═══ 五、班组离场 SOP ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">五</span>
+            <span class="pdf-section-title">班组离场 SOP</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-sop-gallery" id="sop-gallery">
+            <!-- syncSopGallery() 动态渲染 -->
+          </div>
+        </section>
+
+        <!-- ═══ 六、日常保养建议 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">六</span>
+            <span class="pdf-section-title">日常保养建议</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-editable-box" contenteditable="true">
+1. 轨道与滑轮每半年清理一次积尘，勿用强酸强碱清洁剂<br>2. 密封胶条每年检查一次，出现硬化开裂及时更换<br>3. 五金件每半年润滑一次，避免暴力开合<br>4. 建议每年预约一次上门保养，延长门窗使用寿命<br>📱 客服微信号：plf32118（售后咨询 · 预约保养）
+          </div>
+        </section>
+
+        <!-- ═══ 页脚 ═══ -->
+        <footer class="pdf-footer">
+          <div class="pdf-footer-line-gold"></div>
+          <p class="pdf-footer-slogan">「交付不是结束，是长期服务的开始」</p>
           <p class="pdf-footer-company">汕头市初匠门窗科技有限公司 · CHUJIANG</p>
           <p class="pdf-footer-sub">施格归档 · SITELOG AI 出品 · ICP备2024297744号-2</p>
           <div class="pdf-footer-links">
