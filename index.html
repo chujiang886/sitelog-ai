@@ -677,6 +677,74 @@
        text-[#8E6B2E]——任意值工具类不在预构建 CSS 里，写了等于没写。 */
     .addr-hint { color: #8E6B2E; }
 
+    /* ========== 存量归类 + 地址维度统计 ========== */
+    .addr-stat {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 10px;
+      background: linear-gradient(180deg, #f8faf9 0%, #f1f5f3 100%);
+      border: 1px solid #e2e8e5;
+    }
+    .addr-stat-line { font-size: 12px; color: #475569; }
+    .addr-stat-warn {
+      display: flex; align-items: flex-start; gap: 8px;
+      padding: 8px 12px; border-radius: 8px; font-size: 12px; line-height: 1.7;
+      background: rgba(184, 146, 74, 0.08); border: 1px solid rgba(184, 146, 74, 0.35);
+      color: #8E6B2E;
+    }
+    .addr-stat-warn strong { font-weight: 600; }
+    /* 停滞名单：默认折起。名单是给人去跟进的，不该一上来就占满屏幕。 */
+    .addr-stall { border: 1px solid #e2e8e5; border-radius: 8px; overflow: hidden; }
+    .addr-stall-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 8px 12px; background: #f8fafc; cursor: pointer;
+      font-size: 12px; color: #475569;
+    }
+    .addr-stall-rows > * + * { border-top: 1px solid #eef2f5; }
+    .addr-stall-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 8px 12px; font-size: 12px;
+    }
+    /* 完成度小条：比「3/6」这种数字更快看出「卡在哪」。 */
+    .addr-meter { display: inline-flex; gap: 2px; vertical-align: middle; }
+    .addr-meter i { width: 9px; height: 9px; border-radius: 2px; background: #e2e8f0; }
+    .addr-meter i.on { background: #1F3D2A; }
+
+    /* 批量归类弹窗：嵌在地址面板里的一层，所以不能再套 fixed 全屏遮罩
+       （会和地址面板的遮罩打架，点一下就两层一起关）。 */
+    .addr-bulk-mask {
+      position: fixed; inset: 0; z-index: 60;
+      background: rgba(0, 0, 0, 0.45);
+      display: flex; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .addr-bulk-card {
+      background: #fff; border-radius: 12px; width: 100%; max-width: 720px;
+      max-height: 88vh; overflow-y: auto; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    }
+    .addr-bulk-head {
+      position: sticky; top: 0; z-index: 10; background: #fff;
+      border-bottom: 1px solid #e5e7eb; padding: 14px 18px;
+    }
+    .addr-bulk-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 12px;
+    }
+    .addr-bulk-rows > * + * { border-top: 1px solid #eef2f5; }
+    .addr-bulk-row.off { background: #fafafa; }
+    .addr-bulk-title { font-size: 13px; font-weight: 500; color: #0f172a; }
+    .addr-bulk-sub { font-size: 11px; color: #64748b; line-height: 1.7; word-break: break-word; }
+    .addr-bulk-pick {
+      display: inline-block; padding: 2px 8px; border-radius: 99px;
+      background: rgba(184, 146, 74, 0.14); color: #8E6B2E; font-size: 11px; font-weight: 600;
+    }
+    .addr-bulk-ok { color: #15803d; }
+    .addr-bulk-bad { color: #b91c1c; }
+    .addr-bulk-result {
+      border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;
+      font-size: 12px;
+    }
+    .addr-bulk-result > div { padding: 7px 12px; }
+    .addr-bulk-result > * + * { border-top: 1px solid #eef2f5; }
+
     @media screen and (max-width: 767px) {
       #report-content:not(.pdf-exporting) { padding: 12px; }
       .pdf-cover-band { padding: 18px 14px; gap: 12px; }
@@ -1026,7 +1094,7 @@
       </details>
       <details class="border-t pt-4" x-show="accountUser && accountUser.role==='admin'">
         <summary class="font-semibold cursor-pointer">客户 LOGO 库（管理员）</summary>
-        <p class="text-sm text-slate-500 my-2">上传各客户的公司 LOGO（PNG / JPG / WebP，≤ 2MB）。员工在「确认完成」时可选择是否加入报告封面，分享卡也会显示。</p>
+        <p class="text-sm text-slate-500 my-2">上传各客户的公司 LOGO（PNG / JPG / WebP，最大 8MB）。上传前会自动等比压缩到长边 1200px，PNG 的透明底会保留——选多大都能传，不用自己先压。员工在「确认完成」时可选择是否加入报告封面，分享卡也会显示。</p>
         <form @submit.prevent="uploadClientLogo()" class="space-y-2 my-2">
           <label class="block text-sm">LOGO 名称（客户公司名）<span class="text-slate-500">批量上传时留空则自动用文件名</span><input x-model="clientLogoName" maxlength="60" class="block w-full border rounded-lg px-3 py-2 mt-1" placeholder="如：津福世家" aria-label="客户LOGO名称"></label>
           <input type="file" accept="image/png,image/jpeg,image/webp" multiple @change="onClientLogoFile($event)" class="block text-sm" aria-label="选择客户LOGO文件">
@@ -1036,7 +1104,7 @@
         <div class="space-y-2">
           <template x-for="logo in clientLogos" :key="logo.id">
             <div class="flex items-center justify-between gap-2 border rounded-lg p-2">
-              <div class="flex items-center gap-2 min-w-0"><img :src="'/api/share/client-logo/'+logo.id" class="h-8 border rounded bg-white p-1 shrink-0" alt="LOGO"><span class="text-sm truncate" x-text="logo.name"></span></div>
+              <div class="flex items-center gap-2 min-w-0"><img :src="'/api/share/client-logo/'+logo.id" style="height:32px;width:auto;max-width:64px;object-fit:contain" class="border rounded bg-white p-1 shrink-0" alt="LOGO"><span class="text-sm truncate" x-text="logo.name"></span></div>
               <button @click="deleteClientLogo(logo.id)" class="text-sm text-red-700 underline shrink-0">删除</button>
             </div>
           </template>
@@ -1319,7 +1387,10 @@
             <div>
               <div class="flex items-center justify-between mb-2">
                 <h4 class="font-semibold text-slate-900">已挂接的阶段归档</h4>
-                <button @click="openAddressAttach()" class="px-3 py-1.5 text-xs bg-slate-100 rounded hover:bg-slate-200">＋ 从已有工程补挂</button>
+                <div class="flex gap-2">
+                  <button @click="openAddressBulk()" class="px-3 py-1.5 text-xs bg-slate-100 rounded hover:bg-slate-200">📥 归类老分享码</button>
+                  <button @click="openAddressAttach()" class="px-3 py-1.5 text-xs bg-slate-100 rounded hover:bg-slate-200">＋ 从已有工程补挂</button>
+                </div>
               </div>
 
               <div x-show="addressAttachOpen" class="border border-dashed rounded-lg p-3 mb-3 space-y-2 bg-slate-50">
@@ -1446,6 +1517,64 @@
         <!-- ===== 地址列表 ===== -->
         <template x-if="!addressDetail">
           <div class="space-y-3">
+
+            <!-- 统计条。数字全部来自后端，前端不自己数一遍——
+                 「已归档几个阶段」这个口径在代码里已经错过四次，
+                 每次都不报错、画面看着也正常，只能靠「只在一处算」来根治。 -->
+            <template x-if="addressOverview">
+              <div class="space-y-2">
+                <div class="addr-stat">
+                  <span class="addr-stat-line flex-1" x-text="addressOverviewLine()"></span>
+                  <button
+                    x-show="addressOverview.unassigned"
+                    @click="openAddressBulk()"
+                    class="px-3 py-1.5 text-xs rounded shrink-0 bg-[#B8924A] text-white hover:opacity-90"
+                    x-text="'📥 ' + addressOverview.unassigned + ' 条分享码还没归类'"
+                  ></button>
+                </div>
+
+                <!-- 「已挂接但业主看不到」提醒。
+                     分享码被吊销/过期后地址页会静默少一个阶段，而员工侧
+                     如果只统计挂接记录，就会看到「6 个阶段已归档」——
+                     业主扫码只有 5 个，两边永远对不上账，且不会有任何报错。 -->
+                <div x-show="addressOverview.drifted" class="addr-stat-warn">
+                  <span>⚠️</span>
+                  <span>
+                    有 <strong x-text="addressOverview.drifted"></strong> 个地址挂着「业主看不到」的档案：
+                    对应的分享码已被吊销或过期，业主扫码会比这里少看到内容。
+                    请到地址详情里换挂一版，或把该分享码恢复。
+                  </span>
+                </div>
+
+                <!-- 停滞名单。口径写在标题上——14 天是业务判断不是真理，
+                     把阈值藏起来员工就无从判断这个名单可不可信。 -->
+                <template x-if="addressOverview.stalled.length">
+                  <div class="addr-stall">
+                    <div class="addr-stall-head" @click="addressOverviewOpen = !addressOverviewOpen">
+                      <span>🕒 <span x-text="addressStallTitle()"></span>（<span x-text="addressOverview.stalled.length"></span> 个）</span>
+                      <span x-text="addressOverviewOpen ? '收起 ▲' : '展开 ▼'"></span>
+                    </div>
+                    <div x-show="addressOverviewOpen" class="addr-stall-rows">
+                      <template x-for="row in addressOverview.stalled" :key="row.id">
+                        <div class="addr-stall-row">
+                          <span class="flex-1 min-w-0 truncate" x-text="row.label"></span>
+                          <span class="shrink-0 flex items-center gap-2">
+                            <span class="addr-meter" :title="row.done + ' / ' + row.total + ' 个阶段'">
+                              <template x-for="n in row.total" :key="n">
+                                <i :class="n <= row.done ? 'on' : ''"></i>
+                              </template>
+                            </span>
+                            <span class="text-slate-500" x-text="row.done + '/' + row.total + ' · 已 ' + row.idle_days + ' 天没更新'"></span>
+                            <button @click="openAddress(row.id)" class="px-2 py-1 text-xs bg-slate-100 rounded hover:bg-slate-200">管理</button>
+                          </span>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
+
             <div class="addr-toolbar flex flex-wrap gap-2 items-center">
               <input x-model="addressQuery" @keydown.enter="addressSearch()" placeholder="搜索地址名称或客户" class="addr-search-input border rounded p-2 text-sm flex-1">
               <button @click="addressSearch()" class="px-3 py-2 text-sm bg-slate-100 rounded hover:bg-slate-200 shrink-0">搜索</button>
@@ -1477,7 +1606,7 @@
                 <div class="addr-item flex items-center gap-3 px-3 py-3">
                   <div class="addr-item-main flex-1 min-w-0 cursor-pointer" @click="openAddress(a.id)">
                     <p class="addr-item-label text-sm font-medium text-slate-900" x-text="a.label"></p>
-                    <p class="addr-item-meta text-xs text-slate-500" x-text="(a.client_name || '未填客户') + ' · ' + a.stage_count + ' 个阶段已归档 · 更新于 ' + addressStamp(a.updated)"></p>
+                    <p class="addr-item-meta text-xs text-slate-500" x-text="(a.client_name || '未填客户') + ' · 已归档 ' + a.stage_count + '/' + addressStageTotal() + ' 个阶段 · 共 ' + a.record_count + ' 条留档 · 更新于 ' + addressStamp(a.updated)"></p>
                   </div>
                   <div class="addr-item-actions flex items-center gap-2 shrink-0">
                     <span x-show="a.status === 'archived'" class="text-xs text-slate-400 shrink-0">已归档</span>
@@ -1485,6 +1614,130 @@
                     <button x-show="a.status !== 'archived'" @click="archiveAddress(a)" class="px-3 py-1.5 text-xs bg-red-50 text-red-600 rounded hover:bg-red-100 shrink-0">归档</button>
                     <button x-show="a.status === 'archived'" @click="restoreAddress(a)" class="px-3 py-1.5 text-xs bg-green-50 text-green-600 rounded hover:bg-green-100 shrink-0">恢复</button>
                   </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 存量归类：未挂到任何地址的分享码 ==========
+       一址一码是 5.4.4 才上的能力，之前发出去的分享码全都「无主」：
+       能打开（/s/<sid> 直链有效），但不会出现在任何地址页上。
+       这个弹窗就是把这些老分享码批量归位。 -->
+  <div x-show="addressBulkOpen" x-cloak class="addr-bulk-mask no-print" @click.self="closeAddressBulk()">
+    <div class="addr-bulk-card">
+      <div class="addr-bulk-head">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 class="font-bold text-base text-[#1F3D2A]">📥 把老分享码归到地址</h3>
+            <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+              这些是已发布但还没挂到任何地址的公开分享码。归位后业主扫该地址的二维码就能看到。
+              <strong>每一条都作为该阶段的「新一次留档」追加，不会覆盖地址上已有的记录。</strong>
+            </p>
+          </div>
+          <button @click="closeAddressBulk()" class="text-slate-400 hover:text-slate-600 text-2xl leading-none shrink-0" aria-label="关闭">×</button>
+        </div>
+      </div>
+
+      <div class="p-4 space-y-3">
+
+        <!-- 目标地址。必须显式选，且提交前会再念一遍名字——
+             批量挂错地址就是把 A 客户的档案挂到 B 客户门口。 -->
+        <label class="block text-xs text-slate-600">归到哪个地址
+          <select x-model="addressBulkTarget" class="border rounded p-2 w-full text-sm mt-1">
+            <option value="">— 请选择地址 —</option>
+            <template x-for="a in addressItems" :key="a.id">
+              <option :value="a.id" x-text="a.label + (a.client_name ? '（' + a.client_name + '）' : '')"></option>
+            </template>
+          </select>
+        </label>
+        <p x-show="addressItems.length === 0" class="text-xs text-slate-500 leading-relaxed">
+          还没有地址可归。请先关掉这个弹窗，在「＋ 新建地址」里建好地址再回来。
+        </p>
+
+        <!-- 搜索 + 全选 -->
+        <div class="flex flex-wrap gap-2 items-center">
+          <input x-model="addressBulkQuery" @keydown.enter="addressBulkSearch()" placeholder="按工程名搜索" class="addr-search-input border rounded p-2 text-sm flex-1">
+          <button @click="addressBulkSearch()" class="px-3 py-2 text-sm bg-slate-100 rounded hover:bg-slate-200 shrink-0">搜索</button>
+          <button
+            @click="addressBulkToggleAll(!addressBulkAllPicked())"
+            :disabled="!addressBulkItems.length"
+            class="px-3 py-2 text-sm bg-slate-100 rounded hover:bg-slate-200 shrink-0 disabled:opacity-50"
+            x-text="addressBulkAllPicked() ? '取消全选' : '全选本页'"
+          ></button>
+        </div>
+
+        <p x-show="addressBulkLoading" class="text-sm text-slate-500">正在读取…</p>
+        <p
+          x-show="!addressBulkLoading && !addressBulkItems.length"
+          class="text-sm text-slate-500 border border-dashed rounded-lg p-6 text-center leading-relaxed"
+        >没有待归类的分享码。<br>所有已发布的公开分享码都已经挂到地址上了。</p>
+
+        <div x-show="addressBulkItems.length" class="addr-bulk-rows border rounded-lg">
+          <template x-for="item in addressBulkItems" :key="item.publication_id">
+            <div class="addr-bulk-row" :class="addressBulkPickable(item) ? '' : 'off'">
+              <input
+                type="checkbox"
+                class="mt-1 shrink-0"
+                :disabled="!addressBulkPickable(item)"
+                :checked="!!addressBulkPicked[item.publication_id]"
+                @change="addressBulkPicked[item.publication_id] = $event.target.checked"
+              >
+              <div class="flex-1 min-w-0">
+                <p class="addr-bulk-title" x-text="item.project_title + ' · 第 ' + item.version_number + ' 版'"></p>
+                <p class="addr-bulk-sub">
+                  <span x-show="item.site_location" x-text="'📍 ' + item.site_location"></span>
+                  <span x-show="!item.site_location" class="text-slate-400">工程里没填施工地点</span>
+                  <br>
+                  <span x-text="'发布 ' + addressStamp(item.published_at) + (item.expires ? ' · 有效期至 ' + addressStamp(item.expires) : '')"></span>
+                </p>
+                <!-- 建议阶段来自**发布那一刻的版本快照**，不是工程的当前阶段。
+                     工程可以改模板/改名复用，用当前阶段会让老档案被建议成错的阶段。 -->
+                <div class="flex items-center gap-2 mt-1 flex-wrap">
+                  <select
+                    x-model="addressBulkStage[item.publication_id]"
+                    class="border rounded p-1 text-xs"
+                    @change="addressBulkPicked[item.publication_id] = false"
+                  >
+                    <option value="">— 选施工阶段 —</option>
+                    <template x-for="key in ADDRESS_STAGE_KEYS" :key="key">
+                      <option :value="key" x-text="addressStageLabel(key)"></option>
+                    </template>
+                  </select>
+                  <span x-show="item.stage_key" class="addr-bulk-pick" x-text="'建议：' + item.stage_label"></span>
+                  <span x-show="!item.stage_key" class="text-xs text-slate-500">工程没写施工阶段，请自己选</span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div x-show="addressBulkItems.length" class="flex flex-wrap items-center gap-3">
+          <button
+            @click="submitAddressBulk()"
+            :disabled="addressBulkBusy || !addressBulkPickedCount() || !addressBulkTarget"
+            class="px-4 py-2 text-sm bg-[#1F3D2A] text-white rounded hover:opacity-90 disabled:opacity-50"
+            x-text="addressBulkBusy ? '归类中…' : ('归到该地址（已选 ' + addressBulkPickedCount() + ' 条）')"
+          ></button>
+          <span class="text-xs text-slate-500" x-text="'共 ' + addressBulkTotal + ' 条待归类'"></span>
+        </div>
+
+        <!-- 逐条回执。部分失败时**必须逐条列出原因**——
+             只显示「N 条成功 M 条失败」，员工不知道哪条要重做。 -->
+        <template x-if="addressBulkResult">
+          <div class="space-y-2">
+            <p class="text-sm font-medium" x-text="'本次结果：成功 ' + addressBulkResult.succeeded + ' 条，失败 ' + addressBulkResult.failed + ' 条'"></p>
+            <div class="addr-bulk-result">
+              <template x-for="(row, idx) in addressBulkResult.items" :key="idx">
+                <div>
+                  <span :class="row.ok ? 'addr-bulk-ok' : 'addr-bulk-bad'" x-text="row.ok ? '✓ 成功' : '✗ 失败'"></span>
+                  <span class="text-slate-600" x-text="' · ' + (row.stage_label || row.stage_key || '—') + ' · ' + String(row.publication_id).slice(0, 8) + '…'"></span>
+                  <span x-show="row.ok && row.count > 1" class="text-slate-500" x-text="'（第 ' + (row.slot + 1) + ' 次留档）'"></span>
+                  <span x-show="!row.ok" class="addr-bulk-bad" x-text="'：' + row.error"></span>
                 </div>
               </template>
             </div>
@@ -2917,7 +3170,9 @@
               if (!name) { failed.push((file.name || '未命名') + '（无法确定名称）'); continue; }
               name = name.slice(0, 60);
               try {
-                const dataUrl = await this.fileToDataUrl(file);
+                // 先缩再传：原图动辄几 MB，而 LOGO 显示尺寸只有几百 px。
+                // 后端 8MB 是兜底，这里才是「不让员工等」的那一层。
+                const dataUrl = await this.prepareLogoUpload(file);
                 await this.accountJSON('/admin/client-logos', { name, dataUrl });
                 ok++;
               } catch (e) { failed.push((file.name || '未命名') + '：' + (e.message || '失败')); }
@@ -3048,6 +3303,51 @@
             img.onerror = () => resolve(dataUrl);
             img.src = dataUrl;
           });
+        },
+
+        // 客户 LOGO 上传前的预处理：等比缩到长边 1200px，并把 data URL 压到 1.4MB 以内。
+        //
+        // 【为什么不能直接用 compressDataUrl】
+        // 那个函数固定输出 JPEG。JPEG 没有透明通道，公司 LOGO 的透明底会变成黑块
+        // （或者被填成白块），贴到深墨绿的报告封面上就废了。LOGO 必须**保持原格式**：
+        // PNG 进 PNG 出，WebP 进 WebP 出。
+        //
+        // 【为什么非要缩】
+        // LOGO 在报告封面和分享卡上的显示尺寸只有几百 px。传一张 8MB 的原图，
+        // 员工要等很久、报告体积变大、手机端加载变慢、SQLite 里躺着一堆没人看的像素——
+        // 换来的画质提升在几百 px 的显示尺寸下等于零。
+        // 所以这里先把尺寸压到合理范围，8MB 那个上限只是**兜底**（防绕过前端直接打接口）。
+        //
+        // 【为什么最后要比一下长度】
+        // 小图重新编码 PNG 有时反而更大（截图类图片尤其明显）。缩完更大就用原图，
+        // 别为了「压缩」白掉一次画质。
+        async prepareLogoUpload(file, maxEdge = 1200, maxDataUrl = 1400000) {
+          const type = String((file && file.type) || '');
+          if (!/^image\/(png|jpeg|webp)$/.test(type)) throw new Error('仅支持 PNG、JPG、WebP 格式的图片');
+          const original = await this.fileToDataUrl(file);
+          const image = await new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error('这个文件不是有效的图片，请重新选择'));
+            // 直接用刚读出来的 data URL 当 src。这里**不用** createObjectURL：
+            // 反正 original 已经在内存里了，再开一个 blob URL 只是多一个要 revoke 的
+            // 对象，而 revoke 的时机（onload 里立刻撤销）在部分浏览器上会让后面的
+            // drawImage 拿不到像素——那是一个只在 Safari 上偶发的白图 bug。
+            img.src = original;
+          });
+          const w = image.naturalWidth || 0, h = image.naturalHeight || 0;
+          if (!w || !h) return original;
+          const scale = Math.min(1, maxEdge / Math.max(w, h));
+          if (scale >= 1 && original.length <= maxDataUrl) return original;
+          const tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(h * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = tw; canvas.height = th;
+          const ctx = canvas.getContext('2d');
+          // JPEG 没有透明通道，直接画会得到黑底；先铺白底。
+          if (type === 'image/jpeg') { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, tw, th); }
+          ctx.drawImage(image, 0, 0, tw, th);
+          const shrunk = type === 'image/png' ? canvas.toDataURL('image/png') : canvas.toDataURL(type, 0.9);
+          return shrunk.length < original.length ? shrunk : original;
         },
 
         // 品牌分享卡：墨绿底 + 项目名 + 二维码（canvas 绘制，可保存为图片发群）

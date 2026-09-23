@@ -8,7 +8,9 @@
     "start": "npx serve -s . -l 3000",
     "test": "node --test test-share.cjs test-workflow-unit.cjs test-storage.cjs",
     "test:parity": "node test-stage-parity.cjs",
-    "test:address": "node test-address-client.cjs"
+    "test:address": "node test-address-client.cjs",
+    "test:logo": "node test-logo-upload.cjs",
+    "test:logo:mutate": "python3 mutate-logo-upload.py"
   },
   "devDependencies": {
     "alpinejs": "^3.13.5",
