@@ -158,6 +158,15 @@ const clientDisplayBlock = jsProp(clientJs, 'ADDRESS_STAGE_DISPLAY', '{', '}');
 ok(clientDisplayBlock !== null, 'address-client.js 里找不到 ADDRESS_STAGE_DISPLAY');
 const clientDisplay = Object.fromEntries(jsPairs(clientDisplayBlock));
 
+// 「需要洞口/窗位名称」的阶段（P4-C 的 1 对 1 类目）
+const clientLabeledBlock = jsProp(clientJs, 'ADDRESS_LABELED_STAGES', '[', ']');
+ok(clientLabeledBlock !== null, 'address-client.js 里找不到 ADDRESS_LABELED_STAGES');
+const clientLabeled = jsStrings(clientLabeledBlock);
+
+const pyLabeledBlock = pyAssign(py, 'LABELED_STAGE_KEYS', '(', ')');
+ok(pyLabeledBlock !== null, 'stages.py 里找不到 LABELED_STAGE_KEYS');
+const backendLabeled = pyStrings(pyLabeledBlock);
+
 // 3) index.html 顶部阶段下拉框
 const selectMatch = /<select[^>]*x-model="templateType"[^>]*>([\s\S]*?)<\/select>/.exec(html);
 ok(selectMatch !== null, 'index.html 里找不到 x-model="templateType" 的 <select>');
@@ -247,6 +256,16 @@ check('LEGACY_STAGE_KEYS 是 STAGE_KEYS 的子集（存量阶段不能是已废�
   const legacy = pyStrings(block);
   for (const k of legacy) {
     ok(backendKeys.includes(k), '存量阶段「' + k + '」不在 STAGE_KEYS 中');
+  }
+});
+
+check('address-client.js 的「需要洞口名」阶段与后端 LABELED_STAGE_KEYS 完全一致', () => {
+  eq(clientLabeled, backendLabeled, 'ADDRESS_LABELED_STAGES 与 stages.LABELED_STAGE_KEYS 不一致');
+});
+
+check('LABELED_STAGE_KEYS 是 STAGE_KEYS 的子集（1 对 1 类目必须是真实阶段）', () => {
+  for (const k of backendLabeled) {
+    ok(backendKeys.includes(k), '需要洞口名的阶段「' + k + '」不在 STAGE_KEYS 中');
   }
 });
 

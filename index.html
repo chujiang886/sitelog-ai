@@ -789,11 +789,13 @@
       </div>
       <div class="flex flex-wrap items-center gap-2 min-w-0">
         <select x-model="templateType" @change="switchTemplate" class="text-slate-900 text-sm px-3 py-1.5 rounded border-0">
-          <!-- 阶段顺序 = 施工顺序。此处 6 项必须与 address-client.js 的 ADDRESS_STAGE_KEYS
+          <!-- 阶段顺序 = 施工顺序。此处 8 项必须与 address-client.js 的 ADDRESS_STAGE_KEYS
                以及后端 stages.py 的 STAGE_KEYS 完全一致，由 test-stage-parity.cjs 守护。 -->
           <option value="吊装施工">🏗️ 吊装施工归档</option>
           <option value="框架施工">🔲 框架施工归档</option>
+          <option value="框架1对1">📐 框架1对1施工归档</option>
           <option value="玻扇施工">🪟 玻扇施工归档</option>
+          <option value="玻扇1对1">📐 玻扇1对1施工归档</option>
           <option value="五金安装">🔧 五金安装归档</option>
           <option value="离场自检">🚪 离场前自检留底</option>
           <option value="售后保养">🧰 售后保养施工归档</option>
@@ -1215,15 +1217,21 @@
                   </template>
                 </select>
                 <label class="block text-xs text-slate-600">归档阶段
-                  <!-- 同「挂到阶段」：静态 6 项，不用 x-for，避免显示值与 addressStage 不符 -->
+                  <!-- 同「挂到阶段」：静态 8 项，不用 x-for，避免显示值与 addressStage 不符 -->
                   <select aria-label="归档阶段" x-model="addressStage" @change="refreshAddressPickHint()" class="border rounded p-2 ml-2 text-sm">
                     <option value="吊装施工">吊装施工归档</option>
                     <option value="框架施工">框架归档记录</option>
+                    <option value="框架1对1">框架1对1施工归档</option>
                     <option value="玻扇施工">玻扇施工归档</option>
+                    <option value="玻扇1对1">玻扇1对1施工归档</option>
                     <option value="五金安装">五金安装归档</option>
                     <option value="离场自检">离场前自检留底</option>
                     <option value="售后保养">售后保养施工归档</option>
                   </select>
+                </label>
+                <!-- 洞口/窗位名称（P4-C）：1 对 1 类目必填，业主端用它替代「第 N 次」。 -->
+                <label x-show="addressNeedsLabel(addressStage)" class="block text-xs text-slate-600">洞口/窗位名称（必填）
+                  <input x-model="addressPickLabel" maxlength="40" placeholder="例：主卧飘窗 / 厨房推拉门" class="border rounded p-2 ml-2 text-sm">
                 </label>
                 <p class="text-xs text-slate-500" x-show="addressOptionsLoading">正在读取地址…</p>
                 <p class="text-xs text-slate-500" x-show="!addressOptionsLoading && !addressOptions.length">还没有地址，请先到顶部「🏠 地址管理」新建。</p>
@@ -1364,7 +1372,7 @@
               <p class="text-xs opacity-70">工程地址</p>
               <p class="font-semibold text-lg" x-text="addressDetail.label"></p>
               <p class="text-xs opacity-80 mt-1" x-text="(addressDetail.client_name || '未填客户') + (addressDetail.note ? ' · ' + addressDetail.note : '')"></p>
-              <p class="text-xs opacity-60 mt-2" x-text="'已归档 ' + addressDoneStages + ' 个阶段 · 地址编号 ' + addressDetail.id"></p>
+              <p class="text-xs opacity-60 mt-2" x-text="'已归档 ' + addressDoneStages + ' / ' + addressEnabledCount(addressDetail) + ' 个类目 · 地址编号 ' + addressDetail.id"></p>
               <div class="flex flex-wrap gap-2 mt-3">
                 <button @click="openAddressForm(addressDetail)" class="addr-ghost-btn px-3 py-1.5 text-xs rounded">编辑地址</button>
                 <button @click="renderAddressCard()" class="px-3 py-1.5 text-xs bg-[#B8924A] rounded hover:opacity-90">生成二维码卡片</button>
@@ -1422,18 +1430,25 @@
                           </select>
                         </label>
                         <label class="block text-xs text-slate-600">挂到阶段
-                          <!-- 静态列出 6 个阶段，不用 x-for：x-model 在 <select> 上的初始赋值
+                          <!-- 静态列出 8 个阶段，不用 x-for：x-model 在 <select> 上的初始赋值
                                发生在 x-for 插入 <option> 之前，找不到匹配项就回落显示第一项，
-                               出现「显示吊装施工、实际存五金安装」的错位。阶段固定 6 个，
+                               出现「显示吊装施工、实际存五金安装」的错位。阶段固定 8 个，
                                静态写死最稳，也便于 test-stage-parity.cjs 一起校验。 -->
                           <select x-model="addressAttachStage" @change="onAddressAttachStageChange()" class="border rounded p-2 w-full text-sm mt-1">
                             <option value="吊装施工">吊装施工归档</option>
                             <option value="框架施工">框架归档记录</option>
+                            <option value="框架1对1">框架1对1施工归档</option>
                             <option value="玻扇施工">玻扇施工归档</option>
+                            <option value="玻扇1对1">玻扇1对1施工归档</option>
                             <option value="五金安装">五金安装归档</option>
                             <option value="离场自检">离场前自检留底</option>
                             <option value="售后保养">售后保养施工归档</option>
                           </select>
+                        </label>
+                        <!-- 洞口/窗位名称（P4-C）：1 对 1 类目必填。业主端用它替代「第 N 次」。 -->
+                        <label x-show="addressNeedsLabel(addressAttachStage)" class="block text-xs text-slate-600">洞口/窗位名称（必填）
+                          <input x-model="addressAttachLabel" maxlength="40" placeholder="例：主卧飘窗 / 厨房推拉门" class="border rounded p-2 w-full text-sm mt-1">
+                          <span class="text-[11px] text-slate-500">「1 对 1」按门洞逐个建档，业主靠这个名称区分是哪个洞口。</span>
                         </label>
                         <label class="block text-xs text-slate-600">留档方式
                           <select x-model="addressAttachSlotMode" class="border rounded p-2 w-full text-sm mt-1">
@@ -1489,7 +1504,14 @@
                           <span class="addr-dot rounded-full shrink-0" :class="stage.visible ? 'bg-[#B8924A]' : 'bg-slate-300'"></span>
                           <div class="addr-stage-main flex-1 min-w-0">
                             <p class="text-sm font-medium text-slate-900">
-                              <span x-show="group.items.length > 1" class="addr-nth" x-text="'第 ' + (stage.slot + 1) + ' 次'"></span>
+                              <!-- 1 对 1 类目显示洞口/窗位名（业主端也用它）；其余阶段显示「第 N 次」。
+                                   同一洞口有多次留档时还要补「· 第 N 次」——否则员工看到的是
+                                   两行一模一样的「主卧 C1 洞口」，点「移除」时不知道在动哪一次。
+                                   unitSeq/unitTotal 由 buildAddressStageGroups 按**洞口内**计数，
+                                   不能用 stage.slot + 1：那是整个类目内的序号，会把只做过一次的
+                                   次卧洞口显示成「第 3 次」。 -->
+                              <span x-show="stage.label" class="addr-nth" x-text="stage.label + (stage.unitTotal > 1 ? ' · 第 ' + stage.unitSeq + ' 次' : '')"></span>
+                              <span x-show="!stage.label && group.items.length > 1" class="addr-nth" x-text="'第 ' + (stage.slot + 1) + ' 次'"></span>
                               <span x-text="addressStamp(stage.created) + ' 归档'"></span>
                             </p>
                             <p class="text-xs text-slate-500" x-text="(stage.audience === 'public' ? '公开范围' : stage.audience) + (stage.revoked ? ' · 已撤回' : '') + (stage.visible ? '' : ' · 地址页已隐藏')"></p>
@@ -1535,7 +1557,7 @@
 
                 <!-- 「已挂接但业主看不到」提醒。
                      分享码被吊销/过期后地址页会静默少一个阶段，而员工侧
-                     如果只统计挂接记录，就会看到「6 个阶段已归档」——
+                     如果只统计挂接记录，就会看到「8 个阶段已归档」——
                      业主扫码只有 5 个，两边永远对不上账，且不会有任何报错。 -->
                 <div x-show="addressOverview.drifted" class="addr-stat-warn">
                   <span>⚠️</span>
@@ -1592,6 +1614,20 @@
               <label class="block text-xs text-slate-600">备注（可选）
                 <input x-model="addressForm.note" maxlength="500" placeholder="例：二期、含阳台改造" class="border rounded p-2 w-full text-sm mt-1">
               </label>
+              <!-- 展示类目（P4-B）：勾选的才出现在业主扫码页上。新建默认全选。
+                   用 Alpine 的原生数组绑定：checkbox + x-model 数组 + :value 即「多选」。 -->
+              <div class="text-xs text-slate-600">
+                <span class="block mb-1">展示给业主的类目（未勾选的，业主扫码看不到）</span>
+                <div class="grid grid-cols-2 gap-1.5">
+                  <template x-for="k in ADDRESS_STAGE_KEYS" :key="k">
+                    <label class="flex items-center gap-1.5 bg-white border rounded px-2 py-1.5 cursor-pointer">
+                      <input type="checkbox" :value="k" x-model="addressForm.enabled_stages">
+                      <span x-text="addressStageLabel(k)"></span>
+                    </label>
+                  </template>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-1" x-text="'已勾选 ' + addressForm.enabled_stages.length + ' / ' + ADDRESS_STAGE_KEYS.length + ' 个类目'"></p>
+              </div>
               <div class="flex gap-2">
                 <button @click="saveAddressForm()" :disabled="addressBusy" class="px-4 py-2 text-sm bg-[#1F3D2A] text-white rounded disabled:opacity-50" x-text="addressEditingId ? '保存修改' : '创建地址'"></button>
                 <button @click="closeAddressForm()" class="px-4 py-2 text-sm bg-white border rounded">取消</button>
@@ -1606,7 +1642,7 @@
                 <div class="addr-item flex items-center gap-3 px-3 py-3">
                   <div class="addr-item-main flex-1 min-w-0 cursor-pointer" @click="openAddress(a.id)">
                     <p class="addr-item-label text-sm font-medium text-slate-900" x-text="a.label"></p>
-                    <p class="addr-item-meta text-xs text-slate-500" x-text="(a.client_name || '未填客户') + ' · 已归档 ' + a.stage_count + '/' + addressStageTotal() + ' 个阶段 · 共 ' + a.record_count + ' 条留档 · 更新于 ' + addressStamp(a.updated)"></p>
+                    <p class="addr-item-meta text-xs text-slate-500" x-text="(a.client_name || '未填客户') + ' · 已归档 ' + a.stage_count + '/' + addressEnabledCount(a) + ' 个类目 · 共 ' + a.record_count + ' 条留档 · 更新于 ' + addressStamp(a.updated)"></p>
                   </div>
                   <div class="addr-item-actions flex items-center gap-2 shrink-0">
                     <span x-show="a.status === 'archived'" class="text-xs text-slate-400 shrink-0">已归档</span>
@@ -1710,6 +1746,15 @@
                   </select>
                   <span x-show="item.stage_key" class="addr-bulk-pick" x-text="'建议：' + item.stage_label"></span>
                   <span x-show="!item.stage_key" class="text-xs text-slate-500">工程没写施工阶段，请自己选</span>
+                  <!-- 1 对 1 类目要填洞口名；未填时该行不可勾选（后端也会拒）。 -->
+                  <input
+                    x-show="addressNeedsLabel(addressBulkStage[item.publication_id])"
+                    x-model="addressBulkLabel[item.publication_id]"
+                    maxlength="40"
+                    placeholder="洞口/窗位名称（必填）"
+                    class="border rounded p-1 text-xs"
+                    @change="addressBulkPicked[item.publication_id] = false"
+                  >
                 </div>
               </div>
             </div>
@@ -1993,7 +2038,9 @@
           let html = '';
           if (this.templateType === '吊装施工') html = TEMPLATES.lifting();
           else if (this.templateType === '框架施工') html = TEMPLATES.frame();
+          else if (this.templateType === '框架1对1') html = TEMPLATES.frameOneOnOne();
           else if (this.templateType === '玻扇施工') html = TEMPLATES.glass();
+          else if (this.templateType === '玻扇1对1') html = TEMPLATES.glassOneOnOne();
           else if (this.templateType === '五金安装') html = TEMPLATES.hardware();
           else if (this.templateType === '离场自检') html = TEMPLATES.departure();
           else if (this.templateType === '售后保养') html = TEMPLATES.aftercare();
@@ -2066,8 +2113,12 @@
 
         guessCategory(filename) {
           const f = filename.toLowerCase();
-          if (/框架|框体|立柱|横梁|电钻|打孔|水平/.test(f)) return '框架施工';
-          if (/玻|玻璃|扇|合片|中空/.test(f)) return '玻扇施工';
+          // 「1 对 1」比通用阶段更具体，所以先匹配 1 对 1 再回落通用阶段。
+          // 「1 对 1」是师傅口语——文件名里出现的关键词是「洞口 / 门洞 / 单扇 / 调缝 / 调校」。
+          if (/框架|框体|立柱|横梁|电钻|打孔|水平/.test(f) && /洞口|门洞|单扇|调缝|调校|校缝|1对1|一对/.test(f)) return '框架1对1';
+          if (/玻|玻璃|扇|合片|中空/.test(f) && /洞口|门洞|单扇|调缝|调校|校缝|1对1|一对/.test(f)) return '玻扇1对1';
+          if (/框架|框体|立框|装框/.test(f)) return '框架施工';
+          if (/玻|玻璃|玻扇|玻璃施工|合片|装玻璃|挂扇|扇/.test(f)) return '玻扇施工';
           if (/五金|把手|锁|铰链|合页|风撑/.test(f)) return '五金安装';
           if (/胶|密封|收口|打胶|注胶/.test(f)) return '密封收口';
           if (/保护|膜|覆盖|清场/.test(f)) return '成品保护';
@@ -2231,14 +2282,18 @@
         ensureTitles() {
           const SAFE = {
             '框架施工':  { title: '框体就位与水平校准' },
+            '框架1对1':  { title: '框架单扇校正节点' },
             '玻扇施工':  { title: '中空玻璃合片工艺' },
+            '玻扇1对1':  { title: '玻扇单扇调试节点' },
             '五金安装':  { title: '门窗五金件安装调试' },
             '密封收口':  { title: '框墙接缝密封收口' },
             '成品保护':  { title: '门窗成品保护与自检' },
             '离场自检':  { title: '离场前合规留底' },
           };
           const aliasMap = {
+            '框架1对1': ['框架1对1','一对一框架','门洞校正','单扇校正','调校'],
             '框架施工': ['框架','框体','立框','装框'],
+            '玻扇1对1': ['玻扇1对1','一对一玻扇','单扇调试','调缝'],
             '玻扇施工': ['玻璃','玻扇','玻璃施工','合片','装玻璃','挂扇','扇'],
             '五金安装': ['五金','把手','锁具','铰链','合页'],
             '密封收口': ['密封','收口','打胶','注胶','填缝'],
@@ -4177,6 +4232,246 @@
         <footer class="pdf-footer">
           <div class="pdf-footer-line-gold"></div>
           <p class="pdf-footer-slogan">「交付不是结束，是长期服务的开始」</p>
+          <p class="pdf-footer-company">汕头市初匠门窗科技有限公司 · CHUJIANG</p>
+          <p class="pdf-footer-sub">施格归档 · SITELOG AI 出品 · ICP备2024297744号-2</p>
+          <div class="pdf-footer-links">
+            <span>服务热线：待填写</span>
+            <span>官网：chujiang.中国</span>
+            <span>地址：广东省汕头市</span>
+          </div>
+        </footer>
+      `,
+
+      // ═══ 框架 1 对 1 施工（P4 新增）═══
+      // 「1 对 1」是师傅口语，指同一户型里一扇一扇地校正框体五金位。
+      // 业主端不显示「1 对 1」字样，统一说「单独校正 / 单扇记录」。
+      frameOneOnOne: () => `
+        <!-- ═══ 封面 ═══ -->
+        <div class="pdf-cover">
+          <div class="pdf-cover-band">
+            <span class="pdf-cover-brand">CHUJIANG 初匠门窗</span>
+            <span class="pdf-cover-badge">单扇校正留证</span>
+          </div>
+          <div class="pdf-cover-body">
+            <p class="pdf-cover-eng">FRAME 1-ON-1</p>
+            <h1 class="pdf-cover-main-title">框架单扇校正归档</h1>
+            <p class="pdf-cover-tagline">逐洞复核 · 单扇校正 · 调平调直</p>
+            {{PROJECT_INFO}}
+          </div>
+        </div>
+
+        <!-- ═══ 一、本次单扇校正概况 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">一</span>
+            <span class="pdf-section-title">本次单扇校正概况</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-editable-box" contenteditable="true">
+本次单扇（门洞）框架校正整体情况：校正部位与洞口编号、框体规格、校正前偏差、校正方法与工具、校正后指标、整体质量把控要点。建议 100-200 字。
+          </div>
+        </section>
+
+        <!-- ═══ 二、进场与洞口确认 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">二</span>
+            <span class="pdf-section-title">进场与洞口确认</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-sop-gallery" id="arrival-gallery">
+            <!-- syncArrivalGallery() 动态渲染：人员到位、洞口复核、基准放线、安全交底等 -->
+          </div>
+        </section>
+
+        <!-- ═══ 三、单扇校正节点 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">三</span>
+            <span class="pdf-section-title">单扇校正节点</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div id="images-container"></div>
+          <div class="pdf-grid-2 mt-6">
+            <div class="pdf-check-card pdf-check-gold">
+              <p class="pdf-check-title"><span>📐</span>洞口尺寸复核</p>
+              <p class="pdf-check-desc">逐洞复核宽高、对角线与墙体垂直度，偏差控制在规范范围内</p>
+            </div>
+            <div class="pdf-check-card pdf-check-green">
+              <p class="pdf-check-title"><span>📏</span>框体调直</p>
+              <p class="pdf-check-desc">调直框体、校正扭曲与侧弯，保证四角方正、平面度达标</p>
+            </div>
+            <div class="pdf-check-card pdf-check-green">
+              <p class="pdf-check-title"><span>🔩</span>五金位校正</p>
+              <p class="pdf-check-desc">按单扇逐一校正执手、锁点、铰链安装位，开合顺畅无干涉</p>
+            </div>
+            <div class="pdf-check-card pdf-check-neutral">
+              <p class="pdf-check-title"><span>🔧</span>缝隙调平</p>
+              <p class="pdf-check-desc">调整框扇间隙与拼缝，内外侧均匀，密封面平整</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══ 四、校正后固定与成品保护 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">四</span>
+            <span class="pdf-section-title">校正后固定与成品保护</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-sop-gallery" id="finish-gallery">
+            <!-- syncFinishGallery() 动态渲染 -->
+          </div>
+        </section>
+
+        <!-- ═══ 五、班组离场 SOP ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">五</span>
+            <span class="pdf-section-title">班组离场 SOP</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-sop-gallery" id="sop-gallery">
+            <!-- syncSopGallery() 动态渲染 -->
+          </div>
+        </section>
+
+        <!-- ═══ 六、单扇校正注意 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">六</span>
+            <span class="pdf-section-title">单扇校正注意</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-editable-box" contenteditable="true">
+1. 每扇独立校正、独立记录，避免批量放样导致相邻扇偏差累积<br>2. 校正完成后在框体标注洞口编号，便于后续玻扇 1 对 1 对应<br>3. 五金位以单扇开合顺畅、锁点咬合到位为准<br>📱 客服微信号：plf32118（售后咨询 · 预约保养）
+          </div>
+        </section>
+
+        <!-- ═══ 页脚 ═══ -->
+        <footer class="pdf-footer">
+          <div class="pdf-footer-line-gold"></div>
+          <p class="pdf-footer-slogan">「一扇一对，校正到底」</p>
+          <p class="pdf-footer-company">汕头市初匠门窗科技有限公司 · CHUJIANG</p>
+          <p class="pdf-footer-sub">施格归档 · SITELOG AI 出品 · ICP备2024297744号-2</p>
+          <div class="pdf-footer-links">
+            <span>服务热线：待填写</span>
+            <span>官网：chujiang.中国</span>
+            <span>地址：广东省汕头市</span>
+          </div>
+        </footer>
+      `,
+
+      // ═══ 玻扇 1 对 1 施工（P4 新增）═══
+      // 「1 对 1」指每一扇玻扇单独调试、单独记录。与框架 1 对 1 一一对应，
+      // 业主端不显示「1 对 1」字样，统一说「单扇调试 / 单扇记录」。
+      glassOneOnOne: () => `
+        <!-- ═══ 封面 ═══ -->
+        <div class="pdf-cover">
+          <div class="pdf-cover-band">
+            <span class="pdf-cover-brand">CHUJIANG 初匠门窗</span>
+            <span class="pdf-cover-badge">单扇调试留证</span>
+          </div>
+          <div class="pdf-cover-body">
+            <p class="pdf-cover-eng">SASH 1-ON-1</p>
+            <h1 class="pdf-cover-main-title">玻扇单扇调试归档</h1>
+            <p class="pdf-cover-tagline">逐扇入位 · 单扇调缝 · 开合复检</p>
+            {{PROJECT_INFO}}
+          </div>
+        </div>
+
+        <!-- ═══ 一、本次单扇调试概况 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">一</span>
+            <span class="pdf-section-title">本次单扇调试概况</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-editable-box" contenteditable="true">
+本次单扇（门洞）玻扇调试整体情况：调试部位与对应洞口编号、玻扇规格、入位与调缝方法、五金调试、开合复检结果、整体质量把控要点。建议 100-200 字。
+          </div>
+        </section>
+
+        <!-- ═══ 二、进场与扇位确认 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">二</span>
+            <span class="pdf-section-title">进场与扇位确认</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-sop-gallery" id="arrival-gallery">
+            <!-- syncArrivalGallery() 动态渲染：人员到位、扇位核对、工具材料、安全交底等 -->
+          </div>
+        </section>
+
+        <!-- ═══ 三、单扇调试节点 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">三</span>
+            <span class="pdf-section-title">单扇调试节点</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div id="images-container"></div>
+          <div class="pdf-grid-2 mt-6">
+            <div class="pdf-check-card pdf-check-gold">
+              <p class="pdf-check-title"><span>🪟</span>玻扇入位</p>
+              <p class="pdf-check-desc">按洞口编号逐扇入位，框扇配合间隙均匀、无磕碰</p>
+            </div>
+            <div class="pdf-check-card pdf-check-green">
+              <p class="pdf-check-title"><span>🔧</span>五金调试</p>
+              <p class="pdf-check-desc">执手、传动器、铰链逐一调试，开合顺畅、锁点咬合到位</p>
+            </div>
+            <div class="pdf-check-card pdf-check-green">
+              <p class="pdf-check-title"><span>🌧️</span>密封调缝</p>
+              <p class="pdf-check-desc">胶条压合均匀、排水孔通畅，拼缝与内外侧密封面平整</p>
+            </div>
+            <div class="pdf-check-card pdf-check-neutral">
+              <p class="pdf-check-title"><span>✅</span>开合复检</p>
+              <p class="pdf-check-desc">逐扇反复开合锁闭、气密水密复检，与现场确认无干涉</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══ 四、调试后复检与清洁 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">四</span>
+            <span class="pdf-section-title">调试后复检与清洁</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-sop-gallery" id="finish-gallery">
+            <!-- syncFinishGallery() 动态渲染 -->
+          </div>
+        </section>
+
+        <!-- ═══ 五、班组离场 SOP ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">五</span>
+            <span class="pdf-section-title">班组离场 SOP</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-sop-gallery" id="sop-gallery">
+            <!-- syncSopGallery() 动态渲染 -->
+          </div>
+        </section>
+
+        <!-- ═══ 六、日常使用建议 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">六</span>
+            <span class="pdf-section-title">日常使用建议</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-editable-box" contenteditable="true">
+1. 每扇独立调试、独立记录，对应框架 1 对 1 的洞口编号便于追溯<br>2. 开合有阻滞及时联系调试，避免暴力操作损伤五金<br>3. 五金件每半年润滑一次，胶条每年检查更换<br>📱 客服微信号：plf32118（售后咨询 · 预约保养）
+          </div>
+        </section>
+
+        <!-- ═══ 页脚 ═══ -->
+        <footer class="pdf-footer">
+          <div class="pdf-footer-line-gold"></div>
+          <p class="pdf-footer-slogan">「一扇一对，调试到位」</p>
           <p class="pdf-footer-company">汕头市初匠门窗科技有限公司 · CHUJIANG</p>
           <p class="pdf-footer-sub">施格归档 · SITELOG AI 出品 · ICP备2024297744号-2</p>
           <div class="pdf-footer-links">
