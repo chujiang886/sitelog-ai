@@ -18,6 +18,11 @@
      add([g,'$order'],'照片顺序 · '+({images:'施工节点',arrivalImages:'进场',finishImages:'完工',sopImages:'离场'}[g]),local[g].map(p=>p.id),remote[g].map(p=>p.id));
    }
    for(const key of ['report','field','origin','css'])add([key],({report:'自由正文与章节布局',field:'现场事实与核对记录',origin:'历史来源',css:'文档样式'}[key]),local[key],remote[key]);
+   // frames（按门洞分组，只对两个 1 对 1 阶段有意义）必须参与比对，否则冲突合并
+   // 时 merge() 从远端整体克隆，本地刚分好的门洞分组会被静默丢掉。
+   // 两边都补 `|| []`：frames 是后加字段，老版本云端工程没有这个键，
+   // 「键不存在」与「空数组」语义相同，不该让师傅在冲突面板里为一个空分组做选择。
+   add(['frames'],'按门洞分组（1 对 1 阶段）',local.frames||[],remote.frames||[]);
    return rows;
  }
  function merge(local,remote,rows){

@@ -164,10 +164,22 @@
         const { file, analyzing, _debug, ...rest } = photo;
         return JSON.parse(JSON.stringify({ ...rest, analyzing: false, filename: file?.name || photo.filename || '施工照片' }));
       });
-      // 按框分组（1 对 1 阶段）。先自愈再落盘：frames 里若留着已删照片的 id，
-      // 后端 checked_frames 会判「窗框照片与所属分组不匹配」而拒绝整份草稿。
-      if (this.normalizeFrames) this.normalizeFrames();
-      result.frames = JSON.parse(JSON.stringify(this.frames || []));
+      // 按框分组（1 对 1 阶段）。两层约束叠加，看着绕，缺一不可：
+      //   ① 只有按框循环的阶段才有 frames 概念，其余阶段一律空数组。否则每次
+      //      snapshot() 都要给「不存在的框」编一个新 id，两次调用结果不同；
+      //   ② 用纯函数 sanitizeFrames() 而不是 this.normalizeFrames()：
+      //      snapshot() 必须只读且可重入 —— saveCloudProject() 保存后会用
+      //      canonical(cloudBody(this.snapshot())) 与保存前的 bodyKey 比对
+      //      （project-client.js 的 unchanged()），两次结果不同即判
+      //      「保存期间内容有修改」拒绝发布；而 this.normalizeFrames() 会回写
+      //      this.frames，触发 Alpine $watch('frames') → markDraftDirty()，
+      //      又与 saveLocalDraft() 形成「保存 → 标脏 → 再保存」的死循环。
+      const sanitize = window.sitelogFrames && window.sitelogFrames.sanitizeFrames;
+      const framed = this.isFramedTemplate && this.isFramedTemplate();
+      result.frames = JSON.parse(JSON.stringify(sanitize && framed
+        ? sanitize(this.frames, (this.arrivalImages || []).map(photo => photo.id),
+                   (this.images || []).map(photo => photo.id))
+        : []));
       if (this.projectSnapshotExtras) result.project = this.projectSnapshotExtras();
       if (this.fieldSnapshot) result.field = this.fieldSnapshot();
       if(this.legacyOrigin)result.origin={legacy:this.legacyOrigin};

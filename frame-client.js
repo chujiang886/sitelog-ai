@@ -77,7 +77,63 @@
     return list.slice(0, FRAME_LIMIT);
   }
 
-  window.sitelogFrames = { FRAMED_TEMPLATES, CN_NUM, FRAME_LIMIT, sectionNum, normalizeFrames };
+  /**
+   * 草稿落盘前的 frames 净化。**必须是确定性的**——同输入必得同输出。
+   *
+   * 【为什么不能用 normalizeFrames()】
+   * `saveCloudProject()` 保存后用第一次 `snapshot()` 算出 `bodyKey`（workflow-client.js
+   * 的 return 语句），发布前又用第二次 `snapshot()` 重算一次比对（project-client.js 的
+   * `unchanged()`），两次结果只要不同就判「保存期间内容有修改，请核对后再次确认」并
+   * 拒绝发布。而 `normalizeFrames()` 在 frames 为空时会**生成一个新 id**，两次调用必然
+   * 不同 —— 非按框循环的阶段 frames 恒为空，于是每次发布都会被自己拦下。
+   *
+   * 所以两者分工明确：
+   *   - normalizeFrames()：UI 状态自愈，允许生成新 id（缺框就补一个），是状态变更；
+   *   - sanitizeFrames() ：只读净化，只做「清悬空引用 + 跨框去重」，绝不生成 id。
+   *
+   * 编号非法的框直接丢弃：它的照片仍留在 images/arrivalImages 里，一张都不会少，
+   * 只丢分组标签。而这是 UI 不可能产生的状态（新建框必带 id），真出现也该由
+   * syncFrames() 重建，不该在读快照时凭空补一个 id。
+   *
+   * @param {Array} frames      现有分组
+   * @param {Array} arrivalIds  arrivalImages 里全部照片 id
+   * @param {Array} nodeIds     images 里全部照片 id
+   */
+  function sanitizeFrames(frames, arrivalIds, nodeIds) {
+    const arrivals = new Set(arrivalIds || []);
+    const nodes = new Set(nodeIds || []);
+    // 框 id 与照片 id 共用一个「已占用」集合，照片 id 加 p: 前缀避免撞车
+    // （框 id 的字符集不含冒号，前缀一定不冲突）。
+    const taken = new Set();
+    const out = [];
+    for (const frame of Array.isArray(frames) ? frames : []) {
+      if (!frame || typeof frame !== 'object') continue;
+      const id = typeof frame.id === 'string' ? frame.id : '';
+      if (!/^[\w-]{1,100}$/.test(id) || taken.has(id)) continue;
+      taken.add(id);
+      const pick = (ids, pool) => {
+        const kept = [];
+        for (const photoId of Array.isArray(ids) ? ids : []) {
+          // 一框一记录：同一张照片不能落在两个框里，否则报告会重复出图。
+          if (typeof photoId !== 'string' || !pool.has(photoId) || taken.has('p:' + photoId)) continue;
+          taken.add('p:' + photoId);
+          kept.push(photoId);
+        }
+        return kept;
+      };
+      out.push({
+        id,
+        // 窗号在编辑时就已限长 200，这里的截断只是兜底，保证后端 checked_frames 不拒收。
+        label: typeof frame.label === 'string' ? frame.label.slice(0, 200) : '',
+        arrivalIds: pick(frame.arrivalIds, arrivals),
+        nodeIds: pick(frame.nodeIds, nodes),
+      });
+      if (out.length >= FRAME_LIMIT) break;
+    }
+    return out;
+  }
+
+  window.sitelogFrames = { FRAMED_TEMPLATES, CN_NUM, FRAME_LIMIT, sectionNum, normalizeFrames, sanitizeFrames };
 
   window.frameFeatures = {
     // 按框分组的状态。照片本体不在这里，见文件头说明。
@@ -88,12 +144,17 @@
     newFrameId() { return 'fr' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); },
 
     normalizeFrames() {
-      this.frames = normalizeFrames(
+      const next = normalizeFrames(
         this.frames,
         (this.arrivalImages || []).map(photo => photo.id),
         (this.images || []).map(photo => photo.id),
         () => this.newFrameId()
       );
+      // 只在真的变了才赋值。Alpine 的 $watch 按引用比较，无脑重赋值会让每次
+      // syncFrames() 都触发 markDraftDirty()，进而多跑一次本机草稿保存。
+      // frames 很小（≤50 框 × 几个 id），比一次多余的 IndexedDB 写入便宜得多。
+      if (JSON.stringify(next) === JSON.stringify(this.frames)) return;
+      this.frames = next;
     },
 
     // 按 id 顺序取照片本体，id 顺序即用户在框内的排列顺序。
