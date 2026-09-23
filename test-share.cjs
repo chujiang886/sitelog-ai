@@ -42,11 +42,14 @@ test('已审核版本发布成功且绘制完成后才报告成功',async()=>{
  app.publishCloudProject=()=>app.accountJSON('/projects/test/publish',{});
  let drawn;app.drawShareCard=(url)=>drawn=url;await app.doShare();assert.deepEqual(calls,['/api/share/projects/test/publish']);assert.equal(drawn,'https://cj-az.cn/s/ABC234');assert.equal(app.shareCardReady,true);
 });
+// 注意 retryShareCard / drawShareCard 是 async：必须 await，否则断言跑在置位之前。
+// 2026-09-21 把它们从同步改成 async（doShare 需要 await 绘制结果）时漏改了这里的 await，
+// 导致 CI 从那天起一直红。加 await 前请先确认产品代码里这两个方法还是 async。
 test('二维码失败保留链接，重绘不会再次上传',async()=>{
  let posts=0;const app=makeApp(async(url,options)=>{if(options.method==='POST')posts++;return{status:200,ok:true,json:async()=>({ok:true,id:'ABC234',url:'https://cj-az.cn/s/ABC234'})}});
  app.images=[{}];app.syncCoverMeta=()=>{};app.buildSharePayload=async()=>({html:'<p>审核记录</p>'});app.$nextTick=async()=>{};app.drawShareCard=()=>{throw Error('绘制失败')};
  app.publishCloudProject=()=>app.accountJSON('/projects/test/publish',{});
- await app.doShare();assert.equal(app.shareCardReady,false);assert.match(app.shareError,/链接已创建/);app.drawShareCard=()=>{};app.retryShareCard();assert.equal(app.shareCardReady,true);assert.equal(posts,1);
+ await app.doShare();assert.equal(app.shareCardReady,false);assert.match(app.shareError,/链接已创建/);app.drawShareCard=()=>{};await app.retryShareCard();assert.equal(app.shareCardReady,true);assert.equal(posts,1);
 });
 test('员工页面不包含分享配置导入和直接 AI 密钥请求',()=>{
  assert.ok(!html.includes('importShareConfig'));assert.ok(!html.includes('X-Share-Token'));assert.ok(!html.includes("authHeader: 'Bearer '"));
