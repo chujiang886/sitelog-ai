@@ -6,10 +6,9 @@
     "build": "tailwindcss -i app.css -o vendor/app.css --minify --content ./index.html,./auth-client.js,./frame-client.js",
     "dev": "npx serve -s . -l 3000",
     "start": "npx serve -s . -l 3000",
-    "test": "node --test test-share.cjs test-workflow-unit.cjs test-storage.cjs test-frame-client.cjs",
+    "test": "node --test test-share.cjs test-workflow-unit.cjs test-storage.cjs test-frame-client.cjs test-address-client.cjs",
     "test:parity": "node test-stage-parity.cjs",
     "test:frame": "node test-frame-client.cjs",
-    "test:parity": "node test-stage-parity.cjs",
     "test:address": "node test-address-client.cjs",
     "test:logo": "node test-logo-upload.cjs",
     "test:logo:mutate": "python3 mutate-logo-upload.py"
