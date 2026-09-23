@@ -409,6 +409,14 @@
       border: 1px solid #E8E2D0; background: #fff; color: #b91c1c; font-size: 14px; cursor: pointer;
     }
     .frame-remove-btn:hover { background: #fee2e2; border-color: #fca5a5; }
+    @media (hover: none) {
+      /* 触摸设备没有 hover。删框按钮本来就不依赖 hover（不像 .sop-remove-btn
+         opacity:0 那样），但 22×22 在手机上偏小（Apple HIG 推荐 44pt，
+         这里 32px 是 UI 密度与可点性的折中）。同块一并处理 .frame-move-select，
+         原本 font-size 11px + padding 3px6px 在手机上几乎点不到。 */
+      .frame-remove-btn { width: 32px; height: 32px; font-size: 18px; border-width: 2px; }
+      .frame-move-select { font-size: 15px; padding: 8px 12px; }
+    }
     .frame-add-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 18px; }
     .frame-add-btn {
       padding: 9px 18px; border-radius: 6px; cursor: pointer;
