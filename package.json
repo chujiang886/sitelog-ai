@@ -1,12 +1,14 @@
 {
   "name": "sitelog-ai",
   "version": "5.4.4",
-  "description": "闂ㄧ獥鏂藉伐褰掓。 AI 鍔╂墜",
+  "description": "门窗施工归档 AI 助手",
   "scripts": {
     "build": "tailwindcss -i app.css -o vendor/app.css --minify --content ./index.html,./auth-client.js",
     "dev": "npx serve -s . -l 3000",
     "start": "npx serve -s . -l 3000",
-    "test": "node --test test-share.cjs test-workflow-unit.cjs test-storage.cjs",
+    "test": "node --test test-share.cjs test-workflow-unit.cjs test-storage.cjs test-frame-client.cjs",
+    "test:parity": "node test-stage-parity.cjs",
+    "test:frame": "node test-frame-client.cjs",
     "test:parity": "node test-stage-parity.cjs",
     "test:address": "node test-address-client.cjs",
     "test:logo": "node test-logo-upload.cjs",

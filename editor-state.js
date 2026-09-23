@@ -2,6 +2,14 @@
 (() => {
   const collections = ['images', 'arrivalImages', 'finishImages', 'sopImages'];
   const metadata = ['projectName', 'siteLocation', 'archiveDate', 'archivePerson', 'templateType', 'reportTitle', 'pdfFilename', 'pdfFilenameTouched', 'documentId', 'clientLogoId'];
+  // 编辑器能渲染的全部阶段。这是**第五处副本**（另外四处见 test-stage-parity.cjs 的文件头），
+  // 必须与后端 stages.STAGE_KEYS 同序一致，由该测试守护。
+  //
+  // 【为什么原先这里是错的】
+  // 这里原本写死 ['框架施工','玻扇施工','五金安装','离场自检']——P1 加吊装/售后、
+  // P4 加两个 1 对 1 时都没跟着改。后果不是报错而是「静默拒绝」：师傅导出
+  // 1 对 1 的工程包，换台设备导入会得到「工程模板不受支持」，且无从判断原因。
+  const stageKeys = ['吊装施工', '框架施工', '框架1对1', '玻扇施工', '玻扇1对1', '五金安装', '离场自检', '售后保养'];
   const databases = new Map();
   async function database() {
     if (!databases.has('drafts')) databases.set('drafts', new Promise((resolve, reject) => {
@@ -25,13 +33,26 @@
   }
   function validateSnapshot(snapshot) {
     if (!snapshot || snapshot.format !== 'sitelog-project' || snapshot.schema !== 1 || typeof snapshot.report !== 'string' || !snapshot.meta) throw Error('不是受支持的施格归档工程包');
-    if(!['框架施工','玻扇施工','五金安装','离场自检'].includes(snapshot.meta.templateType))throw Error('工程模板不受支持');
+    if (!stageKeys.includes(snapshot.meta.templateType)) throw Error('工程模板不受支持：' + (snapshot.meta.templateType || '未指定'));
     for (const name of collections) {
       if (!Array.isArray(snapshot[name]) || snapshot[name].length > 300) throw Error('工程包照片数量无效');
       for (const img of snapshot[name]) {
         if (!img || typeof img.id !== 'string' || !/^[\w-]{1,100}$/.test(img.id) || typeof img.dataUrl !== 'string' || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=\s]+$/.test(img.dataUrl)) throw Error('工程包包含不支持的照片');
         for (const field of ['title','desc','category','stage','time']) if (img[field] != null && typeof img[field] !== 'string') throw Error('工程包文字格式无效');
         if (img.highlights && (!Array.isArray(img.highlights) || img.highlights.some(x => typeof x !== 'string'))) throw Error('工程包要点格式无效');
+      }
+    }
+    // 按框分组（1 对 1 阶段）。缺省即老工程包，交给 normalizeFrames() 归入第一框。
+    // 这里只做形状校验；引用完整性由后端的 checked_frames 兜底，前端不重复实现。
+    if (snapshot.frames != null) {
+      if (!Array.isArray(snapshot.frames) || snapshot.frames.length > 50) throw Error('工程包窗框列表无效');
+      for (const frame of snapshot.frames) {
+        if (!frame || typeof frame.id !== 'string' || !/^[\w-]{1,100}$/.test(frame.id)) throw Error('工程包窗框编号无效');
+        if (frame.label != null && typeof frame.label !== 'string') throw Error('工程包窗号格式无效');
+        for (const key of ['arrivalIds', 'nodeIds']) {
+          if (frame[key] == null) continue;
+          if (!Array.isArray(frame[key]) || frame[key].some(x => typeof x !== 'string')) throw Error('工程包窗框照片列表无效');
+        }
       }
     }
     return snapshot;
@@ -45,7 +66,7 @@
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     return new Blob([bytes], { type: match[1] });
   }
-  window.sitelogEditor = { collections, metadata, localDate, sanitizeReport, validateSnapshot, transaction, photoBlob };
+  window.sitelogEditor = { collections, metadata, stageKeys, localDate, sanitizeReport, validateSnapshot, transaction, photoBlob };
   window.editorFeatures = {
     draftStatus: '登录后自动保存本机草稿', draftSavedAt: '', draftDirty: false, draftOwner: null, draftLoading: false,
     draftRevision: 0, draftConflict: false, draftRestored: false, draftTimer: null, draftWriting: false,
@@ -75,7 +96,8 @@
         if (!event.target.closest('[contenteditable]')) return;
         event.preventDefault(); document.execCommand('insertText', false, event.clipboardData.getData('text/plain'));
       });
-      for (const key of [...collections, ...metadata]) this.$watch(key, () => this.markDraftDirty());
+      // frames 不是照片集合，但改动同样要落草稿（增删框、改窗号、把照片移到别的框）。
+      for (const key of [...collections, ...metadata, 'frames']) this.$watch(key, () => this.markDraftDirty());
       window.addEventListener('beforeunload', event => { if (this.draftDirty || this.draftWriting) { event.preventDefault(); event.returnValue = ''; } });
       document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && this.draftDirty) this.saveLocalDraft(); });
       await this.activateDraftAccount();
@@ -128,7 +150,9 @@
       this.syncCoverMeta();
       if(this.syncFieldReport)this.syncFieldReport();
       const clone = document.getElementById('report-content').cloneNode(true);
-      clone.querySelectorAll('button,input,details.debug-panel').forEach(node => node.remove());
+      // 交互控件不能进档案：删除框的 ×、各上传区的 file input、移到其他框的下拉，
+      // 以及「+ 增加一个框」整行（它是按钮 + 说明文字的组合）。业主看到的报告里不该有这些。
+      clone.querySelectorAll('button,input,select,details.debug-panel,.frame-add-row').forEach(node => node.remove());
       for (const img of clone.querySelectorAll('img')) {
         const photo = this.allPhotos().find(p => p.dataUrl === img.getAttribute('src'));
         if (photo) { img.removeAttribute('src'); img.dataset.photoRef = photo.id; }
@@ -140,6 +164,10 @@
         const { file, analyzing, _debug, ...rest } = photo;
         return JSON.parse(JSON.stringify({ ...rest, analyzing: false, filename: file?.name || photo.filename || '施工照片' }));
       });
+      // 按框分组（1 对 1 阶段）。先自愈再落盘：frames 里若留着已删照片的 id，
+      // 后端 checked_frames 会判「窗框照片与所属分组不匹配」而拒绝整份草稿。
+      if (this.normalizeFrames) this.normalizeFrames();
+      result.frames = JSON.parse(JSON.stringify(this.frames || []));
       if (this.projectSnapshotExtras) result.project = this.projectSnapshotExtras();
       if (this.fieldSnapshot) result.field = this.fieldSnapshot();
       if(this.legacyOrigin)result.origin={legacy:this.legacyOrigin};
@@ -151,6 +179,10 @@
         for (const key of metadata) if (['string','boolean'].includes(typeof snapshot.meta[key])) this[key] = snapshot.meta[key];
         this.addClientLogo = !!this.clientLogoId;
         for (const key of collections) this[key] = snapshot[key].map(photo => ({ ...photo, analyzing: false, file: { name: photo.filename || '施工照片' } }));
+        // frames 必须深拷贝：快照对象还会被 undoSnapshot 复用，共享引用会让
+        // 「撤销上次操作」把当前状态和还原目标一起改掉。缺省即老工程，交给
+        // normalizeFrames() 把已有照片归入第一框。
+        this.frames = JSON.parse(JSON.stringify(snapshot.frames || []));
         this.activeTemplate = this.templateType;
         this.reportHtml = sanitizeReport(snapshot.report);
         await this.$nextTick();
@@ -227,6 +259,7 @@
     async clearEditorForAccount() {
       clearTimeout(this.draftTimer);this.draftLoading = true;
       for (const key of collections) this[key] = [];
+      this.frames = [];
       this.legacyOrigin='';this.projectName = '';this.siteLocation = '';this.archivePerson = '';this.pdfFilename = '';this.documentId = '';
       this.draftOwner = null;this.undoSnapshot = null;this.aiCandidate = null;
       this.draftStorageKey='';this.draftRevision=0;this.draftConflict=false;this.draftLastError='';

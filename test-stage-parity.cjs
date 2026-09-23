@@ -1,17 +1,21 @@
-// 阶段名一致性守护：四处副本必须完全一致（顺序 + 显示名）。
+// 阶段名一致性守护：五处副本必须完全一致（顺序 + 显示名）。
 //
 // 【为什么需要这个测试】
-// 阶段名在系统里有四个副本，浏览器无法 import Python，所以做不到单一真源：
+// 阶段名在系统里有五个副本，浏览器无法 import Python，所以做不到单一真源：
 //   1. 后端  stages.py                :: STAGE_KEYS / STAGE_DISPLAY   ← 真源
 //   2. 前端  address-client.js        :: ADDRESS_STAGE_KEYS / ADDRESS_STAGE_DISPLAY
 //   3. 前端  index.html <option>      :: 编辑器顶部阶段下拉框
 //   4. 前端  index.html TEMPLATES     :: getTemplateHtml() 的分支映射 + 模板函数本体
+//   5. 前端  editor-state.js          :: stageKeys，工程包导入白名单
 //
 // 漏改任意一处的后果都不是「报错」而是「静默错」：
 //   - 后端漏加 → 保存草稿时被白名单拒绝（能发现，但报错信息难懂）
 //   - 前端 <option> 漏加 → 用户根本选不到该阶段
 //   - TEMPLATES 漏加 → getTemplateHtml() 走 else 分支静默回落成「框架施工」版式，
 //     照片和文字都进了错版式的报告里，且没有任何提示。这一条最危险。
+//   - editor-state.js 漏加 → 导出的工程包换台设备导入时被判「工程模板不受支持」，
+//     用户只会以为是文件坏了。第 5 处是 2026-09-23 补上的：P1 加吊装/售后、
+//     P4 加两个 1 对 1 时都没跟着改，1 对 1 的工程包一直导不回来。
 //   - 顺序不一致 → 地址公开页的阶段顺序与施工实际顺序不符，业主看到的进度条是乱的
 //
 // 所以本测试是纯静态分析：不启服务、不连数据库，直接读文件比对。跑一次几百毫秒。
@@ -29,6 +33,7 @@ const path = require('node:path');
 const HERE = __dirname;
 const CLIENT_JS = path.join(HERE, 'address-client.js');
 const INDEX_HTML = path.join(HERE, 'index.html');
+const EDITOR_STATE_JS = path.join(HERE, 'editor-state.js');
 
 // ---------- 定位后端 stages.py ----------
 
@@ -138,6 +143,7 @@ if (!stagesPath) {
 const py = fs.readFileSync(stagesPath, 'utf8');
 const clientJs = fs.readFileSync(CLIENT_JS, 'utf8');
 const html = fs.readFileSync(INDEX_HTML, 'utf8');
+const editorStateJs = fs.readFileSync(EDITOR_STATE_JS, 'utf8');
 
 // 1) 后端真源
 const pyKeysBlock = pyAssign(py, 'STAGE_KEYS', '(', ')');
@@ -192,6 +198,11 @@ function templateDefined(fnName) {
   const re = new RegExp('(?<![A-Za-z0-9_])' + fnName + '\\s*:\\s*\\(');
   return re.test(html);
 }
+
+// 5) editor-state.js 的工程包导入白名单（形如 `const stageKeys = [...]`）
+const stateKeysMatch = /(?<![A-Za-z0-9_])stageKeys\s*=\s*\[([\s\S]*?)\]/.exec(editorStateJs);
+ok(stateKeysMatch !== null, 'editor-state.js 里找不到 stageKeys 数组');
+const stateKeys = jsStrings(stateKeysMatch[1]);
 
 // ---------- 断言集合 ----------
 
@@ -269,10 +280,14 @@ check('LABELED_STAGE_KEYS 是 STAGE_KEYS 的子集（1 对 1 类目必须是真�
   }
 });
 
+check('editor-state.js 的工程包导入白名单与后端 STAGE_KEYS 完全一致（含顺序）', () => {
+  eq(stateKeys, backendKeys, 'editor-state.js stageKeys 与 stages.STAGE_KEYS 不一致');
+});
+
 console.log(report.join('\n'));
 console.log('');
 if (failures) {
   console.log('阶段一致性检查未通过：' + failures + ' 项失败。');
   process.exit(1);
 }
-console.log('阶段一致性检查通过：' + report.length + ' 项，四处副本完全一致。');
+console.log('阶段一致性检查通过：' + report.length + ' 项，五处副本完全一致。');

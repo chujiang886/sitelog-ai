@@ -17,6 +17,7 @@
   <script src="legacy-client.js"></script>
   <script src="field-client.js"></script>
   <script src="workflow-client.js"></script>
+  <script src="frame-client.js"></script>
   <script src="vendor/alpine.min.js" defer></script>
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="vendor/html2canvas.min.js"></script>
@@ -293,6 +294,9 @@
       .pdf-sop-grid { grid-template-columns: repeat(4, 1fr) !important; gap: 6px !important; }
       .sop-photo-card img { height: 90px !important; }
       .sop-upload-zone, .sop-remove-btn, .sop-grid-top-row { display: none !important; }
+      /* 按框循环的交互控件同样不能进 PDF：删除框的 ×、移到其他框的下拉、
+         「+ 增加一个框」整行（含说明文字，它是 span 不会被 button 规则清掉）。 */
+      .frame-remove-btn, .frame-move-row, .frame-add-row { display: none !important; }
     }
 
     /* ===== Drag & Drop ===== */
@@ -380,6 +384,45 @@
     .pdf-section-title {
       font-size: 16px; font-weight: 700; color: #1F3D2A; letter-spacing: 0.04em;
     }
+
+    /* ═════ 按框循环（1 对 1 阶段）═════ */
+    /* 一框一组「进场确认 + 单扇校正节点」。窗号条用左侧金线标出来，
+       业主在报告里能一眼分辨这是两个不同的门洞，而不是同一段的重复。 */
+    .frame-label-row {
+      display: flex; align-items: center; gap: 10px;
+      margin: -6px 0 14px; padding: 10px 14px;
+      background: #FAFAF8; border: 1px solid #E8E2D0; border-left: 3px solid #B8924A;
+      border-radius: 0 6px 6px 0;
+    }
+    .frame-label-tag {
+      font-size: 11px; font-weight: 700; color: #B8924A; letter-spacing: 0.12em; flex-shrink: 0;
+    }
+    .frame-label {
+      flex: 1; font-size: 15px; font-weight: 700; color: #1F3D2A;
+      min-height: 22px; outline: none !important;
+    }
+    .frame-label:empty::before {
+      content: attr(data-placeholder); color: #bbb; font-weight: 400; font-size: 13px;
+    }
+    .frame-remove-btn {
+      width: 22px; height: 22px; line-height: 1; border-radius: 50%; flex-shrink: 0;
+      border: 1px solid #E8E2D0; background: #fff; color: #b91c1c; font-size: 14px; cursor: pointer;
+    }
+    .frame-remove-btn:hover { background: #fee2e2; border-color: #fca5a5; }
+    .frame-add-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 4px 0 18px; }
+    .frame-add-btn {
+      padding: 9px 18px; border-radius: 6px; cursor: pointer;
+      border: 1px dashed #B8924A; background: #FDFBF6; color: #1F3D2A;
+      font-size: 13px; font-weight: 700;
+    }
+    .frame-add-btn:hover { background: #F6F1E4; }
+    .frame-add-hint { font-size: 11px; color: #999; }
+    .frame-move-row { padding: 0 18px 10px; }
+    .frame-move-select {
+      font-size: 11px; color: #555; border: 1px solid #E8E2D0; border-radius: 4px;
+      padding: 3px 6px; background: #fff; max-width: 100%;
+    }
+    .frame-zone-empty { cursor: pointer; }
 
     /* 可编辑内容框 */
     .pdf-editable-box {
@@ -1954,6 +1997,7 @@
         legacyOrigin:'',
         ...window.legacyFeatures,
         ...window.fieldFeatures,
+        ...window.frameFeatures,
         // ===== 状态 =====
         apiProvider: 'qwen',
         templateType: '框架施工',
@@ -1961,6 +2005,8 @@
         arrivalImages: [],      // 班组进场照片（人员到位、材料到场、安全交底）
         sopImages: [],          // 班组离场 SOP 手动上传照片（关水/关电/关门/清场）
         finishImages: [],       // 完工照片 手动上传（最终交付实景）
+        // 「一框一记录」的 frames 状态与全部方法在 frame-client.js，
+        // 由 ...window.frameFeatures 合并进来。
         reportHtml: '',
         reportTitle: '',
         pdfFilename: '',
@@ -2046,9 +2092,13 @@
           else if (this.templateType === '售后保养') html = TEMPLATES.aftercare();
           else html = TEMPLATES.frame();
 
-          // 所有模板均保留四个照片分区，避免换版式后照片仍在数据中却不可见。
+          // 所有模板均保留照片分区，避免换版式后照片仍在数据中却不可见。
+          // 1 对 1 模板的进场照片按框分区（arrival-gallery-f0、-f1…），没有总区；
+          // 这里必须跳过，否则会多渲染一个空 section，把段落编号整体顶偏。
+          const framed = html.includes('id="frames-container"');
           let missing = '';
           for (const [id, title] of [['arrival-gallery','班组进场照片'],['finish-gallery','完工照片'],['sop-gallery','离场留证']]) {
+            if (framed && id === 'arrival-gallery') continue;
             if (!html.includes('id="' + id + '"')) missing += '<section class="pdf-section"><h2 class="pdf-section-header">' + title + '</h2><div class="pdf-sop-gallery" id="' + id + '"></div></section>';
           }
           html = html.includes('<footer') ? html.replace('<footer', missing + '<footer') : html + missing;
@@ -2084,8 +2134,11 @@
           await this.processFiles(files);
         },
 
-        async processFiles(files) {
+        // `frameId` 只在 1 对 1 阶段的按框上传时传入，用来把新照片登记到对应框。
+        // 不传就是老行为：照片进全局数组，由所属模板的总区渲染。
+        async processFiles(files, frameId) {
           if (files.length === 0) return;
+          const added = [];
           for (const file of files) {
             if (file.size > 10 * 1024 * 1024) {
               this.showToast(`⚠️ ${file.name} 超过 10MB，已跳过`, 'error');
@@ -2105,7 +2158,11 @@
               analyzing: false,
               _analyzed: false   // 是否已被 AI 分析过（区分"AI真实结果"与"兜底默认值"）
             };
-            this.images.push(img);
+            this.images.push(img);added.push(img.id);
+          }
+          if (frameId) {
+            const frame = this.frames.find(f => f.id === frameId);
+            if (frame) frame.nodeIds.push(...added);
           }
           this.showToast(`✅ 已上传 ${files.length} 张照片`);
           this.syncToReport();
@@ -2137,6 +2194,9 @@
 
         removeImage(id) {
           this.images = this.images.filter(i => i.id !== id);
+          // frames 里若还留着这个 id，后端 checked_frames 会判「窗框照片与所属分组不匹配」
+          // 而拒绝整份草稿。删除时必须同步清掉引用。
+          (this.frames || []).forEach(frame => { frame.nodeIds = frame.nodeIds.filter(x => x !== id); });
           this.syncToReport();
         },
 
@@ -2269,9 +2329,11 @@
               if (hls.length) img.highlights = hls;
             }
           };
-          document.querySelectorAll('#images-container .node-block').forEach(block =>
+          // 1 对 1 阶段按框循环后容器是 images-container-f0 / arrival-gallery-f0，
+          // 因此用前缀匹配；旧模板的 images-container / arrival-gallery 同样命中。
+          document.querySelectorAll('[id^="images-container"] .node-block').forEach(block =>
             capture(block, this.images.find(i => i.id === block.dataset.imgId)));
-          document.querySelectorAll('#arrival-gallery .node-block').forEach(block =>
+          document.querySelectorAll('[id^="arrival-gallery"] .node-block').forEach(block =>
             capture(block, this.arrivalImages.find(i => i.id === block.dataset.arrivalId)));
           document.querySelectorAll('#finish-gallery .node-block').forEach(block =>
             capture(block, this.finishImages.find(i => i.id === block.dataset.finishId)));
@@ -2630,16 +2692,20 @@
 
         // ===== 报告渲染 =====
         syncToReport() {
-          // 把图片数据同步到报告 DOM
-          const container = document.getElementById('images-container');
-          if (!container) return;
           // 封面项目信息（归档人/施工部位/日期）与图片无关，先同步，避免无图时提前 return 不更新
           this.syncCoverMeta();
           // 正文输入已由 editor-state.js 即时写入数据；渲染不能用旧 DOM 覆盖新值。
-          this.syncArrivalGallery(); // 班组进场照片区独立渲染
+          this.syncArrivalGallery(); // 班组进场照片区独立渲染（1 对 1 模板没有总区，按框分区）
           this.syncSopGallery(); // SOP 区独立于主图，必须每次都渲染（即使无主图）
           this.syncFinishGallery(); // 完工照片画廊同理，独立于主图渲染
           this.ensureTitles();   // 最终安全网：确保没有空 title/desc 渲染出去
+
+          // 1 对 1 阶段按框循环：进场照片与校正节点都按框分区，不存在全局 #images-container。
+          if (this.isFramedTemplate()) { this.syncFrames(); return; }
+
+          // 把图片数据同步到报告 DOM
+          const container = document.getElementById('images-container');
+          if (!container) return;
 
           if (this.images.length === 0) {
             container.innerHTML = `
@@ -2828,15 +2894,16 @@
           await this.processArrivalFiles(files);
         },
 
-        async processArrivalFiles(files) {
+        async processArrivalFiles(files, frameId) {
           if (files.length === 0) return;
+          const added = [];
           for (const file of files) {
             if (file.size > 10 * 1024 * 1024) {
               this.showToast(`⚠️ ${file.name} 超过 10MB，已跳过`, 'error');
               continue;
             }
             const dataUrl = await this.fileToDataUrl(file);
-            this.arrivalImages.push({
+            const photo = {
               id: Date.now() + '_' + Math.random().toString(36).slice(2, 8),
               file: file,
               dataUrl: dataUrl,
@@ -2850,15 +2917,22 @@
               aiConfirmed: false,
               _analyzed: false,
               analyzing: false
-            });
+            };
+            this.arrivalImages.push(photo);added.push(photo.id);
+          }
+          if (frameId) {
+            const frame = this.frames.find(f => f.id === frameId);
+            if (frame) frame.arrivalIds.push(...added);
           }
           this.showToast(`✅ 进场照片已添加 ${files.length} 张，可点「AI 一键整理」分析`);
-          this.syncArrivalGallery();
+          if (this.isFramedTemplate()) this.syncFrames(); else this.syncArrivalGallery();
         },
 
         removeArrivalImage(id) {
           this.arrivalImages = this.arrivalImages.filter(i => i.id !== id);
-          this.syncArrivalGallery();
+          // 与 removeImage 同理：悬空引用会被后端拒绝，删除时同步清掉。
+          (this.frames || []).forEach(frame => { frame.arrivalIds = frame.arrivalIds.filter(x => x !== id); });
+          if (this.isFramedTemplate()) this.syncFrames(); else this.syncArrivalGallery();
         },
 
         syncSopGallery() {
@@ -3319,7 +3393,7 @@
           let css = '';
           document.querySelectorAll('style').forEach(st => { css += st.textContent + NL; });
           const clone = container.cloneNode(true);
-          clone.querySelectorAll('button, details.debug-panel, .sop-upload-zone, .sop-grid-top-row, .sop-remove-btn').forEach(el => el.remove());
+          clone.querySelectorAll('button, select, details.debug-panel, .sop-upload-zone, .sop-grid-top-row, .sop-remove-btn, .frame-add-row, .frame-move-row').forEach(el => el.remove());
           clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
           const imgs = Array.from(clone.querySelectorAll('img'));
           let compressed = 0;
@@ -4272,45 +4346,11 @@
           </div>
         </section>
 
-        <!-- ═══ 二、进场与洞口确认 ═══ -->
-        <section class="pdf-section">
-          <div class="pdf-section-header">
-            <span class="pdf-section-num">二</span>
-            <span class="pdf-section-title">进场与洞口确认</span>
-            <span class="pdf-section-line"></span>
-          </div>
-          <div class="pdf-sop-gallery" id="arrival-gallery">
-            <!-- syncArrivalGallery() 动态渲染：人员到位、洞口复核、基准放线、安全交底等 -->
-          </div>
-        </section>
-
-        <!-- ═══ 三、单扇校正节点 ═══ -->
-        <section class="pdf-section">
-          <div class="pdf-section-header">
-            <span class="pdf-section-num">三</span>
-            <span class="pdf-section-title">单扇校正节点</span>
-            <span class="pdf-section-line"></span>
-          </div>
-          <div id="images-container"></div>
-          <div class="pdf-grid-2 mt-6">
-            <div class="pdf-check-card pdf-check-gold">
-              <p class="pdf-check-title"><span>📐</span>洞口尺寸复核</p>
-              <p class="pdf-check-desc">逐洞复核宽高、对角线与墙体垂直度，偏差控制在规范范围内</p>
-            </div>
-            <div class="pdf-check-card pdf-check-green">
-              <p class="pdf-check-title"><span>📏</span>框体调直</p>
-              <p class="pdf-check-desc">调直框体、校正扭曲与侧弯，保证四角方正、平面度达标</p>
-            </div>
-            <div class="pdf-check-card pdf-check-green">
-              <p class="pdf-check-title"><span>🔩</span>五金位校正</p>
-              <p class="pdf-check-desc">按单扇逐一校正执手、锁点、铰链安装位，开合顺畅无干涉</p>
-            </div>
-            <div class="pdf-check-card pdf-check-neutral">
-              <p class="pdf-check-title"><span>🔧</span>缝隙调平</p>
-              <p class="pdf-check-desc">调整框扇间隙与拼缝，内外侧均匀，密封面平整</p>
-            </div>
-          </div>
-        </section>
+        <!-- ═══ 二…、按框循环区 ═══ -->
+        <!-- 一套房子里有多个门洞，每个门洞算一框，各自一组「进场与洞口确认 + 单扇校正节点」。
+             段落编号由 renumberSections() 按 DOM 顺序统一算，模板里不写死；
+             框内容由 syncFrames() 渲染。 -->
+        <div id="frames-container"></div>
 
         <!-- ═══ 四、校正后固定与成品保护 ═══ -->
         <section class="pdf-section">
@@ -4392,45 +4432,10 @@
           </div>
         </section>
 
-        <!-- ═══ 二、进场与扇位确认 ═══ -->
-        <section class="pdf-section">
-          <div class="pdf-section-header">
-            <span class="pdf-section-num">二</span>
-            <span class="pdf-section-title">进场与扇位确认</span>
-            <span class="pdf-section-line"></span>
-          </div>
-          <div class="pdf-sop-gallery" id="arrival-gallery">
-            <!-- syncArrivalGallery() 动态渲染：人员到位、扇位核对、工具材料、安全交底等 -->
-          </div>
-        </section>
-
-        <!-- ═══ 三、单扇调试节点 ═══ -->
-        <section class="pdf-section">
-          <div class="pdf-section-header">
-            <span class="pdf-section-num">三</span>
-            <span class="pdf-section-title">单扇调试节点</span>
-            <span class="pdf-section-line"></span>
-          </div>
-          <div id="images-container"></div>
-          <div class="pdf-grid-2 mt-6">
-            <div class="pdf-check-card pdf-check-gold">
-              <p class="pdf-check-title"><span>🪟</span>玻扇入位</p>
-              <p class="pdf-check-desc">按洞口编号逐扇入位，框扇配合间隙均匀、无磕碰</p>
-            </div>
-            <div class="pdf-check-card pdf-check-green">
-              <p class="pdf-check-title"><span>🔧</span>五金调试</p>
-              <p class="pdf-check-desc">执手、传动器、铰链逐一调试，开合顺畅、锁点咬合到位</p>
-            </div>
-            <div class="pdf-check-card pdf-check-green">
-              <p class="pdf-check-title"><span>🌧️</span>密封调缝</p>
-              <p class="pdf-check-desc">胶条压合均匀、排水孔通畅，拼缝与内外侧密封面平整</p>
-            </div>
-            <div class="pdf-check-card pdf-check-neutral">
-              <p class="pdf-check-title"><span>✅</span>开合复检</p>
-              <p class="pdf-check-desc">逐扇反复开合锁闭、气密水密复检，与现场确认无干涉</p>
-            </div>
-          </div>
-        </section>
+        <!-- ═══ 二…、按框循环区 ═══ -->
+        <!-- 与框架 1 对 1 同构：每个门洞一框，各自一组「进场与扇位确认 + 单扇调试节点」。
+             框内容由 syncFrames() 渲染，编号由 renumberSections() 统一计算。 -->
+        <div id="frames-container"></div>
 
         <!-- ═══ 四、调试后复检与清洁 ═══ -->
         <section class="pdf-section">
