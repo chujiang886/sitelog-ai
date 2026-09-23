@@ -668,15 +668,15 @@
 
     /* ========== 地址管理面板（一址一码）==========
        这里的样式不用 Tailwind 工具类，原因是 vendor/app.css 是预构建产物：
-       它只包含「构建那一刻 index.html 里出现过」的类。新写的标记若用了当时不存在的
-       工具类（如 px-6 / divide-y / z-10），CSS 里根本没有对应规则，浏览器不报错、
+       它只包含「构建那一刻 index.html 里出现过」的类。新写的标记若用了当时构建尚未覆盖的
+       工具类，CSS 里根本没有对应规则，浏览器不报错、
        只是少了样式——静默失效。所以面板自己的样式在这里显式写死，
        不依赖任何构建步骤。改动后可用 check_tailwind_classes.py 复核。 */
     .addr-panel-head {
       position: sticky; top: 0; z-index: 10;
       padding: 1rem 1.5rem;
     }
-    /* 列表分隔线。Tailwind 的 divide-y 只给非首个子元素加 border-top，
+    /* 列表分隔线。这种「只给非首个子元素加分隔线」的语义，
        这里用同样的语义，避免最后一行多出一条线。 */
     .addr-list > * + * { border-top: 1px solid #e5e7eb; }
     .addr-search-input { min-width: 180px; }
@@ -723,8 +723,8 @@
       font-size: 11px; font-weight: 400; cursor: pointer;
     }
     .addr-group-add:hover { border-color: rgba(184, 146, 74, 0.6); color: #8E6B2E; }
-    /* 「本次将作为第 N 次留档」提示文字。用内联类而不是 Tailwind 的
-       text-[#8E6B2E]——任意值工具类不在预构建 CSS 里，写了等于没写。 */
+    /* 「本次将作为第 N 次留档」提示文字。这里直接写死颜色，而不是用 Tailwind 的
+       任意值工具类——后者不在预构建 CSS 里，写了等于没写。 */
     .addr-hint { color: #8E6B2E; }
 
     /* ========== 存量归类 + 地址维度统计 ========== */
