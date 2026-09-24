@@ -803,6 +803,98 @@
     .addr-bulk-result > div { padding: 7px 12px; }
     .addr-bulk-result > * + * { border-top: 1px solid #eef2f5; }
 
+    /* ========== 客户签认（signoff v1，员工侧）==========
+       同上：这里一律显式写死样式，不依赖 vendor/app.css 预构建产物。
+       签认面板是要**递到业主手上**的一屏，二维码必须够大、倒计时必须看得见，
+       所以不复用列表里的小按钮样式。 */
+    .signoff-mask {
+      position: fixed; inset: 0; z-index: 60;
+      background: rgba(0, 0, 0, 0.55);
+      display: flex; align-items: center; justify-content: center; padding: 1rem;
+    }
+    .signoff-card {
+      background: #fff; border-radius: 12px; width: 100%; max-width: 420px;
+      max-height: 92vh; overflow-y: auto; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    }
+    .signoff-head {
+      position: sticky; top: 0; z-index: 10; background: #fff;
+      border-bottom: 1px solid #e5e7eb; padding: 14px 18px;
+    }
+    .signoff-qr {
+      width: 260px; height: 260px; display: block;
+      border: 1px solid #e2e8f0; border-radius: 10px; background: #fff;
+    }
+    .signoff-countdown {
+      display: inline-block; padding: 3px 12px; border-radius: 99px;
+      background: rgba(184, 146, 74, 0.14); color: #8E6B2E;
+      font-size: 13px; font-weight: 600;
+    }
+    /* 失效态必须是「红底 + 明确下一步」，不是把倒计时停成 00:00。 */
+    .signoff-expired {
+      padding: 14px; border-radius: 10px; text-align: center;
+      background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
+    }
+    .signoff-link-row { display: flex; gap: 8px; align-items: center; }
+    .signoff-link {
+      flex: 1; min-width: 0; padding: 8px; border-radius: 8px;
+      border: 1px solid #e2e8f0; background: #f8fafc; color: #475569; font-size: 12px;
+    }
+    .signoff-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; }
+    /* 已撤回的记录置灰但**不隐藏**：撤回是留痕动作，藏起来等于把「撤回过」这件事抹掉。 */
+    .signoff-row.revoked { background: #f8fafc; }
+    .signoff-row.revoked .signoff-main { opacity: 0.55; }
+    .signoff-row.revoked .signoff-side { opacity: 0.55; }
+    /* 正在填撤回原因的那一条：表单在列表外，靠这圈高亮把两者对应起来。 */
+    .signoff-row.picking { background: #fff5f5; box-shadow: inset 3px 0 0 #dc2626; }
+    .signoff-main { flex: 1; min-width: 0; }
+    .signoff-meta { margin-top: 2px; font-size: 11px; color: #64748b; line-height: 1.7; }
+    /* stale：签认之后档案又更新过，业主当初签的那份已经不是当前版本。
+       这条提示不能省——不提示的话，双方都会以为签认覆盖的是现在看到的内容。 */
+    .signoff-stale {
+      margin-top: 4px; padding: 5px 8px; border-radius: 6px;
+      font-size: 11px; line-height: 1.6;
+      background: rgba(184, 146, 74, 0.12); border: 1px solid rgba(184, 146, 74, 0.45); color: #8E6B2E;
+    }
+    .signoff-revoked-line {
+      margin-top: 4px; padding: 5px 8px; border-radius: 6px;
+      font-size: 11px; line-height: 1.6; word-break: break-word;
+      background: #f1f5f9; border: 1px solid #e2e8f0; color: #64748b;
+    }
+    .signoff-revoke-form {
+      margin-top: 8px; padding: 10px; border-radius: 8px;
+      background: #fef2f2; border: 1px solid #fecaca;
+    }
+    .signoff-revoke-form textarea {
+      width: 100%; margin-top: 4px; padding: 8px;
+      border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px;
+      /* 这里刻意不声明 textarea 的可拖拽缩放属性：npm run build 的 --content
+         会把整个 index.html 当纯文本扫，那个 CSS 属性名会被当成一个工具类名
+         写进 vendor/app.css，于是每次构建都产生一处与本次改动无关的产物漂移。
+         浏览器默认值（两个方向可拖）可以接受，面板已有 max-height 兜底。 */
+      overflow: auto;
+    }
+    .signoff-side {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0;
+    }
+    .signoff-thumb {
+      width: 76px; height: 42px; object-fit: contain;
+      border: 1px solid #e2e8f0; border-radius: 6px; background: #fff;
+    }
+    .signoff-invite-btn {
+      padding: 2px 8px; border-radius: 6px; font-size: 11px; cursor: pointer; white-space: nowrap;
+      background: rgba(184, 146, 74, 0.14);
+      border: 1px solid rgba(184, 146, 74, 0.5);
+      color: #8E6B2E;
+    }
+    .signoff-invite-btn:hover { background: rgba(184, 146, 74, 0.26); }
+    .signoff-invite-btn:disabled { opacity: 0.5; cursor: default; }
+    /* 窄屏：签认面板占满宽度，二维码仍按 260px 居中（再小就扫不动了）。 */
+    @media screen and (max-width: 767px) {
+      .signoff-card { max-width: 100%; }
+      .signoff-row { flex-wrap: wrap; }
+      .signoff-side { flex-direction: row; align-items: center; margin-left: auto; }
+    }
+
     @media screen and (max-width: 767px) {
       #report-content:not(.pdf-exporting) { padding: 12px; }
       .pdf-cover-band { padding: 18px 14px; gap: 12px; }
@@ -1407,8 +1499,8 @@
     x-show="addressPanel"
     x-cloak
     class="no-print fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-    @click.self="addressPanel = false"
-    @keydown.escape.window="addressFormOpen ? (addressFormOpen = false) : (addressPanel = false)"
+    @click.self="closeAddressPanel()"
+    @keydown.escape.window="escapeAddressPanel()"
   >
     <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" @click.stop>
       <div class="addr-panel-head bg-white border-b flex items-start justify-between gap-4">
@@ -1416,7 +1508,7 @@
           <h3 class="font-bold text-lg text-[#1F3D2A]">🏠 地址管理 · 一址一码</h3>
           <p class="text-xs text-slate-500 mt-1 leading-relaxed">一个地址一张二维码。施工推进到哪个阶段就把该阶段归档挂上去，业主扫同一张码看全程；完工后回头再扫还是全套。</p>
         </div>
-        <button @click="addressPanel = false" class="text-slate-400 hover:text-slate-600 text-2xl leading-none shrink-0" aria-label="关闭地址管理">×</button>
+        <button @click="closeAddressPanel()" class="text-slate-400 hover:text-slate-600 text-2xl leading-none shrink-0" aria-label="关闭地址管理">×</button>
       </div>
 
       <div class="p-6">
@@ -1576,6 +1668,19 @@
                           </div>
                           <div class="addr-stage-actions flex items-center gap-2 shrink-0">
                             <a :href="'/s/' + stage.publication_id" target="_blank" rel="noopener" class="text-xs underline text-slate-600 shrink-0">查看</a>
+                            <!-- 请业主签认：入口挂在**每一条留档**上，不是阶段分组头上。
+                                 契约的签认粒度是 (address_id, kind, stage_key, slot)，也就是
+                                 「某阶段的某一次留档」；售后保养来过两次就有两条互不覆盖的签认，
+                                 而分组头对应 0..N 条留档，指不出是第几次。
+                                 已隐藏的阶段不给入口：后端要求该 (aid,stage_key,slot) 存在
+                                 visible=1 的挂接行，隐藏状态下点必然 404。 -->
+                            <button
+                              x-show="stage.visible"
+                              @click="requestSignoffToken('stage', stage.stage_key, stage.slot)"
+                              :disabled="signoffBusy"
+                              class="signoff-invite-btn shrink-0"
+                              title="生成一次性签认二维码，把手机递给业主手写签名"
+                            >请业主签认</button>
                             <button @click="toggleStageVisible(stage)" class="text-xs px-2 py-1 bg-slate-100 rounded shrink-0" x-text="stage.visible ? '隐藏' : '显示'"></button>
                             <button @click="detachStage(stage)" class="text-xs px-2 py-1 bg-red-50 text-red-600 rounded shrink-0">移除</button>
                           </div>
@@ -1590,6 +1695,126 @@
               <p x-show="addressPendingStages.length" class="text-xs text-slate-500 mt-2 leading-relaxed">
                 还没留档：<span class="font-medium text-slate-600" x-text="addressPendingStages.map(k => ADDRESS_STAGE_DISPLAY[k] || k).join('、')"></span>。施工推进到哪一步，就点该阶段的「＋ 再留一次」补挂哪一步。
               </p>
+            </div>
+
+            <!-- ===== 客户签认（signoff v1）=====
+                 现场负责人把手机递给业主，业主手写签名确认该阶段档案。
+                 员工侧只负责「发令牌 → 递手机 → 事后查看/撤回」。
+                 签认链接一律用后端返回的 url，前端不拼公开页地址；
+                 产品文案只说「客户已确认」，不要写任何超出这句话的效力承诺。 -->
+            <div class="border rounded-lg">
+              <div class="addr-stage-head">
+                <span>客户签认记录</span>
+                <span x-show="signoffItems.length" class="addr-times-badge" x-text="signoffItems.length + ' 条'"></span>
+                <button @click="loadSignoffs(addressDetail.id)" class="addr-group-add">刷新</button>
+              </div>
+              <div class="p-3 space-y-2">
+                <!-- 三态：loading / error / empty 各有明确文案，不留白屏。
+                     注意 error 那一行的 `!!`：**x-show 的表达式必须稳定返回布尔值**。
+                     `!signoffLoading && signoffError` 在三种状态下依次得到
+                     `''` → `false` → `''`——值没变（都是假），但类型在 string/boolean 之间跳，
+                     而 Alpine 内部用 `p === l` 判断「值有没有变」，于是判定「变了两次」，
+                     对同一个元素连续调用两次隐藏流程，第二次抛
+                     `TypeError: u is not a function`（未捕获，vendor/alpine.min.js 内部）。
+                     加 `!!` 之后三种状态都是 `false`，判等成立，隐藏只走一次。
+                     同类写法（`x-show="a && b"` 里 b 可能是字符串/数字）都要留这个心。 -->
+                <p x-show="signoffLoading" class="text-sm text-slate-500">正在读取签认记录…</p>
+                <p x-show="!signoffLoading && !!signoffError" class="text-sm text-red-600 leading-relaxed" x-text="signoffError"></p>
+                <p
+                  x-show="!signoffLoading && !signoffError && !signoffItems.length"
+                  class="text-sm text-slate-500 leading-relaxed"
+                >还没有客户签认记录。<br>施工到关键阶段时，点该阶段那条留档右侧的「请业主签认」，把手机递给业主手写签名。</p>
+
+                <div x-show="signoffItems.length" class="addr-list border rounded-lg">
+                  <template x-for="row in signoffItems" :key="row.id">
+                    <div class="signoff-row" :class="[(row.revoked ? 'revoked' : ''), (signoffRevokeId === row.id ? 'picking' : '')]">
+                      <div class="signoff-main">
+                        <p class="text-sm font-medium text-slate-900">
+                          <span class="addr-nth" x-text="signoffRangeLabel(row)"></span>
+                          <span x-text="row.signer_name"></span>
+                          <span class="text-xs text-slate-500" x-text="row.signer_phone"></span>
+                        </p>
+                        <p class="signoff-meta" x-text="'签认时间 ' + signoffTimeText(row.created) + ' · 见证人 ' + (row.witness_name || '—')"></p>
+
+                        <!-- stale：签认之后该阶段档案又换过版，业主当初签的那份已不是当前内容。
+                             这条必须显眼——不提示的话双方都会以为签认覆盖的是现在看到的东西。 -->
+                        <p x-show="row.stale && !row.revoked" class="signoff-stale">⚠️ 签认后该阶段档案已更新，此签认对应的内容已不是当前版本</p>
+
+                        <!-- 已撤回：置灰 + 保留撤回原因/撤回人/撤回时间，不删除、不隐藏。 -->
+                        <p
+                          x-show="row.revoked"
+                          class="signoff-revoked-line"
+                          x-text="'已撤回 · ' + (row.revoked_by_name || '—') + ' · ' + signoffTimeText(row.revoked_at) + ' · 原因：' + (row.revoke_note || '—')"
+                        ></p>
+
+                      </div>
+
+                      <div class="signoff-side">
+                        <!-- 笔迹缩略图走同源 img（session cookie 自动带上）。
+                             没有笔迹时用 x-if 整块不渲染——x-show 会留着 src 照样发一次 404 请求。 -->
+                        <template x-if="row.has_stroke">
+                          <img
+                            class="signoff-thumb"
+                            :src="signoffStrokeUrl(row)"
+                            :alt="'业主手写笔迹 · ' + row.signer_name"
+                            loading="lazy"
+                          >
+                        </template>
+                        <span x-show="!row.has_stroke" class="text-[11px] text-slate-400">无笔迹</span>
+                        <button
+                          x-show="!row.revoked"
+                          @click="openSignoffRevoke(row)"
+                          class="text-xs px-2 py-1 bg-red-50 text-red-600 rounded"
+                        >撤回</button>
+                        <span x-show="row.revoked" class="text-xs text-slate-400">已撤回</span>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- 撤回原因输入。**只渲染一份，放在列表之外**，不要放进 x-for 里。
+                     两个原因：
+                     1. 放进 x-for 的话，每条记录都会带一个隐藏的 textarea（同一个
+                        x-model、同一个 label），DOM 里躺着 3 个一模一样的表单字段，
+                        读屏软件和「按标签找输入框」都会撞车。
+                     2. 实测：x-show 的元素藏在 x-for 里，且外层列表在同一轮被整体替换时，
+                        Alpine 3 的 x-show 隐藏流程会重复处理同一个元素，
+                        抛 `TypeError: u is not a function`（vendor/alpine.min.js 内部），
+                        是未捕获错误。放在列表外就没有这个组合。
+                     必填 2–500 字，不足下限不发请求（后端同一下限）。 -->
+                <div x-show="signoffRevokeId" class="signoff-revoke-form">
+                  <p class="text-xs text-slate-600 font-medium" x-text="'撤回签认：' + signoffRevokeLabel()"></p>
+                  <label class="block text-xs text-slate-600 mt-1">撤回原因（必填，2–500 字）
+                    <textarea
+                      x-model="signoffRevokeNote"
+                      rows="2"
+                      maxlength="500"
+                      placeholder="例：业主反映漏拍了厨房推拉门，撤回后补档重签"
+                    ></textarea>
+                  </label>
+                  <p class="text-[11px] text-slate-500 mt-1" x-text="'已填 ' + signoffRevokeNoteLength() + ' / ' + SIGNOFF_REVOKE_NOTE_MAX + ' 字'"></p>
+                  <div class="flex gap-2 mt-2">
+                    <button
+                      @click="submitSignoffRevoke()"
+                      :disabled="signoffRevokeBusy"
+                      class="px-3 py-1.5 text-xs bg-red-600 text-white rounded disabled:opacity-50"
+                    >确认撤回</button>
+                    <button @click="cancelSignoffRevoke()" class="px-3 py-1.5 text-xs bg-white border rounded">取消</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 整址竣工验收签认：完工交付时让业主一次性确认本户全部已归档阶段。 -->
+            <div class="addr-stat">
+              <span class="addr-stat-line flex-1 leading-relaxed">
+                竣工验收：把手机递给业主手写签名，确认本户已归档的全部阶段。签认后若档案再更新，这里会标出「档案已更新」。
+              </span>
+              <button
+                @click="requestSignoffToken('final')"
+                :disabled="signoffBusy"
+                class="px-3 py-1.5 text-xs rounded shrink-0 bg-[#B8924A] text-white hover:opacity-90 disabled:opacity-50"
+              >整址竣工验收签认</button>
             </div>
           </div>
         </template>
@@ -1714,6 +1939,59 @@
           </div>
         </template>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 客户签认二维码面板（signoff v1）==========
+       员工点「请业主签认」后弹出，把手机递给业主扫。
+       放在地址面板之外、z-index 更高的一层（与 addr-bulk-mask 同一范式）：
+       二维码要够大、倒计时要在视野里，不能被地址面板的滚动区吃掉。
+       链接文本一并给出——二维码扫不动时还能复制链接发微信。 -->
+  <div x-show="signoffPanelOpen" x-cloak class="signoff-mask no-print" @click.self="closeSignoffPanel()">
+    <div class="signoff-card">
+      <div class="signoff-head">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 class="font-bold text-base text-[#1F3D2A]">✍️ 请业主签认</h3>
+            <p class="text-xs text-slate-500 mt-1 leading-relaxed">
+              把屏幕递给业主，用手机扫码后手写签名，确认这一份档案。签认表示「客户已确认」，请在现场当面完成。
+            </p>
+          </div>
+          <button @click="closeSignoffPanel()" class="text-slate-400 hover:text-slate-600 text-2xl leading-none shrink-0" aria-label="关闭签认面板">×</button>
+        </div>
+      </div>
+
+      <div class="p-4 space-y-3">
+        <p class="text-sm font-medium text-slate-900" x-text="'签认范围：' + signoffLabel"></p>
+
+        <!-- 有效期内：二维码 + 倒计时 -->
+        <div x-show="!signoffExpired()" class="flex flex-col items-center gap-2">
+          <canvas id="signoff-qr-canvas" class="signoff-qr"></canvas>
+          <p x-show="signoffQrError" class="text-xs text-amber-700 leading-relaxed" x-text="signoffQrError"></p>
+          <span class="signoff-countdown" x-text="'链接 ' + signoffCountdownText() + ' 后失效'"></span>
+        </div>
+
+        <!-- 已失效：明确说清「失效了」并给出下一步，而不是把倒计时停在 00:00 -->
+        <div x-show="signoffExpired()" class="signoff-expired">
+          <p class="text-sm font-medium">链接已失效，请重新生成</p>
+          <p class="text-xs mt-1 leading-relaxed">签认链接只在 300 秒内有效，且只能用一次。请重新生成后再把手机递给业主。</p>
+          <button
+            @click="requestSignoffToken(signoffKind, signoffStageKey, signoffSlot)"
+            :disabled="signoffBusy"
+            class="mt-2 px-4 py-2 text-sm bg-[#1F3D2A] text-white rounded-lg disabled:opacity-50"
+          >重新生成签认链接</button>
+        </div>
+
+        <div class="signoff-link-row">
+          <input class="signoff-link" :value="signoffUrl" readonly @focus="$event.target.select()" aria-label="签认链接">
+          <button @click="copySignoffUrl()" class="px-3 py-2 text-xs bg-slate-100 rounded shrink-0 hover:bg-slate-200">复制链接</button>
+        </div>
+
+        <p class="text-[11px] text-slate-500 leading-relaxed">
+          业主提交后，本条签认会出现在地址详情的「客户签认记录」里（点「刷新」查看）。
+          若档案内容在签认后又被更新，该条记录会标出「档案已更新」，需要时可以先撤回再重签。
+        </p>
       </div>
     </div>
   </div>

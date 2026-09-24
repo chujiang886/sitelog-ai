@@ -54,6 +54,41 @@ window.addressFeatures = {
   addressPickHint: '',          // 「该地址的这个阶段已有 N 次留档」提示
   addressCardReady: false,
 
+  // ===== 客户签认（contract signoff v1，员工侧）=====
+  //
+  // 【这套东西解决什么】
+  // 现场负责人把手机递给业主，业主手写签名确认「这一阶段的档案我看过了」。
+  // 业主免登录：后端发一次性令牌，业主扫 /sign/<token> 提交笔迹。
+  // 员工侧只做三件事：生成令牌 → 把二维码/链接给业主 → 事后看签认记录、必要时撤回。
+  //
+  // 【三条不能越界的线（契约 redlines）】
+  //   1. 签认链接只用后端返回的 url。前端不拼公开页地址——一旦自己拼，
+  //      换域名/换 base_url 时前端生成的链接会指向一个不存在的页面，而二维码已经递出去了。
+  //   2. 不在前端算 digest / manifest。签认的法律含义来自服务端冻结的那份清单，
+  //      前端算一遍只会得到「和证据不是同一个值」的第二个数字。
+  //   3. 409「此阶段已签认」这类后端错误原样透出后端 error 文案，前端不另编话术。
+  //      编一套的结果是员工拿着前端文案去问后端，两边说的不是一回事。
+  SIGNOFF_REVOKE_NOTE_MIN: 2,   // 契约 REVOKE_NOTE_MIN：撤回原因至少 2 字
+  SIGNOFF_REVOKE_NOTE_MAX: 500, // 契约 REVOKE_NOTE_LIMIT
+  signoffBusy: false,           // 生成令牌请求进行中（防重复提交）
+  signoffPanelOpen: false,      // 签认二维码面板
+  signoffKind: '',              // 'stage' | 'final'
+  signoffStageKey: '',          // kind=stage 时的阶段名；final 为空串
+  signoffSlot: 0,
+  signoffLabel: '',             // 签认范围的显示名（念给业主听的那一句）
+  signoffToken: '',
+  signoffUrl: '',               // 只用后端返回的 url，绝不前端拼
+  signoffExpires: 0,            // epoch 秒
+  signoffNow: 0,                // 每秒推进的当前时间（秒）；0 = 用真实时间
+  signoffTimer: null,           // setInterval 句柄
+  signoffQrError: '',           // 二维码绘制失败时仍保留链接（同分享卡片的既有教训）
+  signoffItems: [],             // 签认记录（含已撤回）
+  signoffLoading: false,
+  signoffError: '',
+  signoffRevokeId: '',          // 正在填撤回原因的那一条
+  signoffRevokeNote: '',
+  signoffRevokeBusy: false,
+
   // ===== 存量归类（未挂到任何地址的分享码）=====
   //
   // 【为什么需要这个东西】
@@ -174,6 +209,7 @@ window.addressFeatures = {
     this.addressDetail = null;
     this.addressFormOpen = false;
     this.addressBulkOpen = false;
+    this.resetSignoffState();
     // 统计和列表一起拉：两者不同步时，统计条会显示「3 条待归类」而列表里
     // 一条都没有，员工会以为功能坏了。并行请求，一起落库。
     await Promise.all([this.loadAddresses(), this.loadAddressOverview()]);
@@ -394,6 +430,11 @@ window.addressFeatures = {
       this.addressPendingStages = this.buildAddressPendingStages(detail.stages, detail.enabled_stages);
       this.addressDoneStages = this.addressDoneStageCount(detail.stages);
       this.addressAttachOpen = false;
+      // 签认记录属于「这个地址」，切地址时必须先清空再拉。
+      // 不清空的后果是：A 户的签认记录会短暂显示在 B 户详情里，
+      // 而两条记录长得一模一样（都是姓名+手机号+笔迹），肉眼分辨不出来。
+      this.resetSignoffState();
+      await this.loadSignoffs(addressId);
     } catch (e) { this.showToast(e.message || '地址读取失败', 'error', 8000); }
   },
   closeAddressDetail() {
@@ -403,6 +444,23 @@ window.addressFeatures = {
     this.addressDoneStages = 0;
     this.addressAttachOpen = false;
     this.addressCardReady = false;
+    this.resetSignoffState();
+  },
+  // 关闭整个地址面板。签认面板与批量归类弹窗是地址面板之上的一层，
+  // 关掉下层却留着上层，会在下次打开地址面板时凭空冒出来。
+  closeAddressPanel() {
+    this.closeSignoffPanel();
+    this.cancelSignoffRevoke();
+    this.closeAddressBulk();
+    this.addressFormOpen = false;
+    this.addressPanel = false;
+  },
+  // Esc 逐层退出：签认面板 → 批量归类 → 地址表单 → 地址面板。
+  escapeAddressPanel() {
+    if (this.signoffPanelOpen) { this.closeSignoffPanel(); return; }
+    if (this.addressBulkOpen) { this.closeAddressBulk(); return; }
+    if (this.addressFormOpen) { this.addressFormOpen = false; return; }
+    this.closeAddressPanel();
   },
   async refreshAddressDetail() {
     if (!this.addressDetail) return;
@@ -699,5 +757,238 @@ window.addressFeatures = {
       catch (e2) { this.showToast('复制失败，请手动复制：' + text, 'error', 8000); }
       ta.remove();
     }
+  },
+
+  // ===== 客户签认：入口（生成一次性令牌）=====
+  //
+  // 契约 A1：POST /api/share/addresses/<aid>/signoff-token
+  //   body {kind:'stage'|'final', stage_key, slot}
+  //   201 → {ok, token, url, expires, kind, stage_key, slot}
+  //   403 无权限 / Origin 或 CSRF 失败；404 地址不存在或阶段未挂接；409 已签认
+  //
+  // 签认粒度是 (address_id, kind, stage_key, slot)——也就是「某阶段的某一次留档」，
+  // 不是「某个阶段」。售后保养来过两次就有两条独立签认，所以入口挂在**每一条留档**上，
+  // 而不是阶段分组头上（分组头对应的是 0..N 条留档，指不出 slot）。
+  async requestSignoffToken(kind, stageKey, slot) {
+    if (this.signoffBusy) return;                       // 防重复提交：连点两下只发一次
+    if (!this.addressDetail) { this.showToast('请先打开一个地址', 'error', 6000); return; }
+    const isFinal = kind === 'final';
+    if (!isFinal && !stageKey) { this.showToast('请先选择要签认的阶段', 'error', 6000); return; }
+    this.signoffBusy = true;
+    try {
+      // final 也把 stage_key/slot 显式带上（契约表里两者有 DEFAULT ''/0，
+      // 且规则写明 kind=final 时忽略）。少传字段的风险是后端若按「字段必须存在」
+      // 校验就直接 400，而多传两个「会被忽略」的默认值没有任何副作用。
+      const body = isFinal
+        ? { kind: 'final', stage_key: '', slot: 0 }
+        : { kind: 'stage', stage_key: stageKey, slot: Number(slot) || 0 };
+      const data = await this.accountJSON('/addresses/' + this.addressDetail.id + '/signoff-token', body);
+      this.signoffToken = data.token || '';
+      this.signoffUrl = data.url || '';                 // 只用后端的 url
+      this.signoffExpires = Number(data.expires) || 0;
+      this.signoffKind = data.kind || (isFinal ? 'final' : 'stage');
+      this.signoffStageKey = this.signoffKind === 'final' ? '' : (data.stage_key || stageKey || '');
+      this.signoffSlot = this.signoffKind === 'final' ? 0 : (data.slot === undefined ? (Number(slot) || 0) : data.slot);
+      // 范围文案优先用后端回的 label（后端与业主页同一份显示名），拿不到才本地拼。
+      this.signoffLabel = data.label || this.signoffScopeLabel(this.signoffKind, this.signoffStageKey);
+      this.signoffQrError = '';
+      this.signoffPanelOpen = true;
+      this.startSignoffTimer();
+      await this.$nextTick?.();
+      try { await this.drawSignoffQr(); }
+      catch (e) {
+        // 二维码画不出来不能把链接一起弄丢——链接是唯一能递给业主的东西，
+        // 二维码只是更方便的入口（同分享卡片的既有教训）。
+        this.signoffQrError = e.message || '二维码绘制失败，请改用下方链接';
+      }
+    } catch (e) {
+      // 409「此阶段已签认」/ 403 / 404 一律原样透出后端文案，前端不另编话术。
+      this.showToast(e.message || '签认链接生成失败', 'error', 8000);
+    } finally { this.signoffBusy = false; }
+  },
+  // 签认范围的显示名。念给业主听的那一句，必须和后端 stage_label 口径一致。
+  signoffScopeLabel(kind, stageKey) {
+    if (kind === 'final') return '整址竣工验收';
+    return this.addressStageLabel(stageKey) || stageKey || '未指定阶段';
+  },
+  // 关掉二维码面板 = 这一张令牌在界面上作废。链接与过期时间一并清掉：
+  // 留着一条已经不在屏幕上的链接，只会让下一个打开面板的人以为它还有效。
+  // 注意**不动** signoffItems——签认记录是地址的数据，不是这一张令牌的临时状态。
+  closeSignoffPanel() {
+    this.stopSignoffTimer();
+    this.signoffPanelOpen = false;
+    this.signoffQrError = '';
+    this.signoffToken = '';
+    this.signoffUrl = '';
+    this.signoffExpires = 0;
+    this.signoffNow = 0;
+  },
+  // 切地址 / 关详情时把签认相关的状态全部复位，
+  // 否则上一户的链接、倒计时、签认记录、撤回输入框会跟着到下一户。
+  resetSignoffState() {
+    this.closeSignoffPanel();
+    this.signoffBusy = false;
+    this.signoffKind = '';
+    this.signoffStageKey = '';
+    this.signoffSlot = 0;
+    this.signoffLabel = '';
+    this.signoffItems = [];
+    this.signoffLoading = false;
+    this.signoffError = '';
+    this.cancelSignoffRevoke();
+    this.signoffRevokeBusy = false;
+  },
+
+  // ===== 客户签认：倒计时（契约 TOKEN_TTL_SECONDS = 300）=====
+  //
+  // 【为什么倒计时做成「由 expires 反推」而不是「本地从 300 往下减」】
+  // 本地自减有两处会对不上：员工切后台再回来、手机息屏，定时器会被浏览器降频甚至暂停，
+  // 本地减到 120 秒时链接可能早就过期了；反过来手机时间不准也会偏。
+  // 唯一可靠的判据是后端给的 expires 绝对时间戳，本地只负责每秒重算一次显示值。
+  startSignoffTimer() {
+    this.stopSignoffTimer();
+    this.signoffNow = Math.floor(Date.now() / 1000);
+    if (typeof setInterval === 'function') this.signoffTimer = setInterval(() => this.signoffTick(), 1000);
+  },
+  stopSignoffTimer() {
+    if (this.signoffTimer && typeof clearInterval === 'function') clearInterval(this.signoffTimer);
+    this.signoffTimer = null;
+  },
+  signoffNowAt() { return this.signoffNow || Math.floor(Date.now() / 1000); },
+  signoffExpired() { return !this.signoffExpires || this.signoffNowAt() >= this.signoffExpires; },
+  signoffRemaining() {
+    if (!this.signoffExpires) return 0;
+    return Math.max(0, Math.ceil(this.signoffExpires - this.signoffNowAt()));
+  },
+  signoffCountdownText() {
+    const s = this.signoffRemaining(), p = n => String(n).padStart(2, '0');
+    return p(Math.floor(s / 60)) + ':' + p(s % 60);
+  },
+  signoffTick() {
+    this.signoffNow = Math.floor(Date.now() / 1000);
+    // 到期就停表，但**不自动关面板**：员工需要看到「链接已失效，请重新生成」
+    // 并当场点重新生成。自动关掉的话员工只会看到面板消失，以为二维码发出去了。
+    if (this.signoffExpired()) this.stopSignoffTimer();
+  },
+
+  // ===== 客户签认：二维码 =====
+  // 复用本页已有的 window.qrcode（用法同 drawAddressCard），不调任何外部二维码 API。
+  async drawSignoffQr() {
+    const canvas = document.getElementById('signoff-qr-canvas');
+    if (!canvas) return;
+    if (typeof window.qrcode !== 'function') throw new Error('二维码组件未就绪，请改用下方链接');
+    if (!this.signoffUrl) throw new Error('签认链接为空，请重新生成');
+    const W = 560, pad = 40;
+    canvas.width = W; canvas.height = W;
+    canvas.style.width = '260px'; canvas.style.height = '260px';
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, W);
+    const qr = window.qrcode(0, 'M');
+    qr.addData(this.signoffUrl); qr.make();
+    const n = qr.getModuleCount(), inner = W - pad * 2, cell = inner / n;
+    ctx.fillStyle = '#1F3D2A';
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (qr.isDark(r, c)) ctx.fillRect(pad + c * cell, pad + r * cell, cell + 0.5, cell + 0.5);
+      }
+    }
+  },
+  async copySignoffUrl() {
+    const text = this.signoffUrl;
+    if (!text) { this.showToast('签认链接为空，请重新生成', 'error', 6000); return; }
+    try { await navigator.clipboard.writeText(text); this.showToast('✅ 签认链接已复制'); }
+    catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); this.showToast('✅ 签认链接已复制'); }
+      catch (e2) { this.showToast('复制失败，请手动复制：' + text, 'error', 8000); }
+      ta.remove();
+    }
+  },
+
+  // ===== 客户签认：记录区（契约 A2）=====
+  // GET /api/share/addresses/<aid>/signoffs → {ok, items[]}，按 created 倒序，含已撤回。
+  async loadSignoffs(addressId) {
+    this.signoffLoading = true;
+    this.signoffError = '';
+    try {
+      const data = await this.accountJSON('/addresses/' + addressId + '/signoffs');
+      // 迟到的旧响应不能覆盖新地址的清单（切地址时两个请求会并发）。
+      if (!this.addressDetail || this.addressDetail.id !== addressId) return;
+      this.signoffItems = data.items || [];
+      // 撤回表单指向的那条已经不在清单里时收起表单，
+      // 免得留下一个「撤回签认：」后面什么都不写的输入框。
+      if (this.signoffRevokeId && !this.signoffItems.some(r => r.id === this.signoffRevokeId)) {
+        this.cancelSignoffRevoke();
+      }
+    } catch (e) {
+      if (!this.addressDetail || this.addressDetail.id !== addressId) return;
+      this.signoffItems = [];
+      this.signoffError = e.message || '签认记录读取失败';
+    } finally {
+      if (this.addressDetail && this.addressDetail.id === addressId) this.signoffLoading = false;
+    }
+  },
+  // 签认范围：整址竣工验收 / 阶段显示名。
+  // **后端 stage_label 优先**——它是唯一真源（整址竣工那一条后端给的是
+  // 「整址竣工验收签认」，阶段给的是 stages.display()）。本地显示名只在后端没给时兜底，
+  // 否则会出现「列表里叫一个名字、二维码面板里叫另一个名字」。
+  signoffRangeLabel(row) {
+    if (!row) return '';
+    if (row.stage_label) return row.stage_label;
+    if (row.kind === 'final') return '整址竣工验收';
+    return this.addressStageLabel(row.stage_key) || row.stage_key || '未指定阶段';
+  },
+  signoffTimeText(seconds) {
+    if (!seconds) return '—';
+    const d = new Date(seconds * 1000), p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())
+      + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  },
+  // 笔迹图：同源 img，session cookie 自动带上（契约 A3 要求 require_session）。
+  signoffStrokeUrl(row) { return '/api/share/signoffs/' + row.id + '/stroke'; },
+
+  // ===== 客户签认：撤回（契约 A4）=====
+  // POST /api/share/signoffs/<sid>/revoke body {note}，note 必填 2–500 字。
+  // 下限是 2 而不是 1：撤回会作废一份业主已签的凭证，「误」「错」这种一个字
+  // 的事后毫无价值，等于没写。前端先按同一下限挡下，别让员工等一个来回。
+  openSignoffRevoke(row) {
+    this.signoffRevokeId = row.id;
+    this.signoffRevokeNote = '';
+  },
+  // 撤回表单上方那一句「撤回签认：<范围> · <签字人>」。
+  // 撤回是不可逆的留痕动作，表单必须写清楚它作用在哪一条上。
+  signoffRevokeLabel() {
+    const row = (this.signoffItems || []).find(r => r.id === this.signoffRevokeId);
+    if (!row) return '';
+    return this.signoffRangeLabel(row) + ' · ' + (row.signer_name || '');
+  },
+  cancelSignoffRevoke() { this.signoffRevokeId = ''; this.signoffRevokeNote = ''; },
+  signoffRevokeNoteLength() { return (this.signoffRevokeNote || '').length; },
+  async submitSignoffRevoke(row) {
+    if (this.signoffRevokeBusy) return;
+    const sid = (row && row.id) || this.signoffRevokeId;
+    if (!sid) return;
+    const note = (this.signoffRevokeNote || '').trim();
+    // 撤回原因是这条记录唯一的解释字段。空着提交，日后没人知道为什么撤的。
+    // 所以原因不足下限**不发请求**，直接挡下（后端也会 400，但员工不该等一个来回才知道）。
+    if (note.length < this.SIGNOFF_REVOKE_NOTE_MIN) {
+      this.showToast('请填写撤回原因（' + this.SIGNOFF_REVOKE_NOTE_MIN + '–' + this.SIGNOFF_REVOKE_NOTE_MAX + ' 字）', 'error', 6000);
+      return;
+    }
+    if (note.length > this.SIGNOFF_REVOKE_NOTE_MAX) {
+      this.showToast('撤回原因最多 ' + this.SIGNOFF_REVOKE_NOTE_MAX + ' 字，当前 ' + note.length + ' 字', 'error', 6000);
+      return;
+    }
+    this.signoffRevokeBusy = true;
+    try {
+      await this.accountJSON('/signoffs/' + sid + '/revoke', { note });
+      this.showToast('✅ 签认已撤回，可重新发起签认');
+      this.cancelSignoffRevoke();
+      if (this.addressDetail) await this.loadSignoffs(this.addressDetail.id);
+    } catch (e) {
+      // 403「非 admin 的撤回者不得是原见证员工」/ 409「已撤回」等，原样透出后端文案。
+      this.showToast(e.message || '撤回失败', 'error', 8000);
+    } finally { this.signoffRevokeBusy = false; }
   }
 };
