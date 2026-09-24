@@ -495,10 +495,16 @@ window.addressFeatures = {
 
   // ===== 详情 =====
   async openAddress(addressId) {
+    // 切户时隐蔽工程照片态必须在新 detail 落地前清空。若等到 detail 落地后才清，
+    // Alpine 会在这一轮用「新 aid + 旧照片 mid」拼出错误的 H5 图片地址，
+    // 造成串户式 404 / 泄漏帧（尤其隐蔽工程照片最容易看不出来）。
     try {
       const detail = await this.accountJSON('/addresses/' + addressId);
       detail.stages = (detail.stages || []).slice().sort((a, b) =>
         this.addressStageOrder(a.stage_key) - this.addressStageOrder(b.stage_key) || (a.slot - b.slot));
+      // 隐蔽工程照片的 URL 依赖当前 items。必须在切换 addressDetail 之前清掉旧 mid，
+      // 否则 Alpine 会用新 aid 重算旧 x-for 节点一帧，发出「新 aid + 旧照片」的错误请求。
+      this.resetHiddenState();
       this.addressDetail = detail;
       this.addressStageGroups = this.buildAddressStageGroups(detail.stages);
       this.addressPendingStages = this.buildAddressPendingStages(detail.stages, detail.enabled_stages);
@@ -509,13 +515,10 @@ window.addressFeatures = {
       this.resetDimensionState();
       for (const st of (detail.stages || [])) { this.ensureMaterialEntry(st.publication_id); this.ensureDimensionEntry(st.publication_id); }
       this.addressAttachOpen = false;
-      // 签认记录属于「这个地址」，切地址时必须先清空再拉。
-      // 不清空的后果是：A 户的签认记录会短暂显示在 B 户详情里，
-      // 而两条记录长得一模一样（都是姓名+手机号+笔迹），肉眼分辨不出来。
+      // 签认记录属于当前地址；detail 落地后再重置，避免地址详情旧模板在请求期间
+      // 读取到未初始化的关联状态。
       this.resetSignoffState();
-      // 隐蔽工程比签认更要紧：这里错的是**照片**。A 户的现场照片出现在 B 户详情里，
-      // 员工不会察觉、业主更不会——而照片看起来都像「我家的工地」。
-      this.resetHiddenState();
+      // 隐蔽工程状态已在请求前清空；这里再清其它地址级数据。
       this.resetRemediationState();
       this.resetDimensionState();
       await Promise.all([this.loadSignoffs(addressId), this.loadHiddenAcceptance(addressId), this.loadRemediationDue()]);
@@ -1175,6 +1178,12 @@ window.addressFeatures = {
   hiddenPhotoUrl(mid) {
     const aid = this.addressDetail && this.addressDetail.id;
     if (!aid || !mid) return '';
+    // Alpine 在切地址时可能先重算旧的 x-for 节点，再执行节点删除。
+    // 只有当前 H1 返回的照片 id 才能拼公开地址；这样即使旧节点多活一帧，
+    // 也不会出现「新 aid + 旧户 mid」的错误请求，更不会把旧照片串给新户。
+    const belongsToCurrentItems = (this.hiddenItems || []).some((item) =>
+      Array.isArray(item.photos) && item.photos.includes(mid));
+    if (!belongsToCurrentItems) return '';
     return '/api/share/address/' + aid + '/hidden-media/' + mid;
   },
   hiddenPhotoCount(item) { return (item && item.photos ? item.photos : []).length; },

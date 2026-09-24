@@ -607,10 +607,13 @@ test('H4：删照片走 DELETE（不是 POST），并带上 CSRF 头', async () 
 
 test('H5：照片展示走公开路由（单数 address），不是鉴权路由', () => {
   const app = readyApp(async () => okJson({ ok: true }));
-  assert.equal(app.hiddenPhotoUrl('m'.repeat(32)),
+  const mid = 'm'.repeat(32);
+  app.hiddenItems[0].photos = [mid];
+  assert.equal(app.hiddenPhotoUrl(mid),
     '/api/share/address/addr1/hidden-media/' + 'm'.repeat(32),
     '契约 H5 的路径是单数 address（业主侧公开路由），不能写成 addresses');
   assert.equal(app.hiddenPhotoUrl(''), '');
+  assert.equal(app.hiddenPhotoUrl('z'.repeat(32)), '', '不属于当前 H1 items 的 mid 不能拼地址');
 });
 
 // =====================================================================
