@@ -12,4 +12,13 @@ jobs:
           node-version: '24'
       - run: npm ci
       - run: npm test
+      # 本机通常全绿、CI 偶红时，日志下载需要认证，排障很慢。把失败详情写进
+      # job summary（run 页面公开可读），不用下载日志也能看到是哪条挂了。
+      - name: 输出测试失败详情
+        if: failure()
+        run: |
+          echo '### npm test 失败详情' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          npm test 2>&1 | grep -vE '^\s*✔' | tail -60 >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
       - run: npm run build
