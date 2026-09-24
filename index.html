@@ -895,6 +895,92 @@
       .signoff-side { flex-direction: row; align-items: center; margin-left: auto; }
     }
 
+    /* ========== 隐蔽工程验收（hiddenwork v1，员工侧）==========
+       同上：样式一律显式写死，不依赖 vendor/app.css 预构建产物。
+       这一屏是**证据**：照片缩略图要够大，员工能看清「拍的是不是这一项」；
+       而「会展示给业主」这行字必须和输入框挨着——员工得在打字之前就知道
+       自己写的东西业主看得到，而不是事后从文档里才知道。 */
+    .hidden-summary {
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px;
+      padding: 8px 12px; border-radius: 8px;
+      background: #f8fafc; border: 1px solid #e2e8f0;
+    }
+    .hidden-summary-text { font-size: 13px; font-weight: 600; color: #1F3D2A; }
+    .hidden-summary-sub { font-size: 11px; color: #64748b; }
+    .hidden-item { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; }
+    .hidden-item + .hidden-item { margin-top: 8px; }
+    .hidden-item-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+    .hidden-item-name { font-size: 13px; font-weight: 600; color: #0f172a; }
+    /* hint 是写给员工看的检查要点（「预埋件的规格、位置、数量」）。
+       契约 errata HW-5：公开投影**不含** hint，所以这里显示它不会外泄。 */
+    .hidden-item-hint { font-size: 11px; color: #94a3b8; }
+    .hidden-item-state {
+      margin-left: auto; padding: 1px 6px; border-radius: 99px;
+      background: #e2e8f0; color: #475569; font-size: 10px; font-weight: 600;
+    }
+    .hidden-field { display: block; margin-top: 8px; }
+    .hidden-field-label { display: block; font-size: 11px; color: #475569; }
+    .hidden-select, .hidden-input, .hidden-textarea {
+      width: 100%; margin-top: 4px; padding: 6px 8px;
+      border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; background: #fff;
+    }
+    /* 同 signoff 那段：这里刻意不声明 textarea 的可拖拽缩放属性，
+       免得那个属性名被 --content 当成工具类名写进 vendor/app.css。 */
+    .hidden-textarea { overflow: auto; }
+    /* 「会展示给业主」/「不公开」两个标记。它们不是装饰：
+       每项说明与不适用理由会进公开投影，整单备注不会。员工必须一眼分得清。 */
+    .hidden-public-tag {
+      display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 99px;
+      font-size: 10px; font-weight: 600;
+      background: rgba(184, 146, 74, 0.16);
+      border: 1px solid rgba(184, 146, 74, 0.5); color: #8E6B2E;
+    }
+    .hidden-private-tag {
+      display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 99px;
+      font-size: 10px; font-weight: 600;
+      background: #f1f5f9; border: 1px solid #e2e8f0; color: #64748b;
+    }
+    .hidden-photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+    .hidden-photo { position: relative; }
+    .hidden-photo img {
+      width: 88px; height: 66px; object-fit: cover; cursor: pointer;
+      border: 1px solid #e2e8f0; border-radius: 6px; background: #fff;
+    }
+    .hidden-photo-del {
+      position: absolute; top: -6px; right: -6px; width: 20px; height: 20px;
+      padding: 0; border-radius: 99px; line-height: 1; font-size: 12px;
+      cursor: pointer; background: #dc2626; color: #fff; border: 2px solid #fff;
+    }
+    .hidden-photo-del:disabled { opacity: 0.5; cursor: default; }
+    .hidden-photo-add {
+      display: flex; align-items: center; justify-content: center;
+      width: 88px; height: 66px; border-radius: 6px; cursor: pointer;
+      border: 1px dashed #cbd5e1; background: #f8fafc; color: #64748b; font-size: 11px;
+      text-align: center;
+    }
+    .hidden-photo-meta { margin-top: 4px; font-size: 10px; color: #94a3b8; }
+    .hidden-actions {
+      display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px;
+    }
+    .hidden-actions .hidden-field { flex: 1; min-width: 150px; margin-top: 0; }
+    /* 照片放大核对。隐蔽部位封板后拍不到第二次，员工必须能看清传的是哪一张。 */
+    .hidden-lightbox {
+      position: fixed; inset: 0; z-index: 70; padding: 1rem;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .hidden-lightbox img {
+      max-width: 92vw; max-height: 88vh; border-radius: 8px; background: #fff;
+    }
+    .hidden-lightbox-close {
+      position: absolute; top: 10px; right: 16px; padding: 0;
+      font-size: 28px; line-height: 1; cursor: pointer;
+      background: transparent; color: #fff; border: 0;
+    }
+    @media screen and (max-width: 767px) {
+      .hidden-actions .hidden-field { min-width: 100%; }
+    }
+
     @media screen and (max-width: 767px) {
       #report-content:not(.pdf-exporting) { padding: 12px; }
       .pdf-cover-band { padding: 18px 14px; gap: 12px; }
@@ -1697,6 +1783,200 @@
               </p>
             </div>
 
+            <!-- ===== 隐蔽工程验收（hiddenwork v1）=====
+                 GB 50210-2018《建筑装饰装修工程质量验收标准》6.1.4 强制三项隐蔽工程验收：
+                 预埋件和锚固件 / 隐蔽部位的防腐和填嵌处理 / 高层金属窗防雷连接节点。
+                 隐蔽部位**封板之后就拍不到了**，所以每一项只要有结论就必须有照片——
+                 那是事后争议里唯一的证据，没有照片的「已验收」等于没有记录。
+
+                 三项的 key/label/hint 一律由后端 H1 返回，前端不抄第二份：抄一份的结果是
+                 后端改了名、界面还印着旧名，而员工正拿着它对标准原文。
+                 公开面（业主扫码看得到）：三项结论 + 验收时间 + 照片 + 每项说明 + 不适用理由。
+                 不公开：验收人姓名、用户 id、整单备注。所以下面每个输入框都标了
+                 「会展示给业主」或「不公开」——员工得在打字之前就知道谁会看到。
+
+                 产品文案只说「已保存 / 已验收」，不要写任何超出这句话的效力承诺。 -->
+            <div class="border rounded-lg">
+              <div class="addr-stage-head">
+                <span>隐蔽工程验收</span>
+                <span x-show="!!hiddenAcceptance" class="addr-times-badge">已保存</span>
+                <!-- 按钮文案必须带「验收」：同页下方「客户签认记录」区也有一个「刷新」，
+                     两个同名按钮会让读屏软件与「按标签找按钮」的自动化（Playwright 严格模式）
+                     同时踩坑。语义也更准——刷的是验收记录，不是整张地址页。 -->
+                <button @click="loadHiddenAcceptance(addressDetail.id)" class="addr-group-add">刷新验收</button>
+              </div>
+              <div class="p-3 space-y-3">
+                <!-- 三态：loading / error / 表单，各有明确文案，不留白屏。
+                     注意 error 那一行的 `!!`：**x-show 的表达式必须稳定返回布尔值**。
+                     与签认区同一个坑——Alpine 内部用 `p === l` 判断「值有没有变」，
+                     表达式在 string/boolean 之间跳变会被判成「变了两次」，
+                     对同一元素连续跑两次隐藏流程，第二次抛
+                     `TypeError: u is not a function`（vendor/alpine.min.js 内部）。
+                     本块内所有 x-show 的表达式都收敛成布尔值。 -->
+                <p x-show="hiddenLoading" class="text-sm text-slate-500">正在读取隐蔽工程验收记录…</p>
+                <p x-show="!hiddenLoading && !!hiddenError" class="text-sm text-red-600 leading-relaxed" x-text="hiddenError"></p>
+
+                <template x-if="!hiddenLoading && !hiddenError">
+                  <div class="space-y-3">
+                    <!-- 汇总行。还没保存过时明说「尚未填写」，并交代业主看得到什么，
+                         不留空白让员工猜。副行的文案（日期 / 验收人 / 未保存提示）
+                         由 hiddenAcceptanceLine() 统一给，模板里不拼字符串。 -->
+                    <div class="hidden-summary">
+                      <span class="hidden-summary-text" x-text="hiddenSummary()"></span>
+                      <span class="hidden-summary-sub" x-text="hiddenAcceptanceLine()"></span>
+                    </div>
+
+                    <!-- 三项由后端返回，前端不硬编码（见面板顶部注释）。 -->
+                    <template x-for="item in hiddenItems" :key="item.item_key">
+                      <div class="hidden-item">
+                        <div class="hidden-item-head">
+                          <span class="hidden-item-name" x-text="item.label"></span>
+                          <span x-show="!!item.hint" class="hidden-item-hint" x-text="item.hint"></span>
+                          <span class="hidden-item-state" x-text="hiddenResultLabel(item.result)"></span>
+                        </div>
+
+                        <!-- 结论选项**静态写死，不用 x-for**。
+                             本页已有前车之鉴（见「挂到阶段」那个 select 的注释）：
+                             x-model 在 <select> 上的初始赋值发生在 x-for 插入 <option> 之前，
+                             找不到匹配项就回落显示第一项，出现「显示合格、实际存不适用」的错位。
+                             三个结论是标准固定的枚举（契约 constants.RESULTS），静态最稳。
+                             但**文字不写第二份**：一律走 hiddenResultLabel()，真源只有
+                             address-client.js 的 HIDDEN_RESULT_LABELS 一处。
+                             （value 必须与契约 RESULTS 逐字一致，静态写死是刻意的：
+                              它是枚举不是文案，改了要连契约一起改。） -->
+                        <label class="hidden-field">
+                          <span class="hidden-field-label">验收结论</span>
+                          <select x-model="item.result" class="hidden-select">
+                            <option value="">请选择</option>
+                            <option value="pass" x-text="hiddenResultLabel('pass')"></option>
+                            <option value="fail" x-text="hiddenResultLabel('fail')"></option>
+                            <option value="na" x-text="hiddenResultLabel('na')"></option>
+                          </select>
+                        </label>
+
+                        <!-- 照片：合格 / 不合格至少 1 张。隐蔽部位封板后拍不到了，
+                             没有照片的「已验收」在事后争议里等于没有记录。
+                             「不适用」不要求照片（没做的东西拍不出照片），但也不禁止。 -->
+                        <div class="hidden-field">
+                          <span
+                            class="hidden-field-label"
+                            x-text="'照片 ' + hiddenPhotoCount(item) + ' / ' + HIDDEN_PHOTOS_PER_ITEM_MAX
+                              + ((item.result === 'pass' || item.result === 'fail') ? '（至少 1 张）' : '')"
+                          ></span>
+                          <div class="hidden-photos">
+                            <template x-for="mid in (item.photos || [])" :key="mid">
+                              <div class="hidden-photo">
+                                <img
+                                  :src="hiddenPhotoUrl(mid)"
+                                  :alt="item.label + ' 现场照片'"
+                                  loading="lazy"
+                                  @click="openHiddenPreview(mid)"
+                                >
+                                <button
+                                  class="hidden-photo-del"
+                                  @click="removeHiddenPhoto(item, mid)"
+                                  :disabled="!!hiddenPhotoBusy"
+                                  aria-label="删除这张照片"
+                                >×</button>
+                              </div>
+                            </template>
+                            <label x-show="hiddenCanAddPhoto(item)" class="hidden-photo-add">
+                              <span x-text="hiddenPhotoBusy === item.item_key ? '上传中…' : '＋ 加照片'"></span>
+                              <!-- 传完立刻清空 input.value：不清的话同一张图第二次选不触发 change。
+                                   照片压缩沿用本页既有的 compressDataUrl（长边 1280 / JPEG 0.78），
+                                   后端还会再规范化一次（剥 EXIF/GPS、缩到 1920）——那是证据链要求，
+                                   隐蔽工程照片常带定位信息，不能原样外发。 -->
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                class="hidden"
+                                @change="uploadHiddenPhoto(item, $event.target.files[0]); $event.target.value = ''"
+                              >
+                            </label>
+                          </div>
+                          <p
+                            x-show="!hiddenCanAddPhoto(item)"
+                            class="hidden-photo-meta"
+                            x-text="'已达上限 ' + HIDDEN_PHOTOS_PER_ITEM_MAX + ' 张，删掉一张才能再传'"
+                          ></p>
+                        </div>
+
+                        <!-- 不适用理由：**会展示给业主**，所以标签上必须写明。
+                             「不适用」和「没做」是两件事，理由空着日后没人记得为什么不做。
+                             结论不是「不适用」时这个输入框整块收起，提交时理由会被清空
+                             （否则会生成「合格 + 不适用理由」这种自相矛盾的记录）。
+
+                             这里用 `x-if` 而**不是** `x-show`：本块在 `x-for` 里，而
+                             `loadHiddenAcceptance` 会整体替换 `hiddenItems`（切地址、保存后刷新）。
+                             「x-show 藏在 x-for 里 + 外层列表同轮被整体替换」这个组合，
+                             签认区实测会让 Alpine 3 对同一元素重复走一遍隐藏流程，第二次抛
+                             未捕获的 `TypeError: u is not a function`（vendor/alpine.min.js 内部）。
+                             x-if 直接增删节点，不碰隐藏流程。值也不会丢：x-model 只在 input
+                             事件写回，`item.na_reason` 始终留在数据里。 -->
+                        <template x-if="item.result === 'na'">
+                          <label class="hidden-field">
+                            <span class="hidden-field-label">
+                              <span x-text="'不适用理由（至少 ' + HIDDEN_NA_REASON_MIN + ' 字）'"></span>
+                              <span class="hidden-public-tag">会展示给业主</span>
+                            </span>
+                            <textarea
+                              x-model="item.na_reason"
+                              rows="2"
+                              :maxlength="HIDDEN_NA_REASON_LIMIT"
+                              class="hidden-textarea"
+                              placeholder="例：本户非高层，无此项"
+                            ></textarea>
+                          </label>
+                        </template>
+
+                        <!-- 每项说明：**会展示给业主**。 -->
+                        <label class="hidden-field">
+                          <span class="hidden-field-label">
+                            <span>说明</span>
+                            <span class="hidden-public-tag">会展示给业主</span>
+                          </span>
+                          <input
+                            x-model="item.note"
+                            :maxlength="HIDDEN_NOTE_LIMIT"
+                            class="hidden-input"
+                            placeholder="例：锚固件间距 400mm，已拍照留底"
+                          >
+                        </label>
+                      </div>
+                    </template>
+
+                    <!-- 整单备注：**不公开**，只有员工和后台看得到。 -->
+                    <label class="hidden-field">
+                      <span class="hidden-field-label">
+                        <span>整单备注</span>
+                        <span class="hidden-private-tag">不公开</span>
+                      </span>
+                      <input
+                        x-model="hiddenNote"
+                        :maxlength="HIDDEN_NOTE_LIMIT"
+                        class="hidden-input"
+                        placeholder="例：验收当天业主在场，照片由现场负责人拍摄"
+                      >
+                    </label>
+
+                    <div class="hidden-actions">
+                      <label class="hidden-field">
+                        <span class="hidden-field-label">验收日期</span>
+                        <input type="date" x-model="hiddenAcceptedAt" class="hidden-input">
+                      </label>
+                      <button
+                        @click="saveHiddenAcceptance()"
+                        :disabled="hiddenBusy"
+                        class="px-4 py-2 text-sm rounded-lg shrink-0 bg-[#1F3D2A] text-white hover:opacity-90 disabled:opacity-50"
+                        x-text="hiddenBusy ? '保存中…' : '保存验收记录'"
+                      ></button>
+                    </div>
+                    <p class="text-xs text-slate-500 leading-relaxed">三项必须全部有结论才能保存。合格 / 不合格的每一项至少 1 张照片；标「不适用」的必须写明理由。业主扫码能看到三项结论、验收时间与照片，看不到验收人姓名。</p>
+                  </div>
+                </template>
+              </div>
+            </div>
+
             <!-- ===== 客户签认（signoff v1）=====
                  现场负责人把手机递给业主，业主手写签名确认该阶段档案。
                  员工侧只负责「发令牌 → 递手机 → 事后查看/撤回」。
@@ -1815,6 +2095,20 @@
                 :disabled="signoffBusy"
                 class="px-3 py-1.5 text-xs rounded shrink-0 bg-[#B8924A] text-white hover:opacity-90 disabled:opacity-50"
               >整址竣工验收签认</button>
+            </div>
+
+            <!-- 隐蔽工程照片放大核对。隐蔽部位封板后拍不到第二次，
+                 员工必须能看清自己传的是哪一张，再决定留还是删。
+                 放在地址详情模板内部：详情一关（addressDetail=null）整块消失，
+                 不会留一张悬空的浮层。z-index 高于地址面板的 z-50。 -->
+            <div
+              x-show="!!hiddenPreview"
+              x-cloak
+              class="hidden-lightbox no-print"
+              @click.self="closeHiddenPreview()"
+            >
+              <button class="hidden-lightbox-close" @click="closeHiddenPreview()" aria-label="关闭照片预览">×</button>
+              <img :src="hiddenPhotoUrl(hiddenPreview)" alt="隐蔽工程现场照片放大查看">
             </div>
           </div>
         </template>

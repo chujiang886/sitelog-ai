@@ -89,6 +89,47 @@ window.addressFeatures = {
   signoffRevokeNote: '',
   signoffRevokeBusy: false,
 
+  // ===== 隐蔽工程验收（contract hiddenwork v1，员工侧）=====
+  //
+  // 【这套东西解决什么】
+  // GB 50210-2018 6.1.4 强制三项隐蔽工程验收：预埋件和锚固件 / 隐蔽部位的防腐和填嵌处理 /
+  // 高层金属窗防雷连接节点。隐蔽部位**封板之后就拍不到了**，所以每一项有结论就必须有照片——
+  // 那是事后争议里唯一的证据。三项必须**全部**有结论才能保存：标准强制三项，缺一项就不算「已验收」。
+  //
+  // 【三条不能越界的线】
+  //   1. 三项的 key / label / hint **一律由后端 H1 返回**，前端不抄第二份。
+  //      抄一份的结果是后端改了名、界面还印着旧名字，而员工正拿着它去对标准原文。
+  //   2. 会展示给业主的字段（每项说明 `note`、不适用理由 `na_reason`）在界面上必须写明，
+  //      员工得知道自己写的东西业主看得到。整单备注 `note` 不公开，也要标明。
+  //   3. 409 **不静默重试**。静默重试会把对方刚存的那一版覆盖掉，而两边都以为自己的生效了。
+  //
+  // 【为什么不做业主签认】
+  // 隐蔽工程封板前业主常不在场，硬要签认只会变成现场补签、流于形式。
+  // 业主的确认动作统一留到整址竣工（P5 已有一次性令牌签认）。
+  HIDDEN_RESULT_LABELS: { pass: '合格', fail: '不合格', na: '不适用' },
+  // 三项的 key。**这不是真源**——真源是后端 `hidden_work.ITEMS`（契约 constants.ITEMS）。
+  // 它只干一件事：后端返回的项目形状不对时（少一项 / 多项）当场报错，而不是静默渲染半张表、
+  // 让员工存下一份「不完整」的记录。一致性由 test-hidden-client.cjs 的 SITELOG_BACKEND 守卫钉住。
+  HIDDEN_ITEM_KEYS: ['embedded_parts', 'anti_corrosion', 'lightning_bond'],
+  HIDDEN_NA_REASON_MIN: 2,        // 契约 NA_REASON_MIN：「不适用」和「没做」必须能区分
+  HIDDEN_NA_REASON_LIMIT: 200,    // 契约 NA_REASON_LIMIT
+  HIDDEN_NOTE_LIMIT: 200,         // 契约 NOTE_LIMIT（整单备注与每项说明同上限）
+  HIDDEN_PHOTOS_PER_ITEM_MAX: 8,  // 契约 PHOTOS_PER_ITEM_MAX
+  // 契约 PHOTO_DATA_URL_CEILING（= media_store.PHOTO_MAX_BYTES 10MB base64 放大 4/3 再留余量）。
+  // 超了后端会 413，先拦下来省一次白传。
+  HIDDEN_PHOTO_DATA_URL_CEILING: 15029588,
+
+  hiddenLoading: false,
+  hiddenError: '',
+  hiddenItems: [],          // 后端返回的三项：label/hint/result/na_reason/note/photos 全部来自后端
+  hiddenAcceptance: null,   // null = 尚未填写
+  hiddenRevision: 0,        // 乐观并发：新建传 0
+  hiddenAcceptedAt: '',     // <input type="date"> 的值（'YYYY-MM-DD'，提交时转 epoch 秒）
+  hiddenNote: '',           // 整单备注，**不公开**
+  hiddenBusy: false,        // 整单保存中（防重复提交）
+  hiddenPhotoBusy: '',      // 正在传/删照片的 item_key（同一时刻只允许一张）
+  hiddenPreview: '',        // 正在放大查看的照片 mid（照片证据要能放大核对）
+
   // ===== 存量归类（未挂到任何地址的分享码）=====
   //
   // 【为什么需要这个东西】
@@ -210,6 +251,9 @@ window.addressFeatures = {
     this.addressFormOpen = false;
     this.addressBulkOpen = false;
     this.resetSignoffState();
+    // 面板重开时详情已被置空，隐蔽工程状态也要一起清掉：
+    // 留着上一户的三项结论和照片 id，重开面板会先闪一屏旧数据。
+    this.resetHiddenState();
     // 统计和列表一起拉：两者不同步时，统计条会显示「3 条待归类」而列表里
     // 一条都没有，员工会以为功能坏了。并行请求，一起落库。
     await Promise.all([this.loadAddresses(), this.loadAddressOverview()]);
@@ -434,7 +478,10 @@ window.addressFeatures = {
       // 不清空的后果是：A 户的签认记录会短暂显示在 B 户详情里，
       // 而两条记录长得一模一样（都是姓名+手机号+笔迹），肉眼分辨不出来。
       this.resetSignoffState();
-      await this.loadSignoffs(addressId);
+      // 隐蔽工程比签认更要紧：这里错的是**照片**。A 户的现场照片出现在 B 户详情里，
+      // 员工不会察觉、业主更不会——而照片看起来都像「我家的工地」。
+      this.resetHiddenState();
+      await Promise.all([this.loadSignoffs(addressId), this.loadHiddenAcceptance(addressId)]);
     } catch (e) { this.showToast(e.message || '地址读取失败', 'error', 8000); }
   },
   closeAddressDetail() {
@@ -445,6 +492,7 @@ window.addressFeatures = {
     this.addressAttachOpen = false;
     this.addressCardReady = false;
     this.resetSignoffState();
+    this.resetHiddenState();
   },
   // 关闭整个地址面板。签认面板与批量归类弹窗是地址面板之上的一层，
   // 关掉下层却留着上层，会在下次打开地址面板时凭空冒出来。
@@ -453,10 +501,13 @@ window.addressFeatures = {
     this.cancelSignoffRevoke();
     this.closeAddressBulk();
     this.addressFormOpen = false;
+    this.resetHiddenState();
     this.addressPanel = false;
   },
-  // Esc 逐层退出：签认面板 → 批量归类 → 地址表单 → 地址面板。
+  // Esc 逐层退出：照片放大 → 签认面板 → 批量归类 → 地址表单 → 地址面板。
   escapeAddressPanel() {
+    // 照片放大是最内层的一层浮层，先收它，否则 Esc 会连底下整块面板一起关掉。
+    if (this.hiddenPreview) { this.closeHiddenPreview(); return; }
     if (this.signoffPanelOpen) { this.closeSignoffPanel(); return; }
     if (this.addressBulkOpen) { this.closeAddressBulk(); return; }
     if (this.addressFormOpen) { this.addressFormOpen = false; return; }
@@ -990,5 +1041,303 @@ window.addressFeatures = {
       // 403「非 admin 的撤回者不得是原见证员工」/ 409「已撤回」等，原样透出后端文案。
       this.showToast(e.message || '撤回失败', 'error', 8000);
     } finally { this.signoffRevokeBusy = false; }
+  },
+
+  // ===== 隐蔽工程验收：DELETE 通道 =====
+  //
+  // 【为什么不走 accountJSON】
+  // `accountJSON(path, payload)` 只实现了两种调用形态（见 auth-client.js）：
+  // 不传 payload = GET，传 payload = POST。契约 H4 删照片是 **DELETE**，
+  // 走 accountJSON 只能发出一个 POST —— 而后端 H4 明确判了 `self.command!='DELETE'`
+  // 就 405（errata HW-3：不判的话一个 POST 就能删照片）。
+  // 所以这里直接用 sessionRequest，它同样会给非 GET 请求带上 X-CSRF-Token
+  // （H4 是 require_session(write=True)），与「删除客户 LOGO」是同一范式。
+  async accountDelete(path) {
+    const response = await this.sessionRequest(path, { method: 'DELETE' });
+    let data = {};
+    try { data = await response.json(); } catch (e) { data = {}; }
+    // 与 accountJSON 同一套错误语义：后端 error 文案原样透出，带上状态码供上层判 409/405。
+    if (!response.ok || data.ok === false) {
+      const error = new Error(data.error || '操作未完成，请重试');
+      error.status = response.status;
+      throw error;
+    }
+    return data;
+  },
+
+  // ===== 隐蔽工程验收：日期 =====
+  // <input type="date"> 用 'YYYY-MM-DD'，契约 H2 要 epoch 秒。
+  // 用**本地时区**换算：员工选「9 月 24 日」，界面上就该是 9 月 24 日。
+  // 用 Date.UTC 的话，东八区用户在晚上 8 点后选到的日期会显示成前一天。
+  hiddenDateInput(seconds) { return seconds ? this.addressStamp(seconds) : ''; },
+  hiddenDateEpoch(value) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || '').trim());
+    if (!m) return 0;
+    const at = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime();
+    // 2026-02-31 这种 JS 会静默顺延到 3 月 3 日 —— 回写一次比对，对不上就是非法日期。
+    if (this.addressStamp(Math.floor(at / 1000)) !== m[0]) return 0;
+    return Math.floor(at / 1000);
+  },
+  hiddenTodayInput() { return this.hiddenDateInput(Math.floor(Date.now() / 1000)); },
+
+  // ===== 隐蔽工程验收：展示口径 =====
+  hiddenResultLabel(result) { return this.HIDDEN_RESULT_LABELS[result] || '未填写'; },
+  // 面板顶部那一行汇总（团队给的样例：「2 项合格 · 1 项不适用」）。
+  // 口径只看当前 items 的结论；一项都没填时明说「尚未填写」，不留空白。
+  // 填了一半也要说清楚还差几项——「2 项合格」看不出第三项还没填。
+  hiddenSummary() {
+    const count = { pass: 0, fail: 0, na: 0 };
+    let blank = 0;
+    for (const item of this.hiddenItems || []) {
+      if (count[item.result] === undefined) blank++;
+      else count[item.result]++;
+    }
+    if (!count.pass && !count.fail && !count.na) return '尚未填写';
+    const parts = [];
+    if (count.pass) parts.push(count.pass + ' 项合格');
+    if (count.fail) parts.push(count.fail + ' 项不合格');
+    if (count.na) parts.push(count.na + ' 项不适用');
+    if (blank) parts.push(blank + ' 项未填');
+    return parts.join(' · ');
+  },
+  // 汇总行下面那一小行：已保存 → 「验收日期 2026-05-29 · 验收人 王工」；
+  // 还没保存 → 交代业主看得到什么（员工得知道这一屏会外发）。
+  //
+  // 【验收人姓名为什么只在员工侧显示】
+  // 契约 public_visibility 写死了：业主可见「三项结论 + 验收时间 + 照片 + 每项说明」，
+  // **不含**验收人姓名与用户 id。员工侧是登录态、本来就有该地址权限，显示它是信息不是泄漏。
+  hiddenAcceptanceLine() {
+    if (!this.hiddenAcceptance) return '保存后业主可在地址页看到三项结论、验收时间与照片';
+    const parts = ['验收日期 ' + this.hiddenAcceptedAt];
+    if (this.hiddenAcceptance.acceptor_name) parts.push('验收人 ' + this.hiddenAcceptance.acceptor_name);
+    return parts.join(' · ');
+  },
+  // 照片展示走**公开**路由（契约 H5）：单数 `address`，不是 `addresses`。
+  // 员工侧也用这一条，不再加一条鉴权路由——同一张图两个入口，迟早有一个
+  // 漏掉鉴权校验或漏掉 Cache-Control（契约要求 private, max-age=3600）。
+  hiddenPhotoUrl(mid) {
+    const aid = this.addressDetail && this.addressDetail.id;
+    if (!aid || !mid) return '';
+    return '/api/share/address/' + aid + '/hidden-media/' + mid;
+  },
+  hiddenPhotoCount(item) { return (item && item.photos ? item.photos : []).length; },
+  hiddenCanAddPhoto(item) { return this.hiddenPhotoCount(item) < this.HIDDEN_PHOTOS_PER_ITEM_MAX; },
+  openHiddenPreview(mid) { this.hiddenPreview = mid || ''; },
+  closeHiddenPreview() { this.hiddenPreview = ''; },
+
+  // ===== 隐蔽工程验收：读取（契约 H1）=====
+  //
+  // GET /api/share/addresses/<aid>/hidden-acceptance
+  //   → {ok, items:[{item_key,label,hint,result,na_reason,note,photos:[mid]}], acceptance:null|{...}}
+  //
+  // 【为什么三项必须由后端给】
+  // 三项是 GB 50210-2018 6.1.4 的强制项，名字必须能一一对上标准原文。前端再抄一份的结果是：
+  // 后端改了名，界面上还印着旧名字，而员工正拿着它去对标准。所以这里只渲染后端返回的 items。
+  async loadHiddenAcceptance(addressId) {
+    this.hiddenLoading = true;
+    this.hiddenError = '';
+    try {
+      const data = await this.accountJSON('/addresses/' + addressId + '/hidden-acceptance');
+      // 迟到的旧响应不能覆盖新地址（切地址时两个请求会并发）。
+      if (!this.addressDetail || this.addressDetail.id !== addressId) return;
+      const items = Array.isArray(data.items) ? data.items : [];
+      if (items.map((i) => i && i.item_key).sort().join(',') !== this.HIDDEN_ITEM_KEYS.slice().sort().join(',')) {
+        // 少一项就渲染少一行，员工会在不知情的情况下存下一份「不完整」的记录。
+        // 与其静默渲染半张表，不如当场说清楚（这是形状兜底，不是真源）。
+        this.hiddenItems = [];
+        this.hiddenError = '隐蔽工程验收项目与标准不符（后端返回 ' + items.length + ' 项），请联系管理员';
+        return;
+      }
+      // 归一化：契约里「未填写」的 result 是 null，但 <select> 的 x-model 拿 null 会
+      // 找不到匹配项（`select.value = null` 被强制成字符串 "null"），显示成空白选项。
+      // 统一成 '' 后，`<option value="">请选择</option>` 能正常选中，校验里的 `!i.result`
+      // 语义也不变。na_reason / note / photos 同理兜底，模板里就不用到处写 `|| ''`。
+      this.hiddenItems = items.map((i) => ({
+        item_key: i.item_key,
+        label: i.label,
+        hint: i.hint || '',
+        result: i.result || '',
+        na_reason: i.na_reason || '',
+        note: i.note || '',
+        photos: Array.isArray(i.photos) ? i.photos.slice() : [],
+      }));
+      this.hiddenAcceptance = data.acceptance || null;
+      this.hiddenRevision = this.hiddenAcceptance ? (Number(this.hiddenAcceptance.revision) || 0) : 0;
+      // 已保存的用记录里的验收日；还没有记录时默认今天——绝大多数验收就是当天填的。
+      this.hiddenAcceptedAt = this.hiddenAcceptance && this.hiddenAcceptance.accepted_at
+        ? this.hiddenDateInput(this.hiddenAcceptance.accepted_at)
+        : this.hiddenTodayInput();
+      this.hiddenNote = (this.hiddenAcceptance && this.hiddenAcceptance.note) || '';
+    } catch (e) {
+      if (!this.addressDetail || this.addressDetail.id !== addressId) return;
+      this.hiddenItems = [];
+      this.hiddenAcceptance = null;
+      this.hiddenError = e.message || '隐蔽工程验收读取失败';
+    } finally {
+      if (this.addressDetail && this.addressDetail.id === addressId) this.hiddenLoading = false;
+    }
+  },
+
+  // ===== 隐蔽工程验收：保存前的校验 =====
+  //
+  // 【为什么前端要再校验一遍】
+  // 后端会拒（400），但员工得白等一个来回才知道是哪一项缺照片；而且 H2 的规则是
+  // 「三项必须齐全」，在界面上直接指出缺哪一项比让后端回一句笼统的 400 有用得多。
+  //
+  // 【但这**不是**安全边界】
+  // 照片齐全性后端会在**事务内**复查：上传照片与保存是两次请求，中间可能有人把照片删了。
+  // 这里只是提前报错，真正说了算的是后端。
+  hiddenValidate() {
+    const items = this.hiddenItems || [];
+    // 项目还没加载出来（形状兜底报错、或刚进详情）时别放行，也别给出
+    // 「缺少：（空）」。这一句是兜底，正常情况下 loadHiddenAcceptance 已经拦在前面。
+    if (!items.length) return '隐蔽工程验收项目尚未加载，请点「刷新」重试';
+    const missing = items.filter((i) => !i.result).map((i) => i.label);
+    if (missing.length) return '请填写全部三项验收结论，缺少：' + missing.join('、');
+    for (const item of items) {
+      if (item.result === 'pass' || item.result === 'fail') {
+        // 隐蔽部位封板后拍不到了。没有照片的「已验收」在事后争议里等于没有记录。
+        if (!this.hiddenPhotoCount(item)) return '请为「' + item.label + '」至少上传 1 张照片';
+      } else if (item.result === 'na') {
+        // 「不适用」和「没做」是两件事：理由空着的话，日后没人记得为什么不该做这一项。
+        if ((item.na_reason || '').trim().length < this.HIDDEN_NA_REASON_MIN) {
+          return '请写明「' + item.label + '」不适用的理由（至少 ' + this.HIDDEN_NA_REASON_MIN + ' 字）';
+        }
+      }
+      if (this.hiddenPhotoCount(item) > this.HIDDEN_PHOTOS_PER_ITEM_MAX) {
+        return '「' + item.label + '」最多上传 ' + this.HIDDEN_PHOTOS_PER_ITEM_MAX + ' 张照片';
+      }
+      if ((item.note || '').length > this.HIDDEN_NOTE_LIMIT) {
+        return '「' + item.label + '」说明不能超过 ' + this.HIDDEN_NOTE_LIMIT + ' 字';
+      }
+      if ((item.na_reason || '').length > this.HIDDEN_NA_REASON_LIMIT) {
+        return '「' + item.label + '」不适用理由不能超过 ' + this.HIDDEN_NA_REASON_LIMIT + ' 字';
+      }
+    }
+    if ((this.hiddenNote || '').length > this.HIDDEN_NOTE_LIMIT) {
+      return '整单备注不能超过 ' + this.HIDDEN_NOTE_LIMIT + ' 字';
+    }
+    if (!this.hiddenDateEpoch(this.hiddenAcceptedAt)) return '请选择验收日期';
+    return '';
+  },
+  hiddenPayload() {
+    return {
+      revision: this.hiddenRevision,
+      accepted_at: this.hiddenDateEpoch(this.hiddenAcceptedAt),
+      note: (this.hiddenNote || '').trim(),
+      items: (this.hiddenItems || []).map((item) => ({
+        item_key: item.item_key,
+        result: item.result,
+        // 结论不是「不适用」时理由必须清空：留着它会生成「合格 + 不适用理由：本户非高层」
+        // 这种自相矛盾的记录。后端也会清，但前端留着的话员工在提交前看到的就是那份矛盾状态。
+        na_reason: item.result === 'na' ? (item.na_reason || '').trim() : '',
+        note: (item.note || '').trim(),
+      })),
+    };
+  },
+
+  // ===== 隐蔽工程验收：整单保存（契约 H2，POST 不是 PUT）=====
+  //
+  // 【为什么是 POST】
+  // 契约 errata HW-1：两个部署入口都没有 PUT（Flask 405 / stdlib 501），
+  // 且请求体上限链只实现了一份。为 PUT 再抄一份就是 client-logos 那次
+  // 「两处限制必须一起改」的翻版。语义不变，仍是整单保存 + revision 乐观并发。
+  async saveHiddenAcceptance() {
+    if (this.hiddenBusy) return;                       // 防重复提交：连点两下只发一次
+    if (!this.addressDetail) { this.showToast('请先打开一个地址', 'error', 6000); return; }
+    const problem = this.hiddenValidate();
+    if (problem) { this.showToast(problem, 'error', 8000); return; }
+    this.hiddenBusy = true;
+    const aid = this.addressDetail.id;
+    try {
+      const data = await this.accountJSON('/addresses/' + aid + '/hidden-acceptance', this.hiddenPayload());
+      this.hiddenRevision = Number(data.revision) || this.hiddenRevision;
+      this.showToast('✅ 隐蔽工程验收已保存');
+      await this.loadHiddenAcceptance(aid);
+    } catch (e) {
+      if (e.status === 409) {
+        // 【不静默重试】静默重试会把对方刚存的那一版用我这一份覆盖掉，
+        // 而两边都以为自己的版本生效了。刷新 + 明确告知，让员工自己核对。
+        await this.loadHiddenAcceptance(aid);
+        this.showToast('记录已被其他设备更新，已刷新，请核对后重新保存', 'error', 9000);
+      } else {
+        this.showToast(e.message || '隐蔽工程验收保存失败', 'error', 8000);
+      }
+    } finally { this.hiddenBusy = false; }
+  },
+
+  // ===== 隐蔽工程验收：照片（契约 H3 上传 / H4 删除 / H5 展示）=====
+  //
+  // 【为什么上传前要压】
+  // 契约 PHOTO_MAX_BYTES 是 10MB，而 base64 会放大 4/3。现场手机原图动辄 4–8MB，
+  // 先压到长边 1280 / JPEG 0.78（沿用本页既有的 compressDataUrl）后通常只有几百 KB：
+  // 员工少等、后端少存。后端还会再规范化一次（剥 EXIF/GPS、缩到 1920、重编码 JPEG），
+  // 那是**证据链**要求（隐蔽工程照片常带定位信息，不能原样外发），不是重复劳动。
+  async uploadHiddenPhoto(item, file) {
+    if (!file || !item) return;
+    if (this.hiddenPhotoBusy) return;                  // 同一时刻只允许一张，避免交错覆盖
+    if (!this.addressDetail) { this.showToast('请先打开一个地址', 'error', 6000); return; }
+    if (!this.hiddenCanAddPhoto(item)) {
+      this.showToast('「' + item.label + '」最多上传 ' + this.HIDDEN_PHOTOS_PER_ITEM_MAX + ' 张照片', 'error', 6000);
+      return;
+    }
+    this.hiddenPhotoBusy = item.item_key;
+    const aid = this.addressDetail.id;
+    try {
+      const dataUrl = await this.compressDataUrl(await this.fileToDataUrl(file));
+      if (!/^data:image\/(png|jpeg|webp);base64,/.test(String(dataUrl || ''))) {
+        throw new Error('这个文件不是支持的图片格式（PNG / JPG / WebP）');
+      }
+      if (dataUrl.length > this.HIDDEN_PHOTO_DATA_URL_CEILING) {
+        throw new Error('这张照片太大，请换一张或先压缩后再上传');
+      }
+      const data = await this.accountJSON('/addresses/' + aid + '/hidden-media', {
+        item_key: item.item_key, dataUrl, filename: (file.name || ''),
+      });
+      if (this.addressDetail && this.addressDetail.id === aid) {
+        // 只把新 id 追加到本地列表，不重新拉整单：上传与保存是两条路径，
+        // 重新拉会把员工正在填的结论/说明一起覆盖掉。
+        if (!item.photos) item.photos = [];
+        if (data.id && !item.photos.includes(data.id)) item.photos.push(data.id);
+      }
+      this.showToast(data.duplicate ? '这张照片已经传过了，不用重复上传' : '✅ 照片已上传');
+    } catch (e) {
+      this.showToast(e.message || '照片上传失败', 'error', 8000);
+    } finally { this.hiddenPhotoBusy = ''; }
+  },
+  async removeHiddenPhoto(item, mid) {
+    if (!item || !mid) return;
+    if (this.hiddenPhotoBusy) return;
+    if (!this.addressDetail) return;
+    this.hiddenPhotoBusy = item.item_key;
+    const aid = this.addressDetail.id;
+    try {
+      await this.accountDelete('/addresses/' + aid + '/hidden-media/' + mid);
+      if (this.addressDetail && this.addressDetail.id === aid && item.photos) {
+        item.photos = item.photos.filter((x) => x !== mid);
+      }
+      if (this.hiddenPreview === mid) this.hiddenPreview = '';
+      this.showToast('照片已删除');
+    } catch (e) {
+      this.showToast(e.message || '照片删除失败', 'error', 8000);
+    } finally { this.hiddenPhotoBusy = ''; }
+  },
+
+  // 切地址 / 关详情时把隐蔽工程状态全部复位。
+  //
+  // 【为什么比签认那边更要紧】
+  // 签认记录错了是几行文字；隐蔽工程错了是**照片**，而照片比文字更容易让人
+  // 以为「这是我家」。A 户的照片出现在 B 户详情里，员工不会察觉，业主更不会。
+  resetHiddenState() {
+    this.hiddenLoading = false;
+    this.hiddenError = '';
+    this.hiddenItems = [];
+    this.hiddenAcceptance = null;
+    this.hiddenRevision = 0;
+    this.hiddenAcceptedAt = '';
+    this.hiddenNote = '';
+    this.hiddenBusy = false;
+    this.hiddenPhotoBusy = '';
+    this.hiddenPreview = '';
   }
 };
