@@ -119,6 +119,30 @@ window.addressFeatures = {
   // 超了后端会 413，先拦下来省一次白传。
   HIDDEN_PHOTO_DATA_URL_CEILING: 15029588,
 
+  // ===== 材料与性能证明附件（contract materials v1，员工侧 per-publication）=====
+  //
+  // 【这套东西解决什么】
+  // GB 50210-2018 3.2 / 6.1.2：门窗工程验收要检查「材料的产品合格证书、性能检测报告、
+  // 进场验收记录」。这些文件是**交付给这一户业主**的那一份，挂在每一条留档（publication）
+  // 上，业主在该留档的文档视图里能看到并下载。与隐蔽工程照片同一归属口径：只认 publication_id。
+  //
+  // 【三条不能越界的线（契约 redlines）】
+  //   1. KINDS / MIME / 上限严格对齐契约 materials.v1.json，前端不另写一份
+  //      （test-materials-client.cjs 的跨仓库守卫会比对后端字面量）。
+  //   2. 材料名称（title）会随留档展示给业主——界面要写明，员工得知道自己在填公开内容。
+  //   3. PDF **原样**存储：上传前不压缩（compressDataUrl 会把 PNG 透明底压成黑块、把 PDF 重编码
+  //      损坏），直接把 FileReader 读出来的 data URL 发给后端。
+  MATERIAL_KINDS: ['合格证', '检测报告', '使用说明书', '质保卡', '其它'],            // 契约 constants.KINDS
+  MATERIAL_MIME_ALLOWED: ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'], // 契约 constants.MIME_ALLOWED
+  MATERIAL_TITLE_LIMIT: 60,        // 契约 constants.TITLE_LIMIT
+  MATERIAL_FILENAME_LIMIT: 160,    // 契约 constants.FILENAME_LIMIT
+  MATERIAL_BODY_LIMIT: 26214400,   // 契约 constants.MATERIAL_BODY_LIMIT（25MB）
+  // 与后端 materials.MATERIAL_DATA_URL_CEILING 同一公式（base64 放大 4/3 再留 2MB 余量）：
+  // MATERIAL_BODY_LIMIT // 3 * 4 + 2*1024*1024 = 37049684。超过后端会 413，先拦省一次白传。
+  MATERIAL_DATA_URL_CEILING: 37049684,
+
+  addressMaterials: {},            // { [publication_id]: {items, loading, error, removing, draft} }
+
   hiddenLoading: false,
   hiddenError: '',
   hiddenItems: [],          // 后端返回的三项：label/hint/result/na_reason/note/photos 全部来自后端
@@ -473,6 +497,10 @@ window.addressFeatures = {
       this.addressStageGroups = this.buildAddressStageGroups(detail.stages);
       this.addressPendingStages = this.buildAddressPendingStages(detail.stages, detail.enabled_stages);
       this.addressDoneStages = this.addressDoneStageCount(detail.stages);
+      // 材料与性能证明是 per-publication 的缓存，切地址必须清空再按当前留档重建，
+      // 否则上一户某条留档的材料会串到这一户同名留档上（与隐蔽工程照片同一条教训）。
+      this.resetMaterialsState();
+      for (const st of (detail.stages || [])) this.ensureMaterialEntry(st.publication_id);
       this.addressAttachOpen = false;
       // 签认记录属于「这个地址」，切地址时必须先清空再拉。
       // 不清空的后果是：A 户的签认记录会短暂显示在 B 户详情里，
@@ -493,6 +521,7 @@ window.addressFeatures = {
     this.addressCardReady = false;
     this.resetSignoffState();
     this.resetHiddenState();
+    this.resetMaterialsState();
   },
   // 关闭整个地址面板。签认面板与批量归类弹窗是地址面板之上的一层，
   // 关掉下层却留着上层，会在下次打开地址面板时凭空冒出来。
@@ -1336,6 +1365,122 @@ window.addressFeatures = {
     } catch (e) {
       this.showToast(e.message || '照片删除失败', 'error', 8000);
     } finally { this.hiddenPhotoBusy = ''; }
+  },
+
+  // ===== 材料与性能证明附件：per-publication 缓存与瞬态 =====
+  // 每条留档（publication_id）一份缓存；draft 是该条的上传表单瞬态。
+  ensureMaterialEntry(pid) {
+    if (!pid) return;
+    if (!this.addressMaterials[pid]) {
+      this.addressMaterials[pid] = {
+        items: [], loading: false, error: '', removing: false,
+        draft: { kind: '', title: '', file: null, uploading: false },
+      };
+    }
+  },
+  resetMaterialsState() {
+    this.addressMaterials = {};
+  },
+
+  // ===== 材料与性能证明附件：读取（契约 M2）=====
+  //
+  // GET /api/share/publication/<pid>/materials
+  //   → {ok, items:[{id,kind,title,filename,mime,size,created}]}
+  //
+  // 挂在每条留档上，员工展开折叠区时触发（index.html 的 <details> @click）。
+  // 已加载且非错误态不重复拉——反复展开折叠不重发请求。
+  async loadMaterials(pid) {
+    if (!pid) return;
+    this.ensureMaterialEntry(pid);
+    const entry = this.addressMaterials[pid];
+    if (entry.items.length && !entry.error && !entry.loading) return;
+    entry.loading = true;
+    entry.error = '';
+    try {
+      const data = await this.accountJSON('/publication/' + pid + '/materials');
+      if (!this.addressMaterials[pid]) return;
+      this.addressMaterials[pid].items = Array.isArray(data.items) ? data.items.slice() : [];
+    } catch (e) {
+      if (!this.addressMaterials[pid]) return;
+      this.addressMaterials[pid].items = [];
+      this.addressMaterials[pid].error = e.message || '材料读取失败';
+    } finally {
+      if (this.addressMaterials[pid]) this.addressMaterials[pid].loading = false;
+    }
+  },
+
+  // ===== 材料与性能证明附件：上传（契约 M3）=====
+  //
+  // POST /api/share/publication/<pid>/materials
+  //   body {kind, title, dataUrl, filename}——mime 由后端从 dataUrl 前缀解析，前端不另发。
+  //   dataUrl 是 FileReader 读出的 data:<mime>;base64,<...>，**不做任何压缩**（PDF 不能重编码）。
+  //
+  // 前端软拦（不替代后端校验）：kind 必须在 KINDS 内、title 非空且 ≤60、mime 在白名单、
+  // dataUrl 长度 ≤ MATERIAL_DATA_URL_CEILING（≈25MB 解码上限）。任一不过直接挡下，不白传一次。
+  async uploadMaterial(pid, kind, title, file) {
+    if (!pid || !file) return;
+    this.ensureMaterialEntry(pid);
+    const entry = this.addressMaterials[pid];
+    if (entry.draft.uploading) return;                  // 同一时刻只允许一份在传
+    if (!this.addressDetail) { this.showToast('请先打开一个地址', 'error', 6000); return; }
+    const k = (kind || '').trim();
+    if (!this.MATERIAL_KINDS.includes(k)) {
+      this.showToast('请选择材料类别', 'error', 6000); return;
+    }
+    const t = (title || '').trim();
+    if (!t) { this.showToast('请填写材料名称', 'error', 6000); return; }
+    if (t.length > this.MATERIAL_TITLE_LIMIT) {
+      this.showToast('材料名称不能超过 ' + this.MATERIAL_TITLE_LIMIT + ' 字', 'error', 6000); return;
+    }
+    let dataUrl;
+    try { dataUrl = await this.fileToDataUrl(file); }
+    catch (e) { this.showToast('文件读取失败，请重试', 'error', 6000); return; }
+    const mimeMatch = /^data:([^;]+);base64,/.exec(String(dataUrl || ''));
+    const mime = mimeMatch ? mimeMatch[1] : '';
+    if (!this.MATERIAL_MIME_ALLOWED.includes(mime)) {
+      this.showToast('只支持 PDF 或图片（PNG / JPG / WebP）', 'error', 8000); return;
+    }
+    if (dataUrl.length > this.MATERIAL_DATA_URL_CEILING) {
+      this.showToast('这张文件太大，请换一份或先压缩后再上传', 'error', 8000); return;
+    }
+    entry.draft.uploading = true;
+    try {
+      const data = await this.accountJSON('/publication/' + pid + '/materials', {
+        kind: k, title: t, dataUrl, filename: (file.name || ''),
+      });
+      this.showToast(data && data.duplicate ? '这份材料已经传过了，不用重复上传' : '✅ 材料已上传');
+      entry.draft.kind = '';
+      entry.draft.title = '';
+      await this.loadMaterials(pid);                     // 刷新清单
+    } catch (e) {
+      this.showToast(e.message || '材料上传失败', 'error', 8000);
+    } finally {
+      entry.draft.uploading = false;
+    }
+  },
+
+  // ===== 材料与性能证明附件：删除（契约 M4）=====
+  //
+  // DELETE /api/share/publication/<pid>/materials/<mid>
+  //   走 accountDelete（sessionRequest + DELETE + CSRF）；accountJSON 只能发 POST，后端会 405。
+  async removeMaterial(pid, mid) {
+    if (!pid || !mid) return;
+    this.ensureMaterialEntry(pid);
+    const entry = this.addressMaterials[pid];
+    if (entry.removing || entry.draft.uploading) return;  // 防重复提交
+    if (!this.addressDetail) return;
+    entry.removing = true;
+    try {
+      await this.accountDelete('/publication/' + pid + '/materials/' + mid);
+      if (this.addressMaterials[pid]) {
+        this.addressMaterials[pid].items = this.addressMaterials[pid].items.filter((x) => x.id !== mid);
+      }
+      this.showToast('材料已删除');
+    } catch (e) {
+      this.showToast(e.message || '材料删除失败', 'error', 8000);
+    } finally {
+      if (this.addressMaterials[pid]) this.addressMaterials[pid].removing = false;
+    }
   },
 
   // 切地址 / 关详情时把隐蔽工程状态全部复位。

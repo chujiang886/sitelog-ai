@@ -1736,6 +1736,7 @@
                     </div>
                     <div class="addr-stage-rows">
                       <template x-for="stage in group.items" :key="group.key + '-' + stage.slot">
+                        <div>
                         <div class="addr-stage flex items-center gap-3 px-3 py-2">
                           <span class="addr-dot rounded-full shrink-0" :class="stage.visible ? 'bg-[#B8924A]' : 'bg-slate-300'"></span>
                           <div class="addr-stage-main flex-1 min-w-0">
@@ -1770,6 +1771,63 @@
                             <button @click="toggleStageVisible(stage)" class="text-xs px-2 py-1 bg-slate-100 rounded shrink-0" x-text="stage.visible ? '隐藏' : '显示'"></button>
                             <button @click="detachStage(stage)" class="text-xs px-2 py-1 bg-red-50 text-red-600 rounded shrink-0">移除</button>
                           </div>
+                        </div>
+
+                        <!-- ===== 材料与性能证明（materials v1）=====
+                             挂在**每一条留档**上（publication_id），不是阶段分组头。
+                             业主文档视图会展示这份材料清单（材料名 + 类别），所以标题输入框要明确告诉员工
+                             「会随留档展示给业主」。PDF 原样存储、不作任何重编码，这里**不上传前压缩**。
+                             类别枚举 / MIME 白名单 / 大小上限严格对齐契约 materials.v1.json，前端不另写一份。
+                             展开折叠区时 @click 触发 loadMaterials；已加载就不再重拉（见 loadMaterials 的短路）。
+                             内容块用 <template x-if> 而不是 x-show：本块在 x-for 内，外层列表整轮替换时
+                             x-show 会让 Alpine 3 重复走隐藏流程并抛未捕获错误（隐蔽工程区已踩过）。 -->
+                        <details class="addr-material" @click="loadMaterials(stage.publication_id)">
+                          <summary>
+                            <span>材料与性能证明</span>
+                            <span class="addr-times-badge" x-show="(addressMaterials[stage.publication_id].items || []).length" x-text="(addressMaterials[stage.publication_id].items || []).length + ' 项'"></span>
+                            <span class="addr-material-empty" x-show="!(addressMaterials[stage.publication_id].items || []).length" x-text="'待补充'"></span>
+                          </summary>
+                          <div class="p-3 space-y-3">
+                            <p x-show="addressMaterials[stage.publication_id].loading" class="text-sm text-slate-500">正在读取材料清单…</p>
+                            <p x-show="!addressMaterials[stage.publication_id].loading && !!addressMaterials[stage.publication_id].error" class="text-sm text-red-600" x-text="addressMaterials[stage.publication_id].error"></p>
+
+                            <template x-if="!addressMaterials[stage.publication_id].loading && !addressMaterials[stage.publication_id].error">
+                              <div class="space-y-3">
+                                <!-- 已上传材料：类别徽标 + 标题 + 文件名 + 大小 + 删除 -->
+                                <template x-for="m in addressMaterials[stage.publication_id].items" :key="m.id">
+                                  <div class="flex items-center gap-3 text-sm">
+                                    <span class="material-kind-badge" x-text="m.kind"></span>
+                                    <span class="flex-1 min-w-0">
+                                      <span class="font-medium text-slate-900" x-text="m.title"></span>
+                                      <span class="block text-xs text-slate-500" x-text="m.filename + (m.size ? ' · ' + (m.size / 1024).toFixed(0) + ' KB' : '')"></span>
+                                    </span>
+                                    <button @click="removeMaterial(stage.publication_id, m.id)" :disabled="addressMaterials[stage.publication_id].removing" class="text-xs px-2 py-1 bg-red-50 text-red-600 rounded shrink-0">删除</button>
+                                  </div>
+                                </template>
+                                <p x-show="!addressMaterials[stage.publication_id].items.length" class="text-xs text-slate-500">还没有材料，下方可上传合格证 / 检测报告等证明文件。</p>
+
+                                <!-- 上传表单：类别下拉（KINDS）/ 标题（带「会随留档展示给业主」提示）/ 文件 -->
+                                <div class="border-t pt-3 space-y-2">
+                                  <label class="block text-xs text-slate-600">材料类别
+                                    <select x-model="addressMaterials[stage.publication_id].draft.kind" class="border rounded p-1.5 w-full text-sm mt-1">
+                                      <option value="">请选择类别</option>
+                                      <template x-for="k in MATERIAL_KINDS" :key="k">
+                                        <option :value="k" x-text="k"></option>
+                                      </template>
+                                    </select>
+                                  </label>
+                                  <label class="block text-xs text-slate-600">材料名称（会随留档展示给业主）
+                                    <input x-model="addressMaterials[stage.publication_id].draft.title" maxlength="60" placeholder="如：铝合金型材合格证" class="border rounded p-1.5 w-full text-sm mt-1">
+                                  </label>
+                                  <div class="flex items-center gap-2">
+                                    <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" :disabled="addressMaterials[stage.publication_id].draft.uploading" @change="uploadMaterial(stage.publication_id, addressMaterials[stage.publication_id].draft.kind, addressMaterials[stage.publication_id].draft.title, $event.target.files[0]); $event.target.value = ''" class="text-sm">
+                                    <span x-show="addressMaterials[stage.publication_id].draft.uploading" class="text-xs text-slate-500">上传中…</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </template>
+                          </div>
+                        </details>
                         </div>
                       </template>
                     </div>
