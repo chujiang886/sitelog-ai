@@ -1800,32 +1800,32 @@
                         <details class="addr-material" @click="loadMaterials(stage.publication_id)">
                           <summary>
                             <span>材料与性能证明</span>
-                            <span class="addr-times-badge" x-show="(addressMaterials[stage.publication_id].items || []).length" x-text="(addressMaterials[stage.publication_id].items || []).length + ' 项'"></span>
-                            <span class="addr-material-empty" x-show="!(addressMaterials[stage.publication_id].items || []).length" x-text="'待补充'"></span>
+                            <span class="addr-times-badge" x-show="(materialEntry(stage.publication_id).items || []).length" x-text="(materialEntry(stage.publication_id).items || []).length + ' 项'"></span>
+                            <span class="addr-material-empty" x-show="!(materialEntry(stage.publication_id).items || []).length" x-text="'待补充'"></span>
                           </summary>
                           <div class="p-3 space-y-3">
-                            <p x-show="addressMaterials[stage.publication_id].loading" class="text-sm text-slate-500">正在读取材料清单…</p>
-                            <p x-show="!addressMaterials[stage.publication_id].loading && !!addressMaterials[stage.publication_id].error" class="text-sm text-red-600" x-text="addressMaterials[stage.publication_id].error"></p>
+                            <p x-show="materialEntry(stage.publication_id).loading" class="text-sm text-slate-500">正在读取材料清单…</p>
+                            <p x-show="!materialEntry(stage.publication_id).loading && !!materialEntry(stage.publication_id).error" class="text-sm text-red-600" x-text="materialEntry(stage.publication_id).error"></p>
 
-                            <template x-if="!addressMaterials[stage.publication_id].loading && !addressMaterials[stage.publication_id].error">
+                            <template x-if="!materialEntry(stage.publication_id).loading && !materialEntry(stage.publication_id).error">
                               <div class="space-y-3">
                                 <!-- 已上传材料：类别徽标 + 标题 + 文件名 + 大小 + 删除 -->
-                                <template x-for="m in addressMaterials[stage.publication_id].items" :key="m.id">
+                                <template x-for="m in materialEntry(stage.publication_id).items" :key="m.id">
                                   <div class="flex items-center gap-3 text-sm">
                                     <span class="material-kind-badge" x-text="m.kind"></span>
                                     <span class="flex-1 min-w-0">
                                       <span class="font-medium text-slate-900" x-text="m.title"></span>
                                       <span class="block text-xs text-slate-500" x-text="m.filename + (m.size ? ' · ' + (m.size / 1024).toFixed(0) + ' KB' : '')"></span>
                                     </span>
-                                    <button @click="removeMaterial(stage.publication_id, m.id)" :disabled="addressMaterials[stage.publication_id].removing" class="text-xs px-2 py-1 bg-red-50 text-red-600 rounded shrink-0">删除</button>
+                                    <button @click="removeMaterial(stage.publication_id, m.id)" :disabled="materialEntry(stage.publication_id).removing" class="text-xs px-2 py-1 bg-red-50 text-red-600 rounded shrink-0">删除</button>
                                   </div>
                                 </template>
-                                <p x-show="!addressMaterials[stage.publication_id].items.length" class="text-xs text-slate-500">还没有材料，下方可上传合格证 / 检测报告等证明文件。</p>
+                                <p x-show="!materialEntry(stage.publication_id).items.length" class="text-xs text-slate-500">还没有材料，下方可上传合格证 / 检测报告等证明文件。</p>
 
                                 <!-- 上传表单：类别下拉（KINDS）/ 标题（带「会随留档展示给业主」提示）/ 文件 -->
                                 <div class="border-t pt-3 space-y-2">
                                   <label class="block text-xs text-slate-600">材料类别
-                                    <select x-model="addressMaterials[stage.publication_id].draft.kind" class="border rounded p-1.5 w-full text-sm mt-1">
+                                    <select x-model="materialEntry(stage.publication_id).draft.kind" class="border rounded p-1.5 w-full text-sm mt-1">
                                       <option value="">请选择类别</option>
                                       <template x-for="k in MATERIAL_KINDS" :key="k">
                                         <option :value="k" x-text="k"></option>
@@ -1833,11 +1833,11 @@
                                     </select>
                                   </label>
                                   <label class="block text-xs text-slate-600">材料名称（会随留档展示给业主）
-                                    <input x-model="addressMaterials[stage.publication_id].draft.title" maxlength="60" placeholder="如：铝合金型材合格证" class="border rounded p-1.5 w-full text-sm mt-1">
+                                    <input x-model="materialEntry(stage.publication_id).draft.title" maxlength="60" placeholder="如：铝合金型材合格证" class="border rounded p-1.5 w-full text-sm mt-1">
                                   </label>
                                   <div class="flex items-center gap-2">
-                                    <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" :disabled="addressMaterials[stage.publication_id].draft.uploading" @change="uploadMaterial(stage.publication_id, addressMaterials[stage.publication_id].draft.kind, addressMaterials[stage.publication_id].draft.title, $event.target.files[0]); $event.target.value = ''" class="text-sm">
-                                    <span x-show="addressMaterials[stage.publication_id].draft.uploading" class="text-xs text-slate-500">上传中…</span>
+                                    <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" :disabled="materialEntry(stage.publication_id).draft.uploading" @change="uploadMaterial(stage.publication_id, materialEntry(stage.publication_id).draft.kind, materialEntry(stage.publication_id).draft.title, $event.target.files[0]); $event.target.value = ''" class="text-sm">
+                                    <span x-show="materialEntry(stage.publication_id).draft.uploading" class="text-xs text-slate-500">上传中…</span>
                                   </div>
                                 </div>
                               </div>
@@ -1852,15 +1852,15 @@
                         <details class="remediation-card" @click="loadRemediations(stage.publication_id)">
                           <summary>
                             <span>整改时限</span>
-                            <span class="addr-times-badge" x-show="(remediationItems[stage.publication_id].items || []).length" x-text="(remediationItems[stage.publication_id].items || []).length + ' 项'"></span>
-                            <span x-show="!(remediationItems[stage.publication_id].items || []).length">无待整改</span>
+                            <span class="addr-times-badge" x-show="(remediationEntry(stage.publication_id).items || []).length" x-text="(remediationEntry(stage.publication_id).items || []).length + ' 项'"></span>
+                            <span x-show="!(remediationEntry(stage.publication_id).items || []).length">无待整改</span>
                           </summary>
                           <div class="p-3 space-y-3">
-                            <p x-show="remediationItems[stage.publication_id].loading" class="text-sm text-slate-500">正在读取整改清单…</p>
-                            <p x-show="!remediationItems[stage.publication_id].loading && !!remediationItems[stage.publication_id].error" class="text-sm text-red-600" x-text="remediationItems[stage.publication_id].error"></p>
-                            <template x-if="!remediationItems[stage.publication_id].loading && !remediationItems[stage.publication_id].error">
+                            <p x-show="remediationEntry(stage.publication_id).loading" class="text-sm text-slate-500">正在读取整改清单…</p>
+                            <p x-show="!remediationEntry(stage.publication_id).loading && !!remediationEntry(stage.publication_id).error" class="text-sm text-red-600" x-text="remediationEntry(stage.publication_id).error"></p>
+                            <template x-if="!remediationEntry(stage.publication_id).loading && !remediationEntry(stage.publication_id).error">
                               <div class="space-y-3">
-                                <template x-for="item in remediationItems[stage.publication_id].items" :key="item.id">
+                                <template x-for="item in remediationEntry(stage.publication_id).items" :key="item.id">
                                   <div class="border-b pb-2 last:border-0">
                                     <div class="flex items-center gap-2 text-sm">
                                       <span class="remediation-kind" x-text="remediationStatusLabel(item.status)"></span>
@@ -1869,20 +1869,20 @@
                                     </div>
                                     <p x-show="!!item.note" class="text-xs text-slate-500 mt-1" x-text="item.note"></p>
                                     <div class="flex gap-2 mt-1">
-                                      <button x-show="item.status !== 'resolved'" @click="changeRemediation(stage.publication_id, item, 'resolve')" :disabled="remediationItems[stage.publication_id].busy" class="text-xs px-2 py-1 bg-[#1F3D2A] text-white rounded">标记完成</button>
-                                      <button x-show="item.status === 'resolved'" @click="changeRemediation(stage.publication_id, item, 'reopen')" :disabled="remediationItems[stage.publication_id].busy" class="text-xs px-2 py-1 bg-slate-100 rounded">重新打开</button>
-                                      <button @click="removeRemediation(stage.publication_id, item)" :disabled="remediationItems[stage.publication_id].busy" class="text-xs px-2 py-1 bg-red-50 text-red-600 rounded">删除</button>
+                                      <button x-show="item.status !== 'resolved'" @click="changeRemediation(stage.publication_id, item, 'resolve')" :disabled="remediationEntry(stage.publication_id).busy" class="text-xs px-2 py-1 bg-[#1F3D2A] text-white rounded">标记完成</button>
+                                      <button x-show="item.status === 'resolved'" @click="changeRemediation(stage.publication_id, item, 'reopen')" :disabled="remediationEntry(stage.publication_id).busy" class="text-xs px-2 py-1 bg-slate-100 rounded">重新打开</button>
+                                      <button @click="removeRemediation(stage.publication_id, item)" :disabled="remediationEntry(stage.publication_id).busy" class="text-xs px-2 py-1 bg-red-50 text-red-600 rounded">删除</button>
                                     </div>
                                   </div>
                                 </template>
-                                <p x-show="!remediationItems[stage.publication_id].items.length" class="text-xs text-slate-500">还没有整改事项。</p>
+                                <p x-show="!remediationEntry(stage.publication_id).items.length" class="text-xs text-slate-500">还没有整改事项。</p>
                                 <div class="border-t pt-3 space-y-2">
-                                  <input x-model="remediationItems[stage.publication_id].draft.title" maxlength="120" placeholder="整改事项（如：补打南侧窗框密封胶）" class="border rounded p-1.5 w-full text-sm">
-                                  <textarea x-model="remediationItems[stage.publication_id].draft.note" maxlength="500" placeholder="整改说明（可选）" rows="2" class="border rounded p-1.5 w-full text-sm"></textarea>
+                                  <input x-model="remediationEntry(stage.publication_id).draft.title" maxlength="120" placeholder="整改事项（如：补打南侧窗框密封胶）" class="border rounded p-1.5 w-full text-sm">
+                                  <textarea x-model="remediationEntry(stage.publication_id).draft.note" maxlength="500" placeholder="整改说明（可选）" rows="2" class="border rounded p-1.5 w-full text-sm"></textarea>
                                   <div class="flex items-center gap-2">
                                     <label class="text-xs text-slate-600 shrink-0">截止日期</label>
-                                    <input type="date" x-model="remediationItems[stage.publication_id].draft.due_at" class="border rounded p-1.5 text-sm">
-                                    <button @click="addRemediation(stage.publication_id)" :disabled="remediationItems[stage.publication_id].busy" class="px-3 py-1.5 text-xs bg-[#1F3D2A] text-white rounded disabled:opacity-50" x-text="remediationItems[stage.publication_id].busy ? '处理中…' : '添加整改'"></button>
+                                    <input type="date" x-model="remediationEntry(stage.publication_id).draft.due_at" class="border rounded p-1.5 text-sm">
+                                    <button @click="addRemediation(stage.publication_id)" :disabled="remediationEntry(stage.publication_id).busy" class="px-3 py-1.5 text-xs bg-[#1F3D2A] text-white rounded disabled:opacity-50" x-text="remediationEntry(stage.publication_id).busy ? '处理中…' : '添加整改'"></button>
                                   </div>
                                 </div>
                               </div>
@@ -1894,20 +1894,20 @@
                              只做尺寸，不做产品序列号；单位固定为毫米。每条留档一份，
                              保存后会进入该留档的业主文档，creator 不公开。 -->
                         <details class="remediation-card" @click="loadDimensions(stage.publication_id)">
-                          <summary><span>洞口尺寸</span><span x-show="dimensionItems[stage.publication_id].dimension" class="addr-times-badge">已填写</span><span x-show="!dimensionItems[stage.publication_id].dimension">待填写</span></summary>
+                          <summary><span>洞口尺寸</span><span x-show="dimensionEntry(stage.publication_id).dimension" class="addr-times-badge">已填写</span><span x-show="!dimensionEntry(stage.publication_id).dimension">待填写</span></summary>
                           <div class="p-3 space-y-2">
-                            <p x-show="dimensionItems[stage.publication_id].loading" class="text-sm text-slate-500">正在读取洞口尺寸…</p>
-                            <p x-show="!!dimensionItems[stage.publication_id].error" class="text-sm text-red-600" x-text="dimensionItems[stage.publication_id].error"></p>
-                            <template x-if="!dimensionItems[stage.publication_id].loading && !dimensionItems[stage.publication_id].error">
+                            <p x-show="dimensionEntry(stage.publication_id).loading" class="text-sm text-slate-500">正在读取洞口尺寸…</p>
+                            <p x-show="!!dimensionEntry(stage.publication_id).error" class="text-sm text-red-600" x-text="dimensionEntry(stage.publication_id).error"></p>
+                            <template x-if="!dimensionEntry(stage.publication_id).loading && !dimensionEntry(stage.publication_id).error">
                               <div class="space-y-2">
                                 <div class="grid grid-cols-2 gap-2">
-                                  <label class="text-xs text-slate-600">宽（mm）<input type="number" min="1" max="10000" step="1" x-model="dimensionItems[stage.publication_id].draft.width_mm" class="border rounded p-1.5 w-full text-sm mt-1"></label>
-                                  <label class="text-xs text-slate-600">高（mm）<input type="number" min="1" max="10000" step="1" x-model="dimensionItems[stage.publication_id].draft.height_mm" class="border rounded p-1.5 w-full text-sm mt-1"></label>
-                                  <label class="text-xs text-slate-600">对角线 A（可选）<input type="number" min="1" max="20000" step="1" x-model="dimensionItems[stage.publication_id].draft.diagonal_a_mm" class="border rounded p-1.5 w-full text-sm mt-1"></label>
-                                  <label class="text-xs text-slate-600">对角线 B（可选）<input type="number" min="1" max="20000" step="1" x-model="dimensionItems[stage.publication_id].draft.diagonal_b_mm" class="border rounded p-1.5 w-full text-sm mt-1"></label>
+                                  <label class="text-xs text-slate-600">宽（mm）<input type="number" min="1" max="10000" step="1" x-model="dimensionEntry(stage.publication_id).draft.width_mm" class="border rounded p-1.5 w-full text-sm mt-1"></label>
+                                  <label class="text-xs text-slate-600">高（mm）<input type="number" min="1" max="10000" step="1" x-model="dimensionEntry(stage.publication_id).draft.height_mm" class="border rounded p-1.5 w-full text-sm mt-1"></label>
+                                  <label class="text-xs text-slate-600">对角线 A（可选）<input type="number" min="1" max="20000" step="1" x-model="dimensionEntry(stage.publication_id).draft.diagonal_a_mm" class="border rounded p-1.5 w-full text-sm mt-1"></label>
+                                  <label class="text-xs text-slate-600">对角线 B（可选）<input type="number" min="1" max="20000" step="1" x-model="dimensionEntry(stage.publication_id).draft.diagonal_b_mm" class="border rounded p-1.5 w-full text-sm mt-1"></label>
                                 </div>
-                                <input x-model="dimensionItems[stage.publication_id].draft.note" maxlength="200" placeholder="尺寸说明（可选）" class="border rounded p-1.5 w-full text-sm">
-                                <div class="flex gap-2"><button @click="saveDimensions(stage.publication_id)" :disabled="dimensionItems[stage.publication_id].busy" class="px-3 py-1.5 text-xs bg-[#1F3D2A] text-white rounded" x-text="dimensionItems[stage.publication_id].busy ? '保存中…' : '保存尺寸'"></button><button x-show="dimensionItems[stage.publication_id].dimension" @click="removeDimensions(stage.publication_id)" :disabled="dimensionItems[stage.publication_id].busy" class="px-3 py-1.5 text-xs bg-red-50 text-red-600 rounded">删除</button></div>
+                                <input x-model="dimensionEntry(stage.publication_id).draft.note" maxlength="200" placeholder="尺寸说明（可选）" class="border rounded p-1.5 w-full text-sm">
+                                <div class="flex gap-2"><button @click="saveDimensions(stage.publication_id)" :disabled="dimensionEntry(stage.publication_id).busy" class="px-3 py-1.5 text-xs bg-[#1F3D2A] text-white rounded" x-text="dimensionEntry(stage.publication_id).busy ? '保存中…' : '保存尺寸'"></button><button x-show="dimensionEntry(stage.publication_id).dimension" @click="removeDimensions(stage.publication_id)" :disabled="dimensionEntry(stage.publication_id).busy" class="px-3 py-1.5 text-xs bg-red-50 text-red-600 rounded">删除</button></div>
                                 <p class="text-xs text-slate-500">尺寸单位为毫米；保存后会随该留档展示给业主。此记录不替代现场复尺或法定检验批记录。</p>
                               </div>
                             </template>

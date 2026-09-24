@@ -312,7 +312,7 @@ test('index.html：标题右侧「N 项」徽标 / 无材料时「待补充」',
 
 test('index.html：内容块用 <template x-if> 而非 x-show（规避 x-for 内 x-show 重复求值坑）', () => {
   const markup = stripComments(hiddenRegion);
-  assert.match(markup, /<template x-if="!addressMaterials\[stage\.publication_id\]\.loading && !addressMaterials\[stage\.publication_id\]\.error">/,
+  assert.match(markup, /<template x-if="!materialEntry\(stage.publication_id\)\.loading && !materialEntry\(stage.publication_id\)\.error">/,
     '材料列表/上传表单应放在 x-if 内容块里，不能用 x-show');
   // 上传表单必须能找到，且在 x-if 内容块内
   assert.match(markup, /uploadMaterial\(stage\.publication_id/);
@@ -325,9 +325,9 @@ test('index.html：类别下拉渲染契约 KINDS，标题带「会随留档展�
 
 test('index.html：文件选择 accept 覆盖契约 MIME 白名单，上传中禁用并显示「上传中…」', () => {
   assert.match(hiddenRegion, /accept="\.pdf,\.png,\.jpg,\.jpeg,\.webp"/, 'accept 必须覆盖 PDF/PNG/JPG/WebP');
-  assert.match(hiddenRegion, /type="file"[\s\S]{0,400}?uploadMaterial\(stage\.publication_id[^)]*\);\s*\$event\.target\.value = ''/,
+  assert.match(hiddenRegion, /type="file"[\s\S]{0,600}?uploadMaterial\(stage\.publication_id[\s\S]*?\$event\.target\.value = ''/,
     '选完文件要清空 input.value，否则同一份第二次选不触发 change');
-  assert.match(hiddenRegion, /:disabled="addressMaterials\[stage\.publication_id\]\.draft\.uploading"/, '上传中禁用上传按钮');
+  assert.match(hiddenRegion, /:disabled="materialEntry\(stage.publication_id\)\.draft\.uploading"/, '上传中禁用上传按钮');
   assert.ok(hiddenRegion.includes('上传中…'), '上传中应显示「上传中…」');
 });
 
@@ -336,7 +336,7 @@ test('x-show 表达式只收敛成布尔（不外带字符串字段做 && 右操
     !/x-show="[^"]*&&\s*(m\.kind|m\.title|m\.filename|m\.mime|stage\.label|stage\.created)\s*"/.test(HTML),
     'x-show 里把可能为字符串的字段直接当成 && 的右操作数 —— 必须用 !! 转成布尔',
   );
-  assert.match(hiddenRegion, /x-show="!addressMaterials\[stage\.publication_id\]\.loading && !!addressMaterials\[stage\.publication_id\]\.error"/,
+  assert.match(hiddenRegion, /x-show="!materialEntry\(stage.publication_id\)\.loading && !!materialEntry\(stage.publication_id\)\.error"/,
     '错误提示行的 !! 丢了');
 });
 

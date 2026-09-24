@@ -6,6 +6,19 @@
 // 后端真源是 cj-share/current/stages.py 的 STAGE_KEYS。
 // 前端因浏览器无法 import Python，只能保留一份副本；test-stage-parity.cjs 负责守护一致性。
 // 改阶段名时，后端 stages.py、这里、index.html 的 <option> 与 TEMPLATES 四处都要改。
+// 阶段详情模板会在地址切换的 Alpine flush 中先求值；用带默认项的 map，
+// 避免短暂的 undefined.items/loading/error/draft 变成未捕获页面错误。
+function addressEntryMap(factory) {
+  return new Proxy({}, {
+    get(target, key) {
+      if (typeof key === 'string' && !(key in target)) target[key] = factory();
+      return target[key];
+    },
+  });
+}
+const emptyMaterialEntry = () => ({ items: [], loading: false, error: '', removing: false, draft: { kind: '', title: '', file: null, uploading: false } });
+const emptyRemediationEntry = () => ({ items: [], loading: false, error: '', busy: false, draft: { title: '', note: '', due_at: '' } });
+const emptyDimensionEntry = () => ({ dimension: null, loading: false, error: '', busy: false, draft: { width_mm: '', height_mm: '', diagonal_a_mm: '', diagonal_b_mm: '', note: '' } });
 window.addressFeatures = {
   // 施工阶段（与 stages.py 同序，顺序即施工顺序，地址页按此排列）
   ADDRESS_STAGE_KEYS: ['吊装施工', '框架施工', '框架1对1', '玻扇施工', '玻扇1对1', '五金安装', '离场自检', '售后保养'],
@@ -141,12 +154,12 @@ window.addressFeatures = {
   // MATERIAL_BODY_LIMIT // 3 * 4 + 2*1024*1024 = 37049684。超过后端会 413，先拦省一次白传。
   MATERIAL_DATA_URL_CEILING: 37049684,
 
-  addressMaterials: {},            // { [publication_id]: {items, loading, error, removing, draft} }
-  remediationItems: {},            // { [publication_id]: {items, loading, error, draft, busy} }
+  addressMaterials: addressEntryMap(emptyMaterialEntry), // { [publication_id]: {items, loading, error, removing, draft} }
+  remediationItems: addressEntryMap(emptyRemediationEntry), // { [publication_id]: {items, loading, error, draft, busy} }
   remediationDueItems: [],         // 当前员工有权限且逾期/三天内到期的站内提醒
   remediationDueLoading: false,
   remediationReminderDays: 3,      // 契约 remediations.v1 constants.REMINDER_DAYS
-  dimensionItems: {},              // { [publication_id]: {dimension, loading, error, busy, draft} }
+  dimensionItems: addressEntryMap(emptyDimensionEntry), // { [publication_id]: {dimension, loading, error, busy, draft} }
 
   hiddenLoading: false,
   hiddenError: '',
@@ -502,25 +515,27 @@ window.addressFeatures = {
       const detail = await this.accountJSON('/addresses/' + addressId);
       detail.stages = (detail.stages || []).slice().sort((a, b) =>
         this.addressStageOrder(a.stage_key) - this.addressStageOrder(b.stage_key) || (a.slot - b.slot));
-      // 隐蔽工程照片的 URL 依赖当前 items。必须在切换 addressDetail 之前清掉旧 mid，
-      // 否则 Alpine 会用新 aid 重算旧 x-for 节点一帧，发出「新 aid + 旧照片」的错误请求。
+      // 先卸载旧详情，再一次性清空所有 per-publication / 地址级状态。
+      // 这些状态在模板的阶段循环中被直接读取；若先把 addressDetail 换成新户，
+      // 再 reset map，Alpine 会在中间一轮读到 undefined.items/loading/error。
+      // 先 addressDetail=null 让旧阶段模板卸载，再 reset + 预建新户 map，最后挂新详情，
+      // 整个过程对 Alpine 只呈现「旧详情 → 新详情（map 已完整）」两种稳定形态。
+      this.addressDetail = null;
+      this.resetSignoffState();
       this.resetHiddenState();
+      this.resetMaterialsState();
+      this.resetRemediationState();
+      this.resetDimensionState();
+      for (const st of (detail.stages || [])) {
+        this.ensureMaterialEntry(st.publication_id);
+        this.ensureRemediationEntry(st.publication_id);
+        this.ensureDimensionEntry(st.publication_id);
+      }
       this.addressDetail = detail;
       this.addressStageGroups = this.buildAddressStageGroups(detail.stages);
       this.addressPendingStages = this.buildAddressPendingStages(detail.stages, detail.enabled_stages);
       this.addressDoneStages = this.addressDoneStageCount(detail.stages);
-      // 材料与性能证明是 per-publication 的缓存，切地址必须清空再按当前留档重建，
-      // 否则上一户某条留档的材料会串到这一户同名留档上（与隐蔽工程照片同一条教训）。
-      this.resetMaterialsState();
-      this.resetDimensionState();
-      for (const st of (detail.stages || [])) { this.ensureMaterialEntry(st.publication_id); this.ensureDimensionEntry(st.publication_id); }
       this.addressAttachOpen = false;
-      // 签认记录属于当前地址；detail 落地后再重置，避免地址详情旧模板在请求期间
-      // 读取到未初始化的关联状态。
-      this.resetSignoffState();
-      // 隐蔽工程状态已在请求前清空；这里再清其它地址级数据。
-      this.resetRemediationState();
-      this.resetDimensionState();
       await Promise.all([this.loadSignoffs(addressId), this.loadHiddenAcceptance(addressId), this.loadRemediationDue()]);
     } catch (e) { this.showToast(e.message || '地址读取失败', 'error', 8000); }
   },
@@ -1391,6 +1406,11 @@ window.addressFeatures = {
 
   // ===== 材料与性能证明附件：per-publication 缓存与瞬态 =====
   // 每条留档（publication_id）一份缓存；draft 是该条的上传表单瞬态。
+  // 模板可能在切换地址的同一 Alpine flush 中比状态清理早一步求值；
+  // 统一从这三个 accessor 取 entry，确保首次渲染永远拿到完整形状，而不是 undefined。
+  materialEntry(pid) { this.ensureMaterialEntry(pid); return this.addressMaterials[pid]; },
+  remediationEntry(pid) { this.ensureRemediationEntry(pid); return this.remediationItems[pid]; },
+  dimensionEntry(pid) { this.ensureDimensionEntry(pid); return this.dimensionItems[pid]; },
   ensureMaterialEntry(pid) {
     if (!pid) return;
     if (!this.addressMaterials[pid]) {
@@ -1401,7 +1421,7 @@ window.addressFeatures = {
     }
   },
   resetMaterialsState() {
-    this.addressMaterials = {};
+    this.addressMaterials = addressEntryMap(emptyMaterialEntry);
   },
 
   // ===== 材料与性能证明附件：读取（契约 M2）=====
@@ -1525,7 +1545,7 @@ window.addressFeatures = {
     };
   },
   resetRemediationState() {
-    this.remediationItems = {};
+    this.remediationItems = addressEntryMap(emptyRemediationEntry);
     this.remediationDueItems = [];
     this.remediationDueLoading = false;
   },
@@ -1611,7 +1631,7 @@ window.addressFeatures = {
       draft: { width_mm: '', height_mm: '', diagonal_a_mm: '', diagonal_b_mm: '', note: '' },
     };
   },
-  resetDimensionState() { this.dimensionItems = {}; },
+  resetDimensionState() { this.dimensionItems = addressEntryMap(emptyDimensionEntry); },
   async loadDimensions(pid) {
     if (!pid) return;
     this.ensureDimensionEntry(pid);
