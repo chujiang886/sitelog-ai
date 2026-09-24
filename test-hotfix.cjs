@@ -5,8 +5,8 @@ const {chromium}=require('playwright'),{PNG}=require('pngjs'),assert=require('no
  try{
   const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
   let old=true;
-  await page.route(base+'/sitelog/',r=>old?r.fulfill({contentType:'text/html',body:execFileSync('git',['show','58900dd:index.html'],{encoding:'utf8',maxBuffer:2e6})}):r.continue());
-  await page.route('**/sitelog/auth-client.js',r=>old?r.fulfill({contentType:'application/javascript',body:execFileSync('git',['show','58900dd:auth-client.js'],{encoding:'utf8'})}):r.continue());
+  await page.route(base+'/sitelog/',r=>old?r.fulfill({contentType:'text/html',body:execFileSync('git',['show','58900dd24eb70d8e5c83012e12fcf2c1a1900408:index.html'],{encoding:'utf8',maxBuffer:2e6})}):r.continue());
+  await page.route('**/sitelog/auth-client.js',r=>old?r.fulfill({contentType:'application/javascript',body:execFileSync('git',['show','58900dd24eb70d8e5c83012e12fcf2c1a1900408:auth-client.js'],{encoding:'utf8'})}):r.continue());
   await page.goto(base+'/sitelog/');
   await page.waitForFunction(()=>window.Alpine && Alpine.$data(document.body).showLogin);
   const password = process.env.TEST_ADMIN_PASSWORD || 'Test-admin-initial-12345';
