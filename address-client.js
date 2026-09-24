@@ -1067,18 +1067,33 @@ window.addressFeatures = {
 
   // ===== 隐蔽工程验收：日期 =====
   // <input type="date"> 用 'YYYY-MM-DD'，契约 H2 要 epoch 秒。
-  // 用**本地时区**换算：员工选「9 月 24 日」，界面上就该是 9 月 24 日。
-  // 用 Date.UTC 的话，东八区用户在晚上 8 点后选到的日期会显示成前一天。
-  hiddenDateInput(seconds) { return seconds ? this.addressStamp(seconds) : ''; },
+  //
+  // 【必须用 UTC，不能用本地时区】验收日期是**业务日期**（哪一天做的验收），
+  // 不是时刻。两端都按本地时区换算时，同一条记录在 UTC+8 显示 5 月 29 日、
+  // 在 UTC 会显示成 5 月 28 日 —— 业主看到的日期和员工选的不是同一天，而这
+  // 是给业主看的唯一凭据。（CI 跑在 UTC 上，正是靠它才暴露出来。）
+  // 约定：accepted_at 存「该日期的 UTC 00:00」，读取一律用 getUTC* 取年月日，
+  // 这样任何时区的浏览器都显示同一天。addressStamp 是给「归档于」这类**时刻**
+  // 用的，按本地时区显示才是对的，两边不要混用。
+  hiddenDateInput(seconds) {
+    if (!seconds) return '';
+    const d = new Date(seconds * 1000), p = (n) => String(n).padStart(2, '0');
+    return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate());
+  },
   hiddenDateEpoch(value) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || '').trim());
     if (!m) return 0;
-    const at = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime();
-    // 2026-02-31 这种 JS 会静默顺延到 3 月 3 日 —— 回写一次比对，对不上就是非法日期。
-    if (this.addressStamp(Math.floor(at / 1000)) !== m[0]) return 0;
+    const at = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    // 2026-02-31 这种 Date.UTC 会静默顺延到 3 月 3 日 —— 回写一次比对，对不上就是非法日期。
+    if (this.hiddenDateInput(Math.floor(at / 1000)) !== m[0]) return 0;
     return Math.floor(at / 1000);
   },
-  hiddenTodayInput() { return this.hiddenDateInput(Math.floor(Date.now() / 1000)); },
+  // 「今天」取本地日历上的今天，再换算成它的 UTC 午夜 —— 直接拿 Date.now() 的话，
+  // 东八区在早上 8 点前会默认成昨天。
+  hiddenTodayInput() {
+    const n = new Date();
+    return this.hiddenDateInput(Math.floor(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) / 1000));
+  },
 
   // ===== 隐蔽工程验收：展示口径 =====
   hiddenResultLabel(result) { return this.HIDDEN_RESULT_LABELS[result] || '未填写'; },

@@ -133,7 +133,7 @@ function fillPass(app, index, photos = 1) {
 
 test('H1：拉取三项 + 归一化未填写态，revision / 验收日期 / 整单备注都落到 state', async () => {
   const app = makeApp(async () => okJson(h1({
-    acceptance: { accepted_at: 1780000000, note: '业主在场', revision: 3, acceptor_name: '王工', updated: 1780000001 },
+    acceptance: { accepted_at: 1780012800, note: '业主在场', revision: 3, acceptor_name: '王工', updated: 1780000001 },
   })), { addressId: 'addr1' });
 
   await app.loadHiddenAcceptance('addr1');
@@ -144,7 +144,9 @@ test('H1：拉取三项 + 归一化未填写态，revision / 验收日期 / 整�
   assert.equal(app.hiddenError, '');
   assert.equal(app.hiddenItems.length, 3);
   assert.equal(app.hiddenRevision, 3, '已保存的地址要用记录里的 revision');
-  assert.equal(app.hiddenAcceptedAt, '2026-05-29', '验收日期由 accepted_at 反推（本地时区）');
+  // 1780012800 = 2026-05-29T00:00:00Z。验收日期按 **UTC** 取年月日，所以这条断言
+  // 在任何 TZ 下都成立 —— 用本地时区换算的话，CI（UTC）会读到 05-28 而红掉。
+  assert.equal(app.hiddenAcceptedAt, '2026-05-29', '验收日期由 accepted_at 反推（UTC 口径，与运行机器时区无关）');
   assert.equal(app.hiddenNote, '业主在场');
 
   // 未填写态归一化成 ''：<select> 的 x-model 拿 null 会找不到匹配项。
@@ -187,7 +189,7 @@ test('切地址时迟到的旧响应不覆盖新地址的隐蔽工程', async ()
 
   const pending = app.loadHiddenAcceptance('addrA');
   app.addressDetail = { id: 'addrB' };            // 员工已经切到另一户
-  release(okJson(h1({ acceptance: { accepted_at: 1780000000, note: '', revision: 9 } })));
+  release(okJson(h1({ acceptance: { accepted_at: 1780012800, note: '', revision: 9 } })));
 
   await pending;
   assert.equal(app.hiddenItems.length, 1, 'A 户的记录不能落到 B 户详情里');
@@ -325,6 +327,33 @@ test('校验⑥：验收日期必填，非法日期（2026-02-31）也要挡下'
   assert.equal(app.hiddenDateInput(app.hiddenDateEpoch('2026-09-24')), '2026-09-24');
 });
 
+test('验收日期必须与时区无关：存「该日期的 UTC 00:00」，读取也用 UTC', () => {
+  const app = readyApp(async () => okJson({ ok: true }));
+  // 直接对上 Date.UTC 的算术结果：本机时区怎么变，这个数都不动。
+  assert.equal(
+    app.hiddenDateEpoch('2026-09-24'),
+    Math.floor(Date.UTC(2026, 8, 24) / 1000),
+    'epoch 必须落在「该日期的 UTC 00:00」，不是本地午夜',
+  );
+  // 极端时区下回读仍是同一天（东八区选的日子，在 UTC / 西五区都不能变）。
+  const epoch = app.hiddenDateEpoch('2026-01-01');
+  assert.equal(app.hiddenDateInput(epoch), '2026-01-01');
+  assert.equal(app.hiddenDateInput(epoch - 1), '2025-12-31', '上一秒必须回到前一天');
+});
+
+test('验收日期的换算不能退回本地时区（源码守卫）', () => {
+  // CI 跑在 UTC 上，本机跑在 UTC+8 上：两端都绿才算真的与时区无关。
+  // 这条从源码层面钉死，避免有人为「修」一个时区下的显示而改回本地时区。
+  const block = /hiddenDateInput\(seconds\)[\s\S]*?\n  \},[\s\S]*?hiddenDateEpoch\(value\)[\s\S]*?\n  \},/.exec(ADDRESS_SRC);
+  assert.ok(block, '找不到 hiddenDateInput / hiddenDateEpoch 这一段');
+  const src = block[0];
+  assert.match(src, /getUTCFullYear|getUTCMonth|getUTCDate/, '读取必须用 getUTC*');
+  assert.match(src, /Date\.UTC\(/, '构造必须用 Date.UTC');
+  assert.doesNotMatch(src, /new Date\(Number\(m\[1\]\)/, '不能用本地时区构造日期');
+  // 「归档于」这类时刻仍按本地时区显示 —— addressStamp 不能被一起改掉。
+  assert.match(ADDRESS_SRC, /addressStamp\(seconds\) \{[\s\S]*?getFullYear/, 'addressStamp（时刻）仍应按本地时区');
+});
+
 test('校验：文字长度上限（每项说明 / 不适用理由 / 整单备注都是 200）', () => {
   const app = readyApp(async () => okJson({ ok: true }));
   app.hiddenItems.forEach((i) => { i.result = 'na'; i.na_reason = '无此项'; });
@@ -351,7 +380,7 @@ test('校验：文字长度上限（每项说明 / 不适用理由 / 整单备�
 test('H2：POST（不是 PUT）整单保存，body 字段与契约逐条对得上', async () => {
   const app = readyApp(async (url, options) => {
     if (options && options.method === 'POST') return okJson({ ok: true, revision: 1 });
-    return okJson(h1({ acceptance: { accepted_at: 1780000000, note: '业主在场', revision: 1 } }));
+    return okJson(h1({ acceptance: { accepted_at: 1780012800, note: '业主在场', revision: 1 } }));
   });
   app.hiddenItems.forEach((i) => { i.result = 'na'; i.na_reason = '无此项'; });
   fillPass(app, 0, 2);
@@ -390,7 +419,7 @@ test('H2：连点两次「保存」只提交一次', async () => {
   let posts = 0;
   const app = readyApp((url, options) => {
     if (options && options.method === 'POST') { posts++; return new Promise((r) => { release = r; }); }
-    return okJson(h1({ acceptance: { accepted_at: 1780000000, note: '', revision: 1 } }));
+    return okJson(h1({ acceptance: { accepted_at: 1780012800, note: '', revision: 1 } }));
   });
   app.hiddenItems.forEach((i) => { i.result = 'na'; i.na_reason = '无此项'; });
 
@@ -435,7 +464,7 @@ test('H2 409：重新拉取 + 回填最新 revision + 明确告知，**不静默
     }
     return okJson(h1({
       items: serverItems,
-      acceptance: { accepted_at: 1780000000, note: '对方刚写的', revision: 5, acceptor_name: '王工' },
+      acceptance: { accepted_at: 1780012800, note: '对方刚写的', revision: 5, acceptor_name: '王工' },
     }));
   });
   const toasts = [];
@@ -702,12 +731,12 @@ test('汇总副行：已保存显示验收日期与验收人；未保存交代�
 
   assert.equal(app.hiddenAcceptanceLine(), '保存后业主可在地址页看到三项结论、验收时间与照片');
 
-  app.hiddenAcceptance = { accepted_at: 1780000000, revision: 1, acceptor_name: '王工' };
+  app.hiddenAcceptance = { accepted_at: 1780012800, revision: 1, acceptor_name: '王工' };
   app.hiddenAcceptedAt = '2026-05-29';
   assert.equal(app.hiddenAcceptanceLine(), '验收日期 2026-05-29 · 验收人 王工');
 
   // 后端没给验收人姓名时不要留一个空的「验收人 」
-  app.hiddenAcceptance = { accepted_at: 1780000000, revision: 1, acceptor_name: '' };
+  app.hiddenAcceptance = { accepted_at: 1780012800, revision: 1, acceptor_name: '' };
   assert.equal(app.hiddenAcceptanceLine(), '验收日期 2026-05-29');
 });
 
