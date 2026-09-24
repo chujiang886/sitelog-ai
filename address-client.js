@@ -142,6 +142,10 @@ window.addressFeatures = {
   MATERIAL_DATA_URL_CEILING: 37049684,
 
   addressMaterials: {},            // { [publication_id]: {items, loading, error, removing, draft} }
+  remediationItems: {},            // { [publication_id]: {items, loading, error, draft, busy} }
+  remediationDueItems: [],         // 当前员工有权限且逾期/三天内到期的站内提醒
+  remediationDueLoading: false,
+  remediationReminderDays: 3,      // 契约 remediations.v1 constants.REMINDER_DAYS
 
   hiddenLoading: false,
   hiddenError: '',
@@ -278,9 +282,9 @@ window.addressFeatures = {
     // 面板重开时详情已被置空，隐蔽工程状态也要一起清掉：
     // 留着上一户的三项结论和照片 id，重开面板会先闪一屏旧数据。
     this.resetHiddenState();
-    // 统计和列表一起拉：两者不同步时，统计条会显示「3 条待归类」而列表里
-    // 一条都没有，员工会以为功能坏了。并行请求，一起落库。
-    await Promise.all([this.loadAddresses(), this.loadAddressOverview()]);
+    this.resetRemediationState();
+    // 统计、地址列表与整改提醒一起拉：提醒只在员工后台显示，不依赖外部通知通道。
+    await Promise.all([this.loadAddresses(), this.loadAddressOverview(), this.loadRemediationDue()]);
   },
   async loadAddresses() {
     this.addressLoading = true;
@@ -509,7 +513,8 @@ window.addressFeatures = {
       // 隐蔽工程比签认更要紧：这里错的是**照片**。A 户的现场照片出现在 B 户详情里，
       // 员工不会察觉、业主更不会——而照片看起来都像「我家的工地」。
       this.resetHiddenState();
-      await Promise.all([this.loadSignoffs(addressId), this.loadHiddenAcceptance(addressId)]);
+      this.resetRemediationState();
+      await Promise.all([this.loadSignoffs(addressId), this.loadHiddenAcceptance(addressId), this.loadRemediationDue()]);
     } catch (e) { this.showToast(e.message || '地址读取失败', 'error', 8000); }
   },
   closeAddressDetail() {
@@ -522,6 +527,7 @@ window.addressFeatures = {
     this.resetSignoffState();
     this.resetHiddenState();
     this.resetMaterialsState();
+    this.resetRemediationState();
   },
   // 关闭整个地址面板。签认面板与批量归类弹窗是地址面板之上的一层，
   // 关掉下层却留着上层，会在下次打开地址面板时凭空冒出来。
@@ -531,6 +537,7 @@ window.addressFeatures = {
     this.closeAddressBulk();
     this.addressFormOpen = false;
     this.resetHiddenState();
+    this.resetRemediationState();
     this.addressPanel = false;
   },
   // Esc 逐层退出：照片放大 → 签认面板 → 批量归类 → 地址表单 → 地址面板。
@@ -1483,6 +1490,104 @@ window.addressFeatures = {
     }
   },
 
+  // ===== 整改时限与站内提醒（契约 remediations v1）=====
+  remediationDateInput(seconds) {
+    if (!seconds) return '';
+    const d = new Date(seconds * 1000), p = n => String(n).padStart(2, '0');
+    return d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate());
+  },
+  remediationDateEpoch(value) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || '').trim());
+    if (!m) return 0;
+    const at = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return this.remediationDateInput(at / 1000) === m[0] ? at / 1000 : 0;
+  },
+  ensureRemediationEntry(pid) {
+    if (!pid) return;
+    if (!this.remediationItems[pid]) this.remediationItems[pid] = {
+      items: [], loading: false, error: '', busy: false,
+      draft: { title: '', note: '', due_at: '' },
+    };
+  },
+  resetRemediationState() {
+    this.remediationItems = {};
+    this.remediationDueItems = [];
+    this.remediationDueLoading = false;
+  },
+  async loadRemediationDue() {
+    this.remediationDueLoading = true;
+    try {
+      const data = await this.accountJSON('/remediations/due');
+      this.remediationDueItems = Array.isArray(data.items) ? data.items : [];
+      this.remediationReminderDays = Number(data.reminder_days) || 3;
+    } catch (e) {
+      this.remediationDueItems = [];
+    } finally { this.remediationDueLoading = false; }
+  },
+  async loadRemediations(pid) {
+    if (!pid) return;
+    this.ensureRemediationEntry(pid);
+    const entry = this.remediationItems[pid];
+    if (entry.items.length && !entry.error && !entry.loading) return;
+    entry.loading = true; entry.error = '';
+    try {
+      const data = await this.accountJSON('/publication/' + pid + '/remediations');
+      if (this.remediationItems[pid]) this.remediationItems[pid].items = Array.isArray(data.items) ? data.items.slice() : [];
+    } catch (e) {
+      if (this.remediationItems[pid]) { entry.items = []; entry.error = e.message || '整改清单读取失败'; }
+    } finally { if (this.remediationItems[pid]) entry.loading = false; }
+  },
+  async addRemediation(pid) {
+    this.ensureRemediationEntry(pid);
+    const entry = this.remediationItems[pid];
+    const title = (entry.draft.title || '').trim();
+    const note = (entry.draft.note || '').trim();
+    const due_at = this.remediationDateEpoch(entry.draft.due_at);
+    if (!title) { this.showToast('请填写整改事项', 'error', 6000); return; }
+    if (title.length > 120) { this.showToast('整改事项不能超过 120 字', 'error', 6000); return; }
+    if (!due_at) { this.showToast('请选择整改期限', 'error', 6000); return; }
+    if (entry.busy) return;
+    entry.busy = true;
+    try {
+      await this.accountJSON('/publication/' + pid + '/remediations', { title, note, due_at });
+      entry.draft = { title: '', note: '', due_at: '' };
+      this.showToast('✅ 整改事项已添加');
+      await Promise.all([this.loadRemediations(pid), this.loadRemediationDue()]);
+    } catch (e) { this.showToast(e.message || '整改事项添加失败', 'error', 8000); }
+    finally { entry.busy = false; }
+  },
+  async changeRemediation(pid, item, action) {
+    if (!pid || !item || !item.id) return;
+    this.ensureRemediationEntry(pid);
+    const entry = this.remediationItems[pid];
+    if (entry.busy) return;
+    entry.busy = true;
+    try {
+      await this.accountJSON('/publication/' + pid + '/remediations/' + item.id, { action, revision: item.revision });
+      this.showToast(action === 'resolve' ? '整改已标记完成' : '整改已重新打开');
+      await Promise.all([this.loadRemediations(pid), this.loadRemediationDue()]);
+    } catch (e) {
+      if (e.status === 409) { await this.loadRemediations(pid); this.showToast('整改事项已被其他设备更新，已刷新，请核对后重试', 'error', 9000); }
+      else this.showToast(e.message || '整改状态更新失败', 'error', 8000);
+    } finally { entry.busy = false; }
+  },
+  async removeRemediation(pid, item) {
+    if (!pid || !item || !item.id) return;
+    this.ensureRemediationEntry(pid);
+    const entry = this.remediationItems[pid];
+    if (entry.busy) return;
+    entry.busy = true;
+    try {
+      await this.accountDelete('/publication/' + pid + '/remediations/' + item.id);
+      entry.items = entry.items.filter(x => x.id !== item.id);
+      this.showToast('整改事项已删除');
+      await this.loadRemediationDue();
+    } catch (e) { this.showToast(e.message || '整改事项删除失败', 'error', 8000); }
+    finally { entry.busy = false; }
+  },
+  remediationStatusLabel(status) {
+    return status === 'overdue' ? '已逾期' : status === 'resolved' ? '已完成' : '待整改';
+  },
   // 切地址 / 关详情时把隐蔽工程状态全部复位。
   //
   // 【为什么比签认那边更要紧】
