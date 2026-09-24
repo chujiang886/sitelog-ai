@@ -1889,6 +1889,30 @@
                             </template>
                           </div>
                         </details>
+
+                        <!-- ===== 洞口尺寸结构化（dimensions v1）=====
+                             只做尺寸，不做产品序列号；单位固定为毫米。每条留档一份，
+                             保存后会进入该留档的业主文档，creator 不公开。 -->
+                        <details class="remediation-card" @click="loadDimensions(stage.publication_id)">
+                          <summary><span>洞口尺寸</span><span x-show="dimensionItems[stage.publication_id].dimension" class="addr-times-badge">已填写</span><span x-show="!dimensionItems[stage.publication_id].dimension">待填写</span></summary>
+                          <div class="p-3 space-y-2">
+                            <p x-show="dimensionItems[stage.publication_id].loading" class="text-sm text-slate-500">正在读取洞口尺寸…</p>
+                            <p x-show="!!dimensionItems[stage.publication_id].error" class="text-sm text-red-600" x-text="dimensionItems[stage.publication_id].error"></p>
+                            <template x-if="!dimensionItems[stage.publication_id].loading && !dimensionItems[stage.publication_id].error">
+                              <div class="space-y-2">
+                                <div class="grid grid-cols-2 gap-2">
+                                  <label class="text-xs text-slate-600">宽（mm）<input type="number" min="1" max="10000" step="1" x-model="dimensionItems[stage.publication_id].draft.width_mm" class="border rounded p-1.5 w-full text-sm mt-1"></label>
+                                  <label class="text-xs text-slate-600">高（mm）<input type="number" min="1" max="10000" step="1" x-model="dimensionItems[stage.publication_id].draft.height_mm" class="border rounded p-1.5 w-full text-sm mt-1"></label>
+                                  <label class="text-xs text-slate-600">对角线 A（可选）<input type="number" min="1" max="20000" step="1" x-model="dimensionItems[stage.publication_id].draft.diagonal_a_mm" class="border rounded p-1.5 w-full text-sm mt-1"></label>
+                                  <label class="text-xs text-slate-600">对角线 B（可选）<input type="number" min="1" max="20000" step="1" x-model="dimensionItems[stage.publication_id].draft.diagonal_b_mm" class="border rounded p-1.5 w-full text-sm mt-1"></label>
+                                </div>
+                                <input x-model="dimensionItems[stage.publication_id].draft.note" maxlength="200" placeholder="尺寸说明（可选）" class="border rounded p-1.5 w-full text-sm">
+                                <div class="flex gap-2"><button @click="saveDimensions(stage.publication_id)" :disabled="dimensionItems[stage.publication_id].busy" class="px-3 py-1.5 text-xs bg-[#1F3D2A] text-white rounded" x-text="dimensionItems[stage.publication_id].busy ? '保存中…' : '保存尺寸'"></button><button x-show="dimensionItems[stage.publication_id].dimension" @click="removeDimensions(stage.publication_id)" :disabled="dimensionItems[stage.publication_id].busy" class="px-3 py-1.5 text-xs bg-red-50 text-red-600 rounded">删除</button></div>
+                                <p class="text-xs text-slate-500">尺寸单位为毫米；保存后会随该留档展示给业主。此记录不替代现场复尺或法定检验批记录。</p>
+                              </div>
+                            </template>
+                          </div>
+                        </details>
                         </div>
                       </template>
                     </div>

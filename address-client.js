@@ -146,6 +146,7 @@ window.addressFeatures = {
   remediationDueItems: [],         // 当前员工有权限且逾期/三天内到期的站内提醒
   remediationDueLoading: false,
   remediationReminderDays: 3,      // 契约 remediations.v1 constants.REMINDER_DAYS
+  dimensionItems: {},              // { [publication_id]: {dimension, loading, error, busy, draft} }
 
   hiddenLoading: false,
   hiddenError: '',
@@ -283,6 +284,7 @@ window.addressFeatures = {
     // 留着上一户的三项结论和照片 id，重开面板会先闪一屏旧数据。
     this.resetHiddenState();
     this.resetRemediationState();
+    this.resetDimensionState();
     // 统计、地址列表与整改提醒一起拉：提醒只在员工后台显示，不依赖外部通知通道。
     await Promise.all([this.loadAddresses(), this.loadAddressOverview(), this.loadRemediationDue()]);
   },
@@ -504,7 +506,8 @@ window.addressFeatures = {
       // 材料与性能证明是 per-publication 的缓存，切地址必须清空再按当前留档重建，
       // 否则上一户某条留档的材料会串到这一户同名留档上（与隐蔽工程照片同一条教训）。
       this.resetMaterialsState();
-      for (const st of (detail.stages || [])) this.ensureMaterialEntry(st.publication_id);
+      this.resetDimensionState();
+      for (const st of (detail.stages || [])) { this.ensureMaterialEntry(st.publication_id); this.ensureDimensionEntry(st.publication_id); }
       this.addressAttachOpen = false;
       // 签认记录属于「这个地址」，切地址时必须先清空再拉。
       // 不清空的后果是：A 户的签认记录会短暂显示在 B 户详情里，
@@ -514,6 +517,7 @@ window.addressFeatures = {
       // 员工不会察觉、业主更不会——而照片看起来都像「我家的工地」。
       this.resetHiddenState();
       this.resetRemediationState();
+      this.resetDimensionState();
       await Promise.all([this.loadSignoffs(addressId), this.loadHiddenAcceptance(addressId), this.loadRemediationDue()]);
     } catch (e) { this.showToast(e.message || '地址读取失败', 'error', 8000); }
   },
@@ -528,6 +532,7 @@ window.addressFeatures = {
     this.resetHiddenState();
     this.resetMaterialsState();
     this.resetRemediationState();
+    this.resetDimensionState();
   },
   // 关闭整个地址面板。签认面板与批量归类弹窗是地址面板之上的一层，
   // 关掉下层却留着上层，会在下次打开地址面板时凭空冒出来。
@@ -538,6 +543,7 @@ window.addressFeatures = {
     this.addressFormOpen = false;
     this.resetHiddenState();
     this.resetRemediationState();
+    this.resetDimensionState();
     this.addressPanel = false;
   },
   // Esc 逐层退出：照片放大 → 签认面板 → 批量归类 → 地址表单 → 地址面板。
@@ -1587,6 +1593,68 @@ window.addressFeatures = {
   },
   remediationStatusLabel(status) {
     return status === 'overdue' ? '已逾期' : status === 'resolved' ? '已完成' : '待整改';
+  },
+  // ===== 洞口尺寸结构化（契约 dimensions v1）=====
+  ensureDimensionEntry(pid) {
+    if (!pid) return;
+    if (!this.dimensionItems[pid]) this.dimensionItems[pid] = {
+      dimension: null, loading: false, error: '', busy: false,
+      draft: { width_mm: '', height_mm: '', diagonal_a_mm: '', diagonal_b_mm: '', note: '' },
+    };
+  },
+  resetDimensionState() { this.dimensionItems = {}; },
+  async loadDimensions(pid) {
+    if (!pid) return;
+    this.ensureDimensionEntry(pid);
+    const entry = this.dimensionItems[pid];
+    if (entry.dimension || entry.error || entry.loading) return;
+    entry.loading = true; entry.error = '';
+    try {
+      const data = await this.accountJSON('/publication/' + pid + '/dimensions');
+      if (this.dimensionItems[pid]) {
+        entry.dimension = data.dimension || null;
+        if (entry.dimension) entry.draft = {
+          width_mm: entry.dimension.width_mm || '', height_mm: entry.dimension.height_mm || '',
+          diagonal_a_mm: entry.dimension.diagonal_a_mm || '', diagonal_b_mm: entry.dimension.diagonal_b_mm || '',
+          note: entry.dimension.note || '',
+        };
+      }
+    } catch (e) { if (this.dimensionItems[pid]) entry.error = e.message || '洞口尺寸读取失败'; }
+    finally { if (this.dimensionItems[pid]) entry.loading = false; }
+  },
+  async saveDimensions(pid) {
+    this.ensureDimensionEntry(pid);
+    const entry = this.dimensionItems[pid];
+    if (entry.busy) return;
+    const draft = entry.draft;
+    const body = {
+      width_mm: Number(draft.width_mm), height_mm: Number(draft.height_mm),
+      diagonal_a_mm: draft.diagonal_a_mm === '' ? null : Number(draft.diagonal_a_mm),
+      diagonal_b_mm: draft.diagonal_b_mm === '' ? null : Number(draft.diagonal_b_mm),
+      note: (draft.note || '').trim(),
+    };
+    if (!Number.isInteger(body.width_mm) || body.width_mm < 1 || body.width_mm > 10000 || !Number.isInteger(body.height_mm) || body.height_mm < 1 || body.height_mm > 10000) {
+      this.showToast('宽度和高度需填写 1–10000 的整数毫米', 'error', 7000); return;
+    }
+    for (const key of ['diagonal_a_mm', 'diagonal_b_mm']) if (body[key] !== null && (!Number.isInteger(body[key]) || body[key] < 1 || body[key] > 20000)) {
+      this.showToast('对角线需为 1–20000 的整数毫米', 'error', 7000); return;
+    }
+    if (body.note.length > 200) { this.showToast('尺寸说明不能超过 200 字', 'error', 6000); return; }
+    entry.busy = true;
+    try {
+      const data = await this.accountJSON('/publication/' + pid + '/dimensions', body);
+      entry.dimension = data; this.showToast('✅ 洞口尺寸已保存');
+    } catch (e) { this.showToast(e.message || '洞口尺寸保存失败', 'error', 8000); }
+    finally { entry.busy = false; }
+  },
+  async removeDimensions(pid) {
+    this.ensureDimensionEntry(pid);
+    const entry = this.dimensionItems[pid];
+    if (entry.busy || !entry.dimension) return;
+    entry.busy = true;
+    try { await this.accountDelete('/publication/' + pid + '/dimensions'); entry.dimension = null; entry.draft = { width_mm: '', height_mm: '', diagonal_a_mm: '', diagonal_b_mm: '', note: '' }; this.showToast('洞口尺寸已删除'); }
+    catch (e) { this.showToast(e.message || '洞口尺寸删除失败', 'error', 8000); }
+    finally { entry.busy = false; }
   },
   // 切地址 / 关详情时把隐蔽工程状态全部复位。
   //
