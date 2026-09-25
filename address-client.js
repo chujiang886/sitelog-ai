@@ -6,19 +6,19 @@
 // 后端真源是 cj-share/current/stages.py 的 STAGE_KEYS。
 // 前端因浏览器无法 import Python，只能保留一份副本；test-stage-parity.cjs 负责守护一致性。
 // 改阶段名时，后端 stages.py、这里、index.html 的 <option> 与 TEMPLATES 四处都要改。
-// 阶段详情模板会在地址切换的 Alpine flush 中先求值；用带默认项的 map，
-// 避免短暂的 undefined.items/loading/error/draft 变成未捕获页面错误。
-function addressEntryMap(factory) {
-  return new Proxy({}, {
-    get(target, key) {
-      if (typeof key === 'string' && !(key in target)) target[key] = factory();
-      return target[key];
-    },
-  });
-}
-const emptyMaterialEntry = () => ({ items: [], loading: false, error: '', removing: false, draft: { kind: '', title: '', file: null, uploading: false } });
-const emptyRemediationEntry = () => ({ items: [], loading: false, error: '', busy: false, draft: { title: '', note: '', due_at: '' } });
-const emptyDimensionEntry = () => ({ dimension: null, loading: false, error: '', busy: false, draft: { width_mm: '', height_mm: '', diagonal_a_mm: '', diagonal_b_mm: '', note: '' } });
+// 阶段详情模板会在地址切换的 Alpine flush 中先求值；模板一律走
+// materialEntry / remediationEntry / dimensionEntry 这三个 accessor 取缓存，
+// 由它们在读取时 ensure 出完整形状，避免 undefined.items/loading/error/draft
+// 变成未捕获页面错误。
+//
+// 【为什么不能用 Proxy 做「惰性默认项」】
+// 曾经用 `new Proxy({}, {get(){...}})` 让任何键都自动长出默认 entry，结果
+// Alpine 在初始化 x-data 时会探测 `obj._x_interceptor` 这类内部键；Proxy 的
+// get trap 给它凭空造了一个 truthy 对象，Alpine 于是认为这是一个拦截器并去调
+// `obj.initialize()` —— 该方法不存在，抛
+// `TypeError: s.initialize is not a function`，**整个页面的 Alpine 初始化失败**
+// （登录按钮点了没反应）。教训：给响应式数据套 Proxy 时，get trap 必须对
+// 未知/内部键原样 `Reflect.get` 返回 undefined，绝不能自动造值。
 window.addressFeatures = {
   // 施工阶段（与 stages.py 同序，顺序即施工顺序，地址页按此排列）
   ADDRESS_STAGE_KEYS: ['吊装施工', '框架施工', '框架1对1', '玻扇施工', '玻扇1对1', '五金安装', '离场自检', '售后保养'],
@@ -154,12 +154,12 @@ window.addressFeatures = {
   // MATERIAL_BODY_LIMIT // 3 * 4 + 2*1024*1024 = 37049684。超过后端会 413，先拦省一次白传。
   MATERIAL_DATA_URL_CEILING: 37049684,
 
-  addressMaterials: addressEntryMap(emptyMaterialEntry), // { [publication_id]: {items, loading, error, removing, draft} }
-  remediationItems: addressEntryMap(emptyRemediationEntry), // { [publication_id]: {items, loading, error, draft, busy} }
+  addressMaterials: {},            // { [publication_id]: {items, loading, error, removing, draft} }
+  remediationItems: {},            // { [publication_id]: {items, loading, error, draft, busy} }
   remediationDueItems: [],         // 当前员工有权限且逾期/三天内到期的站内提醒
   remediationDueLoading: false,
   remediationReminderDays: 3,      // 契约 remediations.v1 constants.REMINDER_DAYS
-  dimensionItems: addressEntryMap(emptyDimensionEntry), // { [publication_id]: {dimension, loading, error, busy, draft} }
+  dimensionItems: {},              // { [publication_id]: {dimension, loading, error, busy, draft} }
 
   hiddenLoading: false,
   hiddenError: '',
@@ -1408,9 +1408,11 @@ window.addressFeatures = {
   // 每条留档（publication_id）一份缓存；draft 是该条的上传表单瞬态。
   // 模板可能在切换地址的同一 Alpine flush 中比状态清理早一步求值；
   // 统一从这三个 accessor 取 entry，确保首次渲染永远拿到完整形状，而不是 undefined。
-  materialEntry(pid) { this.ensureMaterialEntry(pid); return this.addressMaterials[pid]; },
-  remediationEntry(pid) { this.ensureRemediationEntry(pid); return this.remediationItems[pid]; },
-  dimensionEntry(pid) { this.ensureDimensionEntry(pid); return this.dimensionItems[pid]; },
+  // 【`pid` 为空时也要返回一个稳定对象】用固定占位键而不是每次 new 一个：
+  // x-model 会往里写，返回临时对象等于把员工的输入丢掉。
+  materialEntry(pid) { const key = pid || '__blank__'; this.ensureMaterialEntry(key); return this.addressMaterials[key]; },
+  remediationEntry(pid) { const key = pid || '__blank__'; this.ensureRemediationEntry(key); return this.remediationItems[key]; },
+  dimensionEntry(pid) { const key = pid || '__blank__'; this.ensureDimensionEntry(key); return this.dimensionItems[key]; },
   ensureMaterialEntry(pid) {
     if (!pid) return;
     if (!this.addressMaterials[pid]) {
@@ -1421,7 +1423,7 @@ window.addressFeatures = {
     }
   },
   resetMaterialsState() {
-    this.addressMaterials = addressEntryMap(emptyMaterialEntry);
+    this.addressMaterials = {};
   },
 
   // ===== 材料与性能证明附件：读取（契约 M2）=====
@@ -1545,7 +1547,7 @@ window.addressFeatures = {
     };
   },
   resetRemediationState() {
-    this.remediationItems = addressEntryMap(emptyRemediationEntry);
+    this.remediationItems = {};
     this.remediationDueItems = [];
     this.remediationDueLoading = false;
   },
@@ -1631,7 +1633,7 @@ window.addressFeatures = {
       draft: { width_mm: '', height_mm: '', diagonal_a_mm: '', diagonal_b_mm: '', note: '' },
     };
   },
-  resetDimensionState() { this.dimensionItems = addressEntryMap(emptyDimensionEntry); },
+  resetDimensionState() { this.dimensionItems = {}; },
   async loadDimensions(pid) {
     if (!pid) return;
     this.ensureDimensionEntry(pid);
