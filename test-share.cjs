@@ -23,8 +23,8 @@ test('截断返回即使包含完整 JSON 也不能当作完成结果',async()=>
 
 test('识别失败期间的人工编辑不会被错误占位文字覆盖',async()=>{
  const app=makeApp();app.ensureCompanyAI=async()=>true;app.syncToReport=()=>{};
- app.images=[{id:'a',title:'原始节点',desc:'待整理',highlights:[]}];
- app.analyzeImage=async()=>{app.images[0].desc='识别等待期间人工输入的记录';app.images[0]._manual={desc:true};throw Error('上游中断')};
+ app.images=[{id:'a',title:'原始节点',desc:'待整理',highlights:[],dataUrl:'data:image/png;base64,AAAA'}];
+ app.runAIBatch=async()=>{app.images[0].desc='识别等待期间人工输入的记录';app.images[0]._manual={desc:true};throw Error('上游中断')};
  await app.aiOrganizeAll();assert.equal(app.images[0].desc,'识别等待期间人工输入的记录');assert.equal(app.images[0].title,'原始节点');assert.equal(app.images[0].aiError,'上游中断');
 });
 test('分享请求使用同站点会话和 CSRF，不发送旧分享凭据',async()=>{

@@ -13,6 +13,13 @@ window.projectFeatures = {
     try{while(['queued','running'].includes(job.status)){if(this.aiCancelRequested)await this.accountJSON('/ai/jobs/'+job.id+'/cancel',{});await new Promise(resolve=>setTimeout(resolve,1000));job=await this.accountJSON('/ai/jobs/'+job.id);this.aiJobStatus=job.status==='queued'?'识别排队中':job.status==='running'?'正在识别…':'';}if(job.status!=='succeeded')throw Error(job.error||'识别已取消');return job.result}
     finally{this.aiJobId='';this.aiJobStatus='';}
   },
+  // 批量识别：一次提交多张照片，后端按提交顺序返回 items 数组。
+  async runAIBatch(images,prompt,model,opts){
+    opts=opts||{};this.aiCancelRequested=false;const body={images,prompt,model};if(opts.stage)body.stage=opts.stage;if(opts.context)body.context=opts.context;
+    let job=await this.accountJSON('/ai/jobs',body);this.aiJobId=job.id;this.aiJobStatus='识别任务已排队';
+    try{while(['queued','running'].includes(job.status)){if(this.aiCancelRequested)await this.accountJSON('/ai/jobs/'+job.id+'/cancel',{});await new Promise(resolve=>setTimeout(resolve,1000));job=await this.accountJSON('/ai/jobs/'+job.id);this.aiJobStatus=job.status==='queued'?'识别排队中':job.status==='running'?'正在识别…':'';}if(job.status!=='succeeded')throw Error(job.error||'识别已取消');return job.result}
+    finally{this.aiJobId='';this.aiJobStatus='';}
+  },
   projectSnapshotExtras(){return {id:this.cloudProjectId,revision:this.cloudRevision,status:this.cloudStatus}},
   restoreProjectExtras(value){this.cloudProjectId=value?.id||'';this.cloudRevision=value?.revision||0;this.cloudStatus=value?.status||'draft';this.cloudMessage=this.cloudProjectId?'云端修订 '+this.cloudRevision+' · 本机恢复':'尚未保存云端';this.projectDetail=null;this.publicationAttempt=null;this.reviewMessage='';this.shareStep=''},
   resetProjectContext(){this.restoreProjectExtras(null)},

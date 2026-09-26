@@ -2941,7 +2941,7 @@
           }
         },
 
-        // ===== AI 视觉识别 =====
+        // ===== AI 视觉识别（批量：按分区成组，每组最多 8 张一次提交）=====
         async aiOrganizeAll() {
           if (this.processing || this.aiChecking) return;
           this.aiChecking = true;
@@ -2964,47 +2964,103 @@
           this.processing = true;
           this.processedCount = 0;
           const failures = [];
-          const CONCURRENCY = 1; // 每账号顺序处理；公司并发由服务器控制。
-          let cursor = 0;
-          const worker = async () => {
-            while (cursor < todo.length && !this.aiCancelRequested) {
-              const img = todo[cursor++];
-              img.analyzing = true;
-              const before=JSON.stringify([img.title,img.desc,img.highlights,img._manual]);
-              try {
-                const candidate={...img,highlights:[...(img.highlights||[])]};await this.analyzeImage(candidate);
-                if(before===JSON.stringify([img.title,img.desc,img.highlights,img._manual])){
-                  for(const key of ['title','desc','category','stage','highlights','uncertainties','aiConfirmed','_analyzed','aiError','aiSource'])img[key]=candidate[key];
-                  img.aiBaseline={title:candidate.title,desc:candidate.desc,category:candidate.category,highlights:[...(candidate.highlights||[])],source:candidate.aiSource||{},capturedAt:new Date().toISOString()};
-                }else{this.proposeAI(img,candidate);this.showToast('识别期间你修改了文字，新建议需确认后才会采用');}
-              } catch (e) {
-                console.error('分析失败', img.file && img.file.name, e);
-                const sectionName = img.section === 'arrival' ? '进场照片' : (img.section === 'finish' ? '完工照片' : '施工节点');
-                const idx = img.section === 'arrival' ? this.arrivalImages.indexOf(img) + 1 : (img.section === 'finish' ? this.finishImages.indexOf(img) + 1 : this.images.indexOf(img) + 1);
-                if(before===JSON.stringify([img.title,img.desc,img.highlights,img._manual])) {
-                  img.title = `${sectionName} ${idx}`;
-                  img.desc = `[AI 识别失败] ${e.message}\n\n当前照片已保留，可稍后重试或手动填写。`;
-                }
-                img.aiError = e.message;
-                failures.push({ name: (img.file && img.file.name) || img.id, error: e.message });
-              } finally {
-                img.analyzing = false;
-              }
-              this.processedCount++;
-              this.syncToReport();
-            }
-          };
+          const BATCH_MAX = 8; // 与后端 BATCH_MAX 一致：单次最多 8 张
+          const SECTION_CONTEXT = { construction: '施工过程照片', arrival: '班组进场照片', finish: '完工/离场照片' };
+          // 按 section 分组，组内每 8 张一批（同一批用该分区的提示词与上下文）
+          const groups = {};
+          for (const img of todo) {
+            const key = img.section || 'construction';
+            (groups[key] = groups[key] || []).push(img);
+          }
+          const model = this.companyAIModel;
+          const sectionNameOf = img => img.section === 'arrival' ? '进场照片' : (img.section === 'finish' ? '完工照片' : '施工节点');
+          const indexOf = img => img.section === 'arrival' ? this.arrivalImages.indexOf(img) + 1 : (img.section === 'finish' ? this.finishImages.indexOf(img) + 1 : this.images.indexOf(img) + 1);
           try {
-            await Promise.all(
-              Array.from({ length: Math.min(CONCURRENCY, todo.length) }, () => worker())
-            );
-            if (this.aiCancelRequested) { this.showToast('已停止后续识别，现有内容已保留'); } else if (failures.length === 0) {
-              this.showToast(`✨ AI 整理完成，本次共处理 ${this.processedCount} 张 — 点击文字可直接修改，导出时自动保留您的修改`);
-            } else {
-              this.showToast(`⚠️ ${failures.length} 张识别失败：${failures[0].error.slice(0, 80)}`, 'error');
+            outer:
+            for (const [section, group] of Object.entries(groups)) {
+              for (let i = 0; i < group.length; i += BATCH_MAX) {
+                if (this.aiCancelRequested) break outer;
+                const batch = group.slice(i, i + BATCH_MAX);
+                batch.forEach(img => img.analyzing = true);
+                const beforeArr = batch.map(img => JSON.stringify([img.title, img.desc, img.highlights, img._manual]));
+                let result;
+                try {
+                  // 批量前先压缩超大连图，避免一次请求体积过大
+                  const images = [];
+                  for (const img of batch) {
+                    let data = img.dataUrl;
+                    if (data.length > 400 * 1024) data = await this.compressDataUrl(data);
+                    images.push(data);
+                  }
+                  result = await this.runAIBatch(images, this.buildAnalysisPrompt(section), model, { context: SECTION_CONTEXT[section] || '工程照片' });
+                } catch (e) {
+                  batch.forEach((img, k) => {
+                    if (beforeArr[k] === JSON.stringify([img.title, img.desc, img.highlights, img._manual])) {
+                      img.title = `${sectionNameOf(img)} ${indexOf(img)}`;
+                      img.desc = `[AI 识别失败] ${e.message}\n\n当前照片已保留，可稍后重试或手动填写。`;
+                    }
+                    img.aiError = e.message;
+                    failures.push({ name: (img.file && img.file.name) || img.id, error: e.message });
+                    img.analyzing = false;
+                  });
+                  this.processedCount += batch.length;
+                  this.syncToReport();
+                  continue;
+                }
+                // 后端返回 items 数组（与提交顺序一一对应）；长度不符则降级逐张单图识别
+                let items = (result && Array.isArray(result.items)) ? result.items : null;
+                if (items && items.length !== batch.length) items = null;
+                if (!items) {
+                  for (let k = 0; k < batch.length; k++) {
+                    const img = batch[k];
+                    const before = beforeArr[k];
+                    try {
+                      const candidate = { ...img, highlights: [...(img.highlights || [])], _manual: {} };
+                      await this.analyzeImage(candidate);
+                      this.applyCandidateAndAdopt(img, candidate, before);
+                    } catch (e) {
+                      if (before === JSON.stringify([img.title, img.desc, img.highlights, img._manual])) {
+                        img.title = `${sectionNameOf(img)} ${indexOf(img)}`;
+                        img.desc = `[AI 识别失败] ${e.message}\n\n当前照片已保留，可稍后重试或手动填写。`;
+                      }
+                      img.aiError = e.message;
+                      failures.push({ name: (img.file && img.file.name) || img.id, error: e.message });
+                    } finally {
+                      img.analyzing = false;
+                    }
+                  }
+                  this.processedCount += batch.length;
+                  this.syncToReport();
+                  continue;
+                }
+                batch.forEach((img, k) => {
+                  const candidate = { ...img, highlights: [...(img.highlights || [])], _manual: {} };
+                  const r = items[k] || {};
+                  r._model = result.model || model;
+                  this.applyAnalysisResult(candidate, r, model);
+                  this.applyCandidateAndAdopt(img, candidate, beforeArr[k]);
+                  img.analyzing = false;
+                });
+                this.processedCount += batch.length;
+                this.syncToReport();
+              }
             }
+            if (this.aiCancelRequested) { this.showToast('已停止后续识别，现有内容已保留'); }
+            else if (failures.length === 0) { this.showToast(`✨ AI 整理完成，本次共处理 ${this.processedCount} 张（已批量提交，更快更稳）— 点击文字可直接修改，导出时自动保留您的修改`); }
+            else { this.showToast(`⚠️ ${failures.length} 张识别失败：${failures[0].error.slice(0, 80)}`, 'error'); }
           } finally {
             this.processing = false;
+          }
+        },
+
+        // 识别完成后：若期间用户没手改文字，则直接采用；否则给出建议待确认
+        applyCandidateAndAdopt(img, candidate, before) {
+          if (before === JSON.stringify([img.title, img.desc, img.highlights, img._manual])) {
+            for (const key of ['title','desc','category','stage','highlights','uncertainties','aiConfirmed','_analyzed','aiError','aiSource']) img[key] = candidate[key];
+            img.aiBaseline = { title: candidate.title, desc: candidate.desc, category: candidate.category, highlights: [...(candidate.highlights || [])], source: candidate.aiSource || {}, capturedAt: new Date().toISOString() };
+          } else {
+            this.proposeAI(img, candidate);
+            this.showToast('识别期间你修改了文字，新建议需确认后才会采用');
           }
         },
 
@@ -3117,13 +3173,27 @@
         async analyzeImage(img) {
           const model = this.companyAIModel;
           const result = await this.callVisionAPI(img.dataUrl, this.buildAnalysisPrompt(img.section || 'construction'), model);
-          if (result._noJson || !result.desc) throw Error('AI 返回内容不完整，请保留照片并重试');
+          this.applyAnalysisResult(img, result, model);
+        },
+
+        // 把模型返回的解析结果落到 img（单图与批量复用同一套字段映射）
+        applyAnalysisResult(img, result, model) {
+          if (result._noJson || !result.desc) {
+            img._analyzed = true;
+            img.aiError = 'AI 返回内容不完整，请保留照片并重试';
+            return;
+          }
           const categories = ['框架施工','玻扇施工','五金安装','密封收口','成品保护','其他'];
           img.category = img.section === 'arrival' ? '班组进场' : img.section === 'finish' ? '完工照片' : categories.includes(result.category) ? result.category : '其他';
-          img.title = result.title || '待核实节点';img.desc = result.desc;img.stage = result.stage || '';
+          img.title = result.title || '待核实节点';
+          img.desc = result.desc;
+          img.stage = result.stage || '';
           img.highlights = Array.isArray(result.highlights) ? result.highlights : [];
           img.uncertainties = Array.isArray(result.uncertainties) ? result.uncertainties : ['尺寸、安装精度与验收结论需结合现场记录核实'];
-          img.aiConfirmed = false;img._analyzed = true;img.aiError = '';img.aiSource = {model:result._model || model,generatedAt:new Date().toISOString(),kind:'AI 建议，待人工确认'};
+          img.aiConfirmed = false;
+          img._analyzed = true;
+          img.aiError = '';
+          img.aiSource = { model: result._model || model, generatedAt: new Date().toISOString(), kind: 'AI 建议，待人工确认' };
         },
 
         buildAnalysisPrompt(section = 'construction') {
