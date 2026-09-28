@@ -1571,7 +1571,7 @@
           <div class="border border-slate-200 rounded-lg p-3 flex flex-wrap items-center gap-3">
             <div class="flex-1 min-w-0">
               <p class="text-sm font-semibold text-slate-900 truncate" x-text="item.title || item.id"></p>
-              <p class="text-xs text-slate-500 truncate" x-text="(item.project || '') + ' · ' + item.created_at"></p>
+              <p class="text-xs text-slate-500 truncate" x-text="(item.report || item.project || '') + ' · ' + item.created_at"></p>
               <div class="flex items-center gap-3 mt-1 text-xs">
                 <span class="text-slate-600">👁 查看 <b x-text="item.views"></b> 次</span>
                 <span x-show="item.revoked" class="text-red-500">已作废</span>

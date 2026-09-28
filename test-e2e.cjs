@@ -124,7 +124,9 @@ async function capture(page, name) { await page.screenshot({ path: path.join(out
   await login(second, workerUsername, workerReady);
   await second.locator('#login-user').waitFor({ state: 'hidden' });
   await second.getByRole('button', { name: /分享管理/ }).click();
-  await second.getByText('公司登录端到端验收工程 施工归档', { exact: true }).waitFor();
+  // 分享管理列表的标题是**工程名（房号地址）**，不是 PDF 导出文件名，也不再拼「施工归档」（2026-09-28 改）。
+  // 断言走 Alpine 数据而不是 getByText：工程名同时出现在封面 h1 上，按文本匹配会撞 strict mode。
+  await second.waitForFunction(()=>{const a=Alpine.$data(document.body);return a.shareManageOpen&&a.shareList.some(x=>x.title==='公司登录端到端验收工程')});
   await capture(second, '06-另一设备查看同账号记录');
   const cookies = await secondDevice.cookies();
   assert.ok(cookies.find(c => c.name === 'cj_sitelog_session' && c.httpOnly && c.sameSite === 'Lax' && (!production || c.secure)));

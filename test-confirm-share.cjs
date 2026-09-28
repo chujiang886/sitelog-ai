@@ -25,5 +25,14 @@ async function confirmShare(p){await p.evaluate(()=>Alpine.$data(document.body).
  const ec=await browser.newContext(),ep=await ec.newPage();ep.on('dialog',d=>d.accept());await login(ep,'editor');await ep.evaluate(pid=>Alpine.$data(document.body).openCloudProject(pid),pid);await ep.locator('#images-container .node-card-desc').first().fill('编辑同事修改，需要负责人审核');await confirmShare(ep);assert.match(await ep.evaluate(()=>Alpine.$data(document.body).shareError),/负责人或审核人/);assert.equal((await api(p,'/projects/'+pid)).versions.length,1);
  // 有权限的用户也不能跳过关键整改问题。
  detail=await api(p,'/projects/'+pid);const issue=await api(p,'/projects/'+pid+'/issues',{project_revision:detail.revision,action:'create',title:'关键固定点待复核',severity:'critical',assignee:detail.owner,media:[]});await p.evaluate(pid=>Alpine.$data(document.body).openCloudProject(pid),pid);await confirmShare(p);assert.match(await p.evaluate(()=>Alpine.$data(document.body).shareError),/关键问题/);assert.equal((await api(p,'/projects/'+pid)).versions.length,1);
- assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'一次确认流程验收.json'),JSON.stringify({passed:true,photos:23,unconfirmedBefore:19,staffOwner:true,optionalChecklist:true,qrDecoded:true,responseLossDeduplicated:true,draftApproval:true,emptyIssueNoMutation:true,editorCannotApprove:true,criticalIssueBlocks:true,errors},null,2));console.log('通过：23张照片一次确认分享、审核记录、响应丢失重试、空表单保护、成员权限、关键问题阻断。');
+ // 分享管理列表的标题必须是**工程名（房号地址）**，不是 PDF 导出文件名 —— 2026-09-28 生产缺陷守护。
+ // 旧实现取 meta.pdfFilename（手改一次就粘住），导致列表里所有分享都显示同一个旧房号。
+ // 按标题找而不是按 id：走到这里 shareResult 已被后续的 openShareDialog 清空。
+ await p.evaluate(()=>Alpine.$data(document.body).openShareManage());
+ await p.waitForFunction(()=>Alpine.$data(document.body).shareList.length>0);
+ const listed=await p.evaluate(()=>Alpine.$data(document.body).shareList.find(x=>x.title==='23张照片审核回归'));
+ assert.ok(listed,'分享管理列表里必须有一条标题为工程名的分享');
+ assert.ok(listed.report,'副标题要有报告类型，否则标题与副标题重复');
+ await p.evaluate(()=>{Alpine.$data(document.body).shareManageOpen=false});
+ assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'一次确认流程验收.json'),JSON.stringify({passed:true,photos:23,unconfirmedBefore:19,staffOwner:true,optionalChecklist:true,qrDecoded:true,responseLossDeduplicated:true,draftApproval:true,emptyIssueNoMutation:true,editorCannotApprove:true,criticalIssueBlocks:true,shareListTitleIsProjectName:true,errors},null,2));console.log('通过：23张照片一次确认分享、审核记录、响应丢失重试、空表单保护、成员权限、关键问题阻断、分享清单标题取工程名。');
 })().catch(async e=>{console.error(e);if(browser)for(const c of browser.contexts())for(const p of c.pages())if(p.url().startsWith(base+'/sitelog'))console.error(await p.evaluate(()=>{const a=Alpine.$data(document.body);return {share:a.shareError,review:a.reviewMessage,status:a.cloudStatus}}));process.exitCode=1}).finally(async()=>{if(browser)await browser.close()});
