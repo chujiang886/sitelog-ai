@@ -1,10 +1,15 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),{test}=require('node:test');
 const html=fs.readFileSync('index.html','utf8');
 const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
-for(const source of scripts)new vm.Script(source[1]);
+const APP_MAIN = fs.readFileSync('app-main.js','utf8');
+const CSS = fs.readFileSync('styles.css','utf8');
+// 整页源码：外置样式（head）+ index.html + 外置主脚本（body 末尾）。
+// 这三份原先内联在同一个 index.html 里，结构守卫要按「页面最终长什么样」看，不能只扫 index.html。
+const PAGE = CSS + '\n' + html + '\n' + APP_MAIN;
+for(const source of scripts)new vm.Script(source[1]);new vm.Script(APP_MAIN);
 function makeApp(fetch){
  const context={window:{},fetch,console:{...console,error(){}},confirm:()=>true,setTimeout,clearTimeout};
- vm.createContext(context);vm.runInContext(fs.readFileSync('auth-client.js','utf8'),context);vm.runInContext(scripts.at(-1)[1],context);
+ vm.createContext(context);vm.runInContext(fs.readFileSync('auth-client.js','utf8'),context);vm.runInContext(APP_MAIN,context);
  const app=context.siteLogApp();app.showToast=()=>{};return app;
 }
 
@@ -52,7 +57,7 @@ test('二维码失败保留链接，重绘不会再次上传',async()=>{
  await app.doShare();assert.equal(app.shareCardReady,false);assert.match(app.shareError,/链接已创建/);app.drawShareCard=()=>{};await app.retryShareCard();assert.equal(app.shareCardReady,true);assert.equal(posts,1);
 });
 test('员工页面不包含分享配置导入和直接 AI 密钥请求',()=>{
- assert.ok(!html.includes('importShareConfig'));assert.ok(!html.includes('X-Share-Token'));assert.ok(!html.includes("authHeader: 'Bearer '"));
+ assert.ok(!PAGE.includes('importShareConfig'));assert.ok(!PAGE.includes('X-Share-Token'));assert.ok(!PAGE.includes("authHeader: 'Bearer '"));
 });
 
 test('已打开的员工页面在配置完成后即时恢复，保留照片和人工审核内容',async()=>{

@@ -7,7 +7,11 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const SRC = fs.readFileSync(path.join(__dirname, 'address-client.js'), 'utf8');
 const HTML = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-const scripts = [...HTML.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+const APP_MAIN = fs.readFileSync(path.join(__dirname,'app-main.js'),'utf8');
+const CSS = fs.readFileSync(path.join(__dirname,'styles.css'),'utf8');
+// 整页源码：外置样式（head）+ index.html + 外置主脚本（body 末尾）。
+// 这三份原先内联在同一个 index.html 里，结构守卫要按「页面最终长什么样」看，不能只扫 index.html。
+const PAGE = CSS + '\n' + HTML + '\n' + APP_MAIN;
 function app(fetchImpl) {
   const calls = [];
   const fetch = async (url, options) => { calls.push({url, options}); return fetchImpl(url, options); };
@@ -15,7 +19,7 @@ function app(fetchImpl) {
   vm.createContext(c);
   vm.runInContext(fs.readFileSync(path.join(__dirname, 'auth-client.js'), 'utf8'), c);
   vm.runInContext(SRC, c);
-  vm.runInContext(scripts.at(-1)[1], c);
+  vm.runInContext(APP_MAIN, c);
   const a = c.siteLogApp(); a.calls = calls; a.csrf = 'csrf'; a.showToast = () => {}; a.addressDetail = { id: 'a'.repeat(32) };
   return a;
 }
@@ -81,7 +85,7 @@ test('缓存按 publication 隔离，关闭详情清空', () => {
 });
 
 test('index.html：整改区挂在每条留档，含截止日期、完成/重开与删除', () => {
-  const region = HTML.slice(HTML.indexOf('整改时限与到期提醒'));
+  const region = PAGE.slice(PAGE.indexOf('整改时限与到期提醒'));
   assert.match(region, /loadRemediations\(stage\.publication_id\)/);
   assert.match(region, /addRemediation\(stage\.publication_id\)/);
   assert.match(region, /changeRemediation\(stage\.publication_id, item, 'resolve'\)/);
@@ -92,5 +96,5 @@ test('index.html：整改区挂在每条留档，含截止日期、完成/重开
 
 test('员工侧文案明确整改不进入业主公开文档，不夸大法律效力', () => {
   assert.ok((SRC + HTML).includes('业主公开文档不展示'));
-  assert.ok(!/具有法律效力|可靠电子签名/.test(SRC + HTML));
+  assert.ok(!/具有法律效力|可靠电子签名/.test(SRC + PAGE));
 });

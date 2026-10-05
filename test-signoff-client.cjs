@@ -26,8 +26,12 @@ const { test } = require('node:test');
 
 const HTML = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const ADDRESS_SRC = fs.readFileSync(path.join(__dirname, 'address-client.js'), 'utf8');
-// 与 test-share.cjs 同一套取法：只抓无属性的 <script>，最后一个就是 siteLogApp() 所在的大块。
-const inlineScripts = [...HTML.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+// 主脚本已外置到 app-main.js（原先是 index.html 末尾的内联 <script>）。
+const APP_MAIN = fs.readFileSync(path.join(__dirname,'app-main.js'),'utf8');
+const CSS = fs.readFileSync(path.join(__dirname,'styles.css'),'utf8');
+// 整页源码：外置样式（head）+ index.html + 外置主脚本（body 末尾）。
+// 这三份原先内联在同一个 index.html 里，结构守卫要按「页面最终长什么样」看，不能只扫 index.html。
+const PAGE = CSS + '\n' + HTML + '\n' + APP_MAIN;
 
 // 阶段名真源在 address-client.js 顶部；测试里这一份只用来断言「index.html 没再抄一遍」。
 const STAGE_NAMES = ['吊装施工', '框架施工', '框架1对1', '玻扇施工', '玻扇1对1', '五金安装', '离场自检', '售后保养'];
@@ -74,7 +78,7 @@ function makeApp(fetchImpl, opts = {}) {
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, 'auth-client.js'), 'utf8'), context, { filename: 'auth-client.js' });
   vm.runInContext(ADDRESS_SRC, context, { filename: 'address-client.js' });
-  vm.runInContext(inlineScripts.at(-1)[1], context, { filename: 'index.html:<last inline script>' });
+  vm.runInContext(APP_MAIN, context, { filename: 'app-main.js' });
 
   // 二维码组件：本页已有 window.qrcode，记录它被喂进去的字符串——
   // 「编码的是不是后端返回的 url」只能这样钉住。
@@ -564,7 +568,7 @@ test('红线：前端不拼签认链接、不算 digest/manifest、不发裸 fet
   // 写请求一律走 accountJSON（它负责加 X-CSRF-Token）；裸 fetch 会漏掉 CSRF
   assert.ok(!/\bfetch\s*\(/.test(ADDRESS_SRC), 'address-client.js 不该自己发 fetch');
   // 不调外部二维码 API
-  assert.ok(!/qrserver|googleapis|chart\.api|quickchart/i.test(ADDRESS_SRC + HTML), '引用了外部二维码/图表服务');
+  assert.ok(!/qrserver|googleapis|chart\.api|quickchart/i.test(ADDRESS_SRC + PAGE), '引用了外部二维码/图表服务');
   // 不硬编码域名
   assert.ok(!/https?:\/\/(?!cj-az\.cn\/sign\/TOKEN123)/.test(ADDRESS_SRC.replace(/https:\/\/cj-az\.cn/g, '')), '出现了硬编码域名');
 });
@@ -587,21 +591,21 @@ test('index.html：签认入口挂在每一条留档上，阶段名不抄第二�
 
 test('index.html：stale 徽标、已撤回置灰、撤回入口三态都在位', () => {
   // stale 徽标：签认后档案又改过，必须显眼提示
-  assert.match(HTML, /row\.stale\s*&&\s*!row\.revoked/);
-  assert.match(HTML, /签认后该阶段档案已更新/);
-  // 已撤回：置灰 + 撤回原因/撤回人/撤回时间
-  assert.match(HTML, /:class="\[\(row\.revoked \? 'revoked' : ''\)/);
-  assert.match(HTML, /\.signoff-row\.revoked\s*\{/);
-  assert.match(HTML, /row\.revoke_note/);
-  assert.match(HTML, /row\.revoked_by_name/);
-  assert.match(HTML, /row\.revoked_at/);
+  assert.match(PAGE, /row\.stale\s*&&\s*!row\.revoked/);
+  assert.match(PAGE, /签认后该阶段档案已更新/);
+  // 已撤回：置灰 + 撤回原因/撤回人/撤回时间（.signoff-row.revoked 的样式已外置到 styles.css）
+  assert.match(PAGE, /:class="\[\(row\.revoked \? 'revoked' : ''\)/);
+  assert.match(PAGE, /\.signoff-row\.revoked\s*\{/);
+  assert.match(PAGE, /row\.revoke_note/);
+  assert.match(PAGE, /row\.revoked_by_name/);
+  assert.match(PAGE, /row\.revoked_at/);
   // 未撤回才给「撤回」按钮，已撤回显示灰字
-  assert.match(HTML, /x-show="!row\.revoked"[\s\S]{0,200}?openSignoffRevoke\(row\)/);
+  assert.match(PAGE, /x-show="!row\.revoked"[\s\S]{0,200}?openSignoffRevoke\(row\)/);
   // 正在撤回的那条要高亮，表单在列表外，靠这圈高亮对应
-  assert.match(HTML, /signoffRevokeId === row\.id \? 'picking' : ''/);
-  assert.match(HTML, /\.signoff-row\.picking\s*\{/);
+  assert.match(PAGE, /signoffRevokeId === row\.id \? 'picking' : ''/);
+  assert.match(PAGE, /\.signoff-row\.picking\s*\{/);
   // 笔迹缩略图：无笔迹时整块不渲染（x-show 会留着 src 照样发一次 404 请求）
-  assert.match(HTML, /<template x-if="row\.has_stroke">[\s\S]{0,200}?signoffStrokeUrl\(row\)/);
+  assert.match(PAGE, /<template x-if="row\.has_stroke">[\s\S]{0,200}?signoffStrokeUrl\(row\)/);
 });
 
 test('撤回原因输入框只渲染一份，且不在 x-for 里', () => {
@@ -633,13 +637,13 @@ test('x-show 表达式不能混类型：Alpine 会对同一元素隐藏两次并
   // 对同一个元素连续走两次隐藏流程 —— 第二次 `_x_hidePromise` 已被删掉，
   // 抛 `TypeError: u is not a function`（vendor/alpine.min.js 内部，未捕获）。
   // 加 `!!` 之后三种状态恒为 false，判等成立，隐藏只走一次。
-  assert.ok(!/x-show="[^"]*&&\s*(signoffError|signoffQrError|signoffUrl|signoffToken|signoffLabel|signoffRevokeId)\s*"/.test(HTML),
+  assert.ok(!/x-show="[^"]*&&\s*(signoffError|signoffQrError|signoffUrl|signoffToken|signoffLabel|signoffRevokeId)\s*"/.test(PAGE),
     'x-show 里把字符串字段直接当成 && 的右操作数 —— 必须用 !! 转成布尔');
-  assert.match(HTML, /x-show="!signoffLoading && !!signoffError"/, '错误提示行的 !! 丢了');
+  assert.match(PAGE, /x-show="!signoffLoading && !!signoffError"/, '错误提示行的 !! 丢了');
 });
 
 test('产品文案只说「客户已确认」，不写「具有法律效力」', () => {
-  const signoffText = ADDRESS_SRC + HTML;
+  const signoffText = ADDRESS_SRC + PAGE;
   assert.ok(!/具有法律效力|法律效力|可靠电子签名/.test(signoffText),
     '签认文案越界了：手写笔迹+时间戳只构成「电子数据」，不构成可靠电子签名');
 });

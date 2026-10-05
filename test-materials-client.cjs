@@ -27,7 +27,12 @@ const { test } = require('node:test');
 
 const HTML = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const ADDRESS_SRC = fs.readFileSync(path.join(__dirname, 'address-client.js'), 'utf8');
-const inlineScripts = [...HTML.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+// 主脚本已外置到 app-main.js（原先是 index.html 末尾的内联 <script>）。
+const APP_MAIN = fs.readFileSync(path.join(__dirname,'app-main.js'),'utf8');
+const CSS = fs.readFileSync(path.join(__dirname,'styles.css'),'utf8');
+// 整页源码：外置样式（head）+ index.html + 外置主脚本（body 末尾）。
+// 这三份原先内联在同一个 index.html 里，结构守卫要按「页面最终长什么样」看，不能只扫 index.html。
+const PAGE = CSS + '\n' + HTML + '\n' + APP_MAIN;
 
 // ---------- 跨仓库守卫：读后端契约（照 test-hidden-client.cjs）----------
 const CONTRACT_PATH = process.env.SITELOG_BACKEND
@@ -66,7 +71,7 @@ function makeApp(fetchImpl, opts = {}) {
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, 'auth-client.js'), 'utf8'), context, { filename: 'auth-client.js' });
   vm.runInContext(ADDRESS_SRC, context, { filename: 'address-client.js' });
-  vm.runInContext(inlineScripts.at(-1)[1], context, { filename: 'index.html:<last inline script>' });
+  vm.runInContext(APP_MAIN, context, { filename: 'app-main.js' });
   context.window.qrcode = () => ({
     addData: () => {}, make: () => {}, getModuleCount: () => 21, isDark: (r, c) => (r + c) % 2 === 0,
   });
@@ -333,7 +338,7 @@ test('index.html：文件选择 accept 覆盖契约 MIME 白名单，上传中�
 
 test('x-show 表达式只收敛成布尔（不外带字符串字段做 && 右操作数，避免 Alpine 3 抛错）', () => {
   assert.ok(
-    !/x-show="[^"]*&&\s*(m\.kind|m\.title|m\.filename|m\.mime|stage\.label|stage\.created)\s*"/.test(HTML),
+    !/x-show="[^"]*&&\s*(m\.kind|m\.title|m\.filename|m\.mime|stage\.label|stage\.created)\s*"/.test(PAGE),
     'x-show 里把可能为字符串的字段直接当成 && 的右操作数 —— 必须用 !! 转成布尔',
   );
   assert.match(hiddenRegion, /x-show="!materialEntry\(stage.publication_id\)\.loading && !!materialEntry\(stage.publication_id\)\.error"/,
@@ -341,7 +346,7 @@ test('x-show 表达式只收敛成布尔（不外带字符串字段做 && 右操
 });
 
 test('产品文案克制，不夸大材料证明的法律效力', () => {
-  const text = ADDRESS_SRC + HTML;
+  const text = ADDRESS_SRC + PAGE;
   assert.ok(!/具有法律效力|法律效力|可靠电子签名/.test(text), '文案越界了：材料清单只构成交付附件，不构成效力承诺');
 });
 
@@ -365,7 +370,7 @@ test('调用的端点与契约 materials v1 逐条对得上', () => {
 });
 
 test('用到的字段名全部来自契约，没有自造字段', () => {
-  const combined = ADDRESS_SRC + HTML;
+  const combined = ADDRESS_SRC + PAGE;
   for (const field of ['kind', 'title', 'filename', 'mime', 'size', 'dataUrl', 'items', 'publication_id']) {
     assert.ok(combined.includes(field), '契约字段没被用上（或拼错了）：' + field);
   }

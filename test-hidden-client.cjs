@@ -30,9 +30,12 @@ const { test } = require('node:test');
 
 const HTML = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const ADDRESS_SRC = fs.readFileSync(path.join(__dirname, 'address-client.js'), 'utf8');
-// 与 test-share.cjs / test-signoff-client.cjs 同一套取法：只抓无属性的 <script>，
-// 最后一个就是 siteLogApp() 所在的大块。
-const inlineScripts = [...HTML.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+// 主脚本已外置到 app-main.js（原先是 index.html 末尾的内联 <script>）。
+const APP_MAIN = fs.readFileSync(path.join(__dirname,'app-main.js'),'utf8');
+const CSS = fs.readFileSync(path.join(__dirname,'styles.css'),'utf8');
+// 整页源码：外置样式（head）+ index.html + 外置主脚本（body 末尾）。
+// 这三份原先内联在同一个 index.html 里，结构守卫要按「页面最终长什么样」看，不能只扫 index.html。
+const PAGE = CSS + '\n' + HTML + '\n' + APP_MAIN;
 
 // 契约 constants.ITEMS 的三项。**这份只用于对账**，不是前端的数据来源：
 // 界面上的名字一律渲染后端 H1 返回的 item.label。
@@ -81,7 +84,7 @@ function makeApp(fetchImpl, opts = {}) {
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, 'auth-client.js'), 'utf8'), context, { filename: 'auth-client.js' });
   vm.runInContext(ADDRESS_SRC, context, { filename: 'address-client.js' });
-  vm.runInContext(inlineScripts.at(-1)[1], context, { filename: 'index.html:<last inline script>' });
+  vm.runInContext(APP_MAIN, context, { filename: 'app-main.js' });
   context.window.qrcode = () => ({
     addData: () => {}, make: () => {}, getModuleCount: () => 21, isDark: (r, c) => (r + c) % 2 === 0,
   });
@@ -764,7 +767,7 @@ test('index.html：三项名字一律渲染后端的 item.label，不抄第二�
   for (const label of CONTRACT_ITEM_LABELS) {
     for (const quoted of [`'${label}'`, `"${label}"`]) {
       assert.ok(!ADDRESS_SRC.includes(quoted), 'address-client.js 把项目名写成了字面量：' + label);
-      assert.ok(!HTML.includes(quoted), 'index.html 把项目名写成了字面量：' + label);
+      assert.ok(!PAGE.includes(quoted), '整页源码把项目名写成了字面量：' + label);
     }
   }
   // 三项的 key 在前端只允许出现在一处：形状兜底用的 HIDDEN_ITEM_KEYS
