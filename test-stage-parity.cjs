@@ -34,6 +34,7 @@ const HERE = __dirname;
 const CLIENT_JS = path.join(HERE, 'address-client.js');
 const INDEX_HTML = path.join(HERE, 'index.html');
 const APP_MAIN_JS = path.join(HERE, 'app-main.js');
+const TEMPLATES_JS = path.join(HERE, 'templates.js');
 const EDITOR_STATE_JS = path.join(HERE, 'editor-state.js');
 
 // ---------- 定位后端 stages.py ----------
@@ -144,8 +145,9 @@ if (!stagesPath) {
 const py = fs.readFileSync(stagesPath, 'utf8');
 const clientJs = fs.readFileSync(CLIENT_JS, 'utf8');
 // index.html 只保留页面结构；原先内联在同一个文件里的主脚本已外置到 app-main.js，
-// TEMPLATES / getTemplateHtml() 随之搬走。这里按「整页」读，两处都扫到。
-const html = fs.readFileSync(INDEX_HTML, 'utf8') + '\n' + fs.readFileSync(APP_MAIN_JS, 'utf8');
+// 报告模板（TEMPLATES 本体）又从 app-main.js 搬到了 templates.js。
+// 按「整页」读，三处都扫到 —— 否则「每个阶段都映射到真实存在的模板函数」会假失败。
+const html = [INDEX_HTML, APP_MAIN_JS, TEMPLATES_JS].map((f) => fs.readFileSync(f, 'utf8')).join('\n');
 const editorStateJs = fs.readFileSync(EDITOR_STATE_JS, 'utf8');
 
 // 1) 后端真源
