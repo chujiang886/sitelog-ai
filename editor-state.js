@@ -66,7 +66,42 @@
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     return new Blob([bytes], { type: match[1] });
   }
+  // ═══ 报告 CSS 的**唯一取值口径** ═══
+  // 发布分享 / buildSharePayload / 导出 PDF / 导出可编辑 HTML / 导出工程包，
+  // 共 5 处都要把「报告样式」当成文本塞进产物，全部走这一个函数。
+  //
+  // 【为什么不能只抓内联 <style>】
+  // 这段 CSS 原先以内联 <style> 的形式住在 index.html 里，靠
+  // `document.querySelectorAll('style')` 抓。2026-10-05 把它外置成 styles.css 之后，
+  // 页面里一个内联 <style> 都不剩 → 抓到空串。**它不抛错、测试也不红**，
+  // 表现是业主打开档案发现整页没有样式、只剩文字，而导出 PDF 同样中招。
+  //
+  // 【为什么读样式表而不是 fetch】
+  // styles.css 与页面同源，`sheet.cssRules` 可以直接同步读到已解析的规则：
+  // 不需要 await、不需要缓存、不会和「用户点了导出但请求还没回来」抢跑。
+  // 更重要的是：它不再依赖「CSS 必须内联」这个隐含约束——以后再怎么挪文件，
+  // 只要 <link> 还在，这里就取得到。
+  //
+  // 代价：CSSOM 序列化会去掉注释、把 #fef9c3 规范成 rgb(254, 249, 195)，
+  // 文本与原始文件不完全逐字节相同，但规则集合等价。
+  function reportCssText() {
+    const sheet = [...document.styleSheets].find(s => /(^|\/)styles\.css(\?|#|$)/.test(s.href || ''));
+    if (sheet) {
+      try {
+        const text = [...sheet.cssRules].map(rule => rule.cssText).join('\n');
+        if (text.trim()) return text;
+      } catch (error) {
+        // 跨域样式表读 cssRules 会抛 SecurityError。styles.css 与页面同源，
+        // 正常走不到这里；真走到了就退回下面的内联兜底，别让整个导出失败。
+      }
+    }
+    // 兜底：万一 styles.css 的 <link> 被摘掉（例如离线打开导出的 .html），
+    // 还能退回「内联 <style>」这套旧口径。
+    return [...document.querySelectorAll('style')].map(s => s.textContent).join('\n');
+  }
   window.sitelogEditor = { collections, metadata, stageKeys, localDate, sanitizeReport, validateSnapshot, transaction, photoBlob };
+  // 5 处抓 CSS 的地方共用，必须挂在 window 上（app-main.js / project-client.js 都要用）。
+  window.reportCssText = reportCssText;
   window.editorFeatures = {
     draftStatus: '登录后自动保存本机草稿', draftSavedAt: '', draftDirty: false, draftOwner: null, draftLoading: false,
     draftRevision: 0, draftConflict: false, draftRestored: false, draftTimer: null, draftWriting: false,
@@ -158,7 +193,7 @@
         if (photo) { img.removeAttribute('src'); img.dataset.photoRef = photo.id; }
       }
       const result = { format: 'sitelog-project', schema: 1, savedAt: new Date().toISOString(), meta: {}, report: clone.innerHTML };
-      result.css = [...document.querySelectorAll('style')].map(s => s.textContent).join('\n');
+      result.css = reportCssText();
       for (const key of metadata) result.meta[key] = this[key];
       for (const key of collections) result[key] = this[key].map(photo => {
         const { file, analyzing, _debug, ...rest } = photo;

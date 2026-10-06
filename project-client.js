@@ -106,7 +106,7 @@ window.projectFeatures = {
     const clone=document.getElementById('report-content').cloneNode(true);
     clone.querySelectorAll('button,input,details.debug-panel,.sop-upload-zone,.sop-grid-top-row,.sop-remove-btn').forEach(el=>el.remove());clone.querySelectorAll('[contenteditable]').forEach(el=>el.removeAttribute('contenteditable'));
     for(const image of clone.querySelectorAll('img')){const photo=this.allPhotos().find(p=>p.dataUrl===image.getAttribute('src'));if(!photo?.mediaId)throw Error('有照片尚未保存，请重新保存云端工程');image.src='/api/share/media/'+photo.mediaId;}
-    const payload={revision:this.cloudRevision,idempotency:crypto.randomUUID(),audience:this.shareAudience,expires:Number(this.shareDays)>0?Date.now()/1000+Number(this.shareDays)*86400:null,code:this.shareCode,html:clone.innerHTML,css:[...document.querySelectorAll('style')].map(s=>s.textContent).join('\n')};
+    const payload={revision:this.cloudRevision,idempotency:crypto.randomUUID(),audience:this.shareAudience,expires:Number(this.shareDays)>0?Date.now()/1000+Number(this.shareDays)*86400:null,code:this.shareCode,html:clone.innerHTML,css:window.reportCssText()};
     this.publicationAttempt={pid:this.cloudProjectId,payload};
     return await this.accountJSON('/projects/'+this.cloudProjectId+'/publish',payload);
   }

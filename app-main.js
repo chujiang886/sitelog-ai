@@ -952,8 +952,7 @@
             // 告别 html2canvas 截图（文字被烤成图片 → 无法修改、无法复制）
             // 做法：把报告区克隆进隐藏 iframe，注入打印样式后调用 iframe.print()
             // 用户在打印窗口选「另存为 PDF」即可，得到的 PDF 文字是真实文字层
-            let css = '';
-            document.querySelectorAll('style').forEach(st => { css += st.textContent + NL; });
+            const css = window.reportCssText();
 
             const clone = container.cloneNode(true);
             clone.removeAttribute('id');
@@ -1008,8 +1007,7 @@
           this.syncCoverMeta();
           const container = document.getElementById('report-content');
           if (!container) { this.showToast('❌ 未找到报告内容，请刷新后重试', 'error'); return; }
-          let css = '';
-          document.querySelectorAll('style').forEach(st => { css += st.textContent + NL; });
+          const css = window.reportCssText();
           const clone = container.cloneNode(true);
           clone.removeAttribute('id');
           clone.setAttribute('id', 'report-content');
@@ -1168,8 +1166,7 @@
         async buildSharePayload() {
           const container = document.getElementById('report-content');
           if (!container) throw new Error('未找到报告内容，请刷新页面');
-          let css = '';
-          document.querySelectorAll('style').forEach(st => { css += st.textContent + NL; });
+          const css = window.reportCssText();
           const clone = container.cloneNode(true);
           clone.querySelectorAll('button, select, details.debug-panel, .sop-upload-zone, .sop-grid-top-row, .sop-remove-btn, .frame-add-row, .frame-move-row').forEach(el => el.remove());
           clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
