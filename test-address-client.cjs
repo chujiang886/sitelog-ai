@@ -451,6 +451,17 @@ const bulkItem = (sid, stage_key, title) => ({
   check("同洞口多次留档在后台也标「第 N 次」（否则两行一模一样）",
     /stage\.unitTotal\s*>\s*1[\s\S]{0,80}?stage\.unitSeq/.test(html),
     "模板没用 unitTotal/unitSeq");
+
+  // 挂档时后端会把该类目**自动并入**「展示给业主的类目」（2026-10-06 起）。
+  // 前端必须把这件事说出来：以前要员工自己回「地址管理」手勾，
+  // 漏勾就是「挂成功了、业主看不到、界面零提示」——连踩两次才补上。
+  const enabledAddedHits = source.split("enabled_added").length - 1;
+  check("两个挂档入口都读回执里的 enabled_added（漏一个就有一半场景仍然静默）",
+    enabledAddedHits >= 2,
+    `只出现 ${enabledAddedHits} 处，submitAddressAttach / attachAfterPublish 要各有一处`);
+  check("提示文案是给员工看的人话，不是字段名",
+    source.includes("已自动加入展示类目") && source.includes("已自动把它加入展示类目"),
+    "直接把 enabled_added 这种字段名写进 toast 了");
 }
 
 // ---------- 汇总 ----------

@@ -709,7 +709,11 @@ window.addressFeatures = {
       const result = await this.accountJSON('/addresses/' + this.addressDetail.id + '/attach', body);
       const receipt = (result && result.attached) || null;
       const times = receipt && receipt.count > 1 ? '（第 ' + (receipt.slot + 1) + ' 次留档）' : '';
-      this.showToast('✅ 已挂接到「' + shown + '」' + times);
+      // 后端会把挂上来的类目**自动并入**「展示给业主的类目」（2026-10-06 起）。
+      // 必须明说一句：这一步以前要员工自己回「地址管理」手勾，漏勾就是
+      // 「挂成功了、业主看不到、界面零提示」——连踩两次才补上。
+      const added = receipt && receipt.enabled_added ? '，并已自动加入展示类目' : '';
+      this.showToast('✅ 已挂接到「' + shown + '」' + times + added);
       this.addressAttachOpen = false;
       await this.refreshAddressDetail();
     } catch (e) { this.showToast(e.message || '挂接失败', 'error', 8000); }
@@ -777,7 +781,10 @@ window.addressFeatures = {
       const times = receipt && receipt.count > 1
         ? '（该阶段第 ' + (receipt.slot + 1) + ' 次留档）' : '';
       const shown = stageLabel + (holeLabel ? ' · ' + holeLabel : '');
-      this.addressAttachNote = '✅ 已挂到「' + (target ? target.label : '所选地址') + '」的「' + shown + '」' + times + '。业主扫该地址的二维码即可看到这一份。';
+      // 「已自动把它加入展示类目」= 后端把该类目并进了该地址的展示范围
+      // （2026-10-06 起）。以前要员工自己回「地址管理」勾，漏勾就是「挂成功、业主看不到」。
+      const added = receipt && receipt.enabled_added ? ' 已自动把它加入展示类目。' : '';
+      this.addressAttachNote = '✅ 已挂到「' + (target ? target.label : '所选地址') + '」的「' + shown + '」' + times + '。业主扫该地址的二维码即可看到这一份。' + added;
       this.showToast(this.addressAttachNote);
       // 只在地址面板开着时刷统计：面板没开的时候这些数字没人看，
       // 白发一次请求还多一个失败点（发布流程已经成功了，不该被统计请求影响）。
