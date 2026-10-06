@@ -128,10 +128,11 @@ async function main() {
       return labels.join(' / ');
     });
 
-    await step('甲户：尚未填写 + 交代业主看得到什么', async () => {
+    await step('甲户：尚未填写 + 交代这块记录给谁看', async () => {
       obs.summaryInitial = { text: await summaryText(page), sub: await summarySub(page) };
       assert.equal(obs.summaryInitial.text, '尚未填写');
-      assert.match(obs.summaryInitial.sub, /业主/);
+      // 2026-10-06 起文案不再承诺公开面，只交代「内部留存、业主看不到」。
+      assert.match(obs.summaryInitial.sub, /仅供内部留存/);
       return JSON.stringify(obs.summaryInitial);
     });
 
@@ -142,19 +143,16 @@ async function main() {
       return opts.join('/');
     });
 
-    await step('甲户：「会展示给业主」按输入框逐个标记 / 「不公开」只在整单备注', async () => {
-      const pub = await page.locator('.hidden-public-tag').allInnerTexts();
-      const priv = await page.locator('.hidden-private-tag').allInnerTexts();
-      obs.tags = { pub, priv };
-      // x-for ×3：每一项的「说明」各一个（此时没有 na 项，理由框未渲染）
-      assert.equal(pub.length, 3, '三项的「说明」各要有一个「会展示给业主」标记');
-      assert.ok(pub.every((t) => t.includes('会展示给业主')));
-      assert.deepEqual(priv, ['不公开']);
-      for (let i = 0; i < 3; i++) {
-        assert.equal(await items(page).nth(i).locator('.hidden-public-tag').count(), 1,
-          '第 ' + (i + 1) + ' 项的「说明」没标「会展示给业主」');
-      }
-      return 'public=' + pub.length + ' private=' + priv.length;
+    await step('甲户：面板只说一次「仅内部留存」，不再有逐字段的公开标记', async () => {
+      const pub = await page.locator('.hidden-public-tag').count();
+      const priv = await page.locator('.hidden-private-tag').count();
+      const notice = await page.locator('p', { hasText: '仅内部留存' }).count();
+      obs.tags = { pub, priv, notice };
+      // 2026-10-06：业主侧整块下线，逐字段标记全部撤掉，改成面板顶部一行统一交代。
+      assert.equal(pub, 0, '面板里还有「会展示给业主」标记，但业主侧已经看不到这块了');
+      assert.equal(priv, 0, '面板里还有「不公开」标记：现在整块都不公开，单独标一个字段反而误导');
+      assert.equal(notice, 1, '面板顶部要有且只有一行「仅内部留存」的说明');
+      return 'public=' + pub + ' private=' + priv + ' notice=' + notice;
     });
 
     await step('甲户：结论不是「不适用」时理由输入框整块收起', async () => {
@@ -162,14 +160,12 @@ async function main() {
       await items(page).nth(0).locator('select.hidden-select').selectOption('na');
       await page.waitForTimeout(150);
       const onNa = await naTextarea(page, 0).count();
-      const tagsOnNa = await page.locator('.hidden-public-tag').count();
       await items(page).nth(0).locator('select.hidden-select').selectOption('pass');
       await page.waitForTimeout(150);
       const offNa = await naTextarea(page, 0).count();
-      obs.naToggle = { before, onNa, offNa, tagsOnNa };
+      obs.naToggle = { before, onNa, offNa };
       assert.equal(before, 0, '未选 na 时不该有理由框');
       assert.equal(onNa, 1, '选 na 后必须出现理由框');
-      assert.equal(tagsOnNa, 4, '理由框出现时要多一个「会展示给业主」标记');
       assert.equal(offNa, 0, '改回 pass 后理由框必须收起（x-if）');
       return JSON.stringify(obs.naToggle);
     });
@@ -313,10 +309,13 @@ async function main() {
       return 'A=' + aSrcs.length + ' B=' + bSrcs.length;
     });
 
-    await step('整单备注标了「不公开」，且不是公开投影的一部分', async () => {
+    await step('整单备注不再标「不公开」：整块都不公开，逐字段标记只会误导', async () => {
       const label = await page.locator('label.hidden-field', { hasText: '整单备注' }).first().innerText();
       obs.noteLabel = label;
-      assert.match(label, /不公开/);
+      // 2026-10-06：业主侧整块下线，逐字段的「会展示给业主 / 不公开」标记全部撤掉，
+      // 改成面板顶部一行「仅内部留存」。所以这里反过来断言「不该有标记」。
+      assert.ok(!/不公开|会展示给业主/.test(label), '整单备注还挂着公开 / 不公开标记：' + label);
+      assert.match(label, /整单备注/);
       return label.replace(/\s+/g, ' ');
     });
 

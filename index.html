@@ -941,9 +941,13 @@
 
                  三项的 key/label/hint 一律由后端 H1 返回，前端不抄第二份：抄一份的结果是
                  后端改了名、界面还印着旧名，而员工正拿着它对标准原文。
-                 公开面（业主扫码看得到）：三项结论 + 验收时间 + 照片 + 每项说明 + 不适用理由。
-                 不公开：验收人姓名、用户 id、整单备注。所以下面每个输入框都标了
-                 「会展示给业主」或「不公开」——员工得在打字之前就知道谁会看到。
+
+                 ⚠️ 2026-10-06：这块记录**不再对业主公开**。原先每个输入框都挂着
+                 「会展示给业主 / 不公开」标记，业主页也有一块折叠面板——现在业主侧整块
+                 下线（后端 ADDRESS_PUBLIC_FIELDS 不再返回 hidden_acceptance，
+                 views.ADDRESS_VIEWER 也不再渲染）。所以标记全部撤掉，改成面板顶部一行
+                 统一交代「仅内部留存」。**别按旧记忆把标记加回来**：员工会照着
+                 「会展示给业主」决定自己写什么，那现在已经是一句误导人的话。
 
                  产品文案只说「已保存 / 已验收」，不要写任何超出这句话的效力承诺。 -->
             <div class="border rounded-lg">
@@ -956,6 +960,9 @@
                 <button @click="loadHiddenAcceptance(addressDetail.id)" class="addr-group-add">刷新验收</button>
               </div>
               <div class="p-3 space-y-3">
+                <!-- 2026-10-06：业主侧整块下线，员工只需要知道一次「这里写的东西客户看不到」。
+                     放在面板最上方而不是底部——员工是**打字之前**要知道，不是提交之后。 -->
+                <p class="text-xs text-slate-500 leading-relaxed">本记录仅内部留存：业主扫码看不到隐蔽工程验收这一块。</p>
                 <!-- 三态：loading / error / 表单，各有明确文案，不留白屏。
                      注意 error 那一行的 `!!`：**x-show 的表达式必须稳定返回布尔值**。
                      与签认区同一个坑——Alpine 内部用 `p === l` 判断「值有没有变」，
@@ -1051,8 +1058,7 @@
                           ></p>
                         </div>
 
-                        <!-- 不适用理由：**会展示给业主**，所以标签上必须写明。
-                             「不适用」和「没做」是两件事，理由空着日后没人记得为什么不做。
+                        <!-- 不适用理由：「不适用」和「没做」是两件事，理由空着日后没人记得为什么不做。
                              结论不是「不适用」时这个输入框整块收起，提交时理由会被清空
                              （否则会生成「合格 + 不适用理由」这种自相矛盾的记录）。
 
@@ -1067,7 +1073,6 @@
                           <label class="hidden-field">
                             <span class="hidden-field-label">
                               <span x-text="'不适用理由（至少 ' + HIDDEN_NA_REASON_MIN + ' 字）'"></span>
-                              <span class="hidden-public-tag">会展示给业主</span>
                             </span>
                             <textarea
                               x-model="item.na_reason"
@@ -1079,11 +1084,10 @@
                           </label>
                         </template>
 
-                        <!-- 每项说明：**会展示给业主**。 -->
+                        <!-- 每项说明。 -->
                         <label class="hidden-field">
                           <span class="hidden-field-label">
                             <span>说明</span>
-                            <span class="hidden-public-tag">会展示给业主</span>
                           </span>
                           <input
                             x-model="item.note"
@@ -1095,11 +1099,10 @@
                       </div>
                     </template>
 
-                    <!-- 整单备注：**不公开**，只有员工和后台看得到。 -->
+                    <!-- 整单备注。 -->
                     <label class="hidden-field">
                       <span class="hidden-field-label">
                         <span>整单备注</span>
-                        <span class="hidden-private-tag">不公开</span>
                       </span>
                       <input
                         x-model="hiddenNote"
@@ -1121,7 +1124,7 @@
                         x-text="hiddenBusy ? '保存中…' : '保存验收记录'"
                       ></button>
                     </div>
-                    <p class="text-xs text-slate-500 leading-relaxed">三项必须全部有结论才能保存。合格 / 不合格的每一项至少 1 张照片；标「不适用」的必须写明理由。业主扫码能看到三项结论、验收时间与照片，看不到验收人姓名。</p>
+                    <p class="text-xs text-slate-500 leading-relaxed">三项必须全部有结论才能保存。合格 / 不合格的每一项至少 1 张照片；标「不适用」的必须写明理由。这块记录不对外展示。</p>
                   </div>
                 </template>
               </div>

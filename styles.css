@@ -650,9 +650,9 @@
 
     /* ========== 隐蔽工程验收（hiddenwork v1，员工侧）==========
        同上：样式一律显式写死，不依赖 vendor/app.css 预构建产物。
-       这一屏是**证据**：照片缩略图要够大，员工能看清「拍的是不是这一项」；
-       而「会展示给业主」这行字必须和输入框挨着——员工得在打字之前就知道
-       自己写的东西业主看得到，而不是事后从文档里才知道。 */
+       这一屏是**证据**：照片缩略图要够大，员工能看清「拍的是不是这一项」。
+       2026-10-06 起这块记录不对业主公开，原先逐字段的「会展示给业主 / 不公开」
+       标记连同样式一起去掉了——改成面板顶部一行统一交代「仅内部留存」。 */
     .hidden-summary {
       display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px;
       padding: 8px 12px; border-radius: 8px;
@@ -665,7 +665,7 @@
     .hidden-item-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
     .hidden-item-name { font-size: 13px; font-weight: 600; color: #0f172a; }
     /* hint 是写给员工看的检查要点（「预埋件的规格、位置、数量」）。
-       契约 errata HW-5：公开投影**不含** hint，所以这里显示它不会外泄。 */
+       2026-10-06 起这块记录不对业主公开，所以它连「可能外泄」这个顾虑都没有了。 */
     .hidden-item-hint { font-size: 11px; color: #94a3b8; }
     .hidden-item-state {
       margin-left: auto; padding: 1px 6px; border-radius: 99px;
@@ -680,19 +680,6 @@
     /* 同 signoff 那段：这里刻意不声明 textarea 的可拖拽缩放属性，
        免得那个属性名被 --content 当成工具类名写进 vendor/app.css。 */
     .hidden-textarea { overflow: auto; }
-    /* 「会展示给业主」/「不公开」两个标记。它们不是装饰：
-       每项说明与不适用理由会进公开投影，整单备注不会。员工必须一眼分得清。 */
-    .hidden-public-tag {
-      display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 99px;
-      font-size: 10px; font-weight: 600;
-      background: rgba(184, 146, 74, 0.16);
-      border: 1px solid rgba(184, 146, 74, 0.5); color: #8E6B2E;
-    }
-    .hidden-private-tag {
-      display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 99px;
-      font-size: 10px; font-weight: 600;
-      background: #f1f5f9; border: 1px solid #e2e8f0; color: #64748b;
-    }
     .hidden-photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
     .hidden-photo { position: relative; }
     .hidden-photo img {

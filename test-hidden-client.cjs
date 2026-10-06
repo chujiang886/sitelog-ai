@@ -13,7 +13,7 @@
  *   - 前端自己抄一份三项名字 → 后端改了名、界面还印着旧名，员工正拿着它对标准原文
  *   - 409 被静默重试 → 把对方刚存的那一版覆盖掉，而两边都以为自己的生效了
  *   - 切地址没清照片 id → A 户的现场照片出现在 B 户详情里，照片看起来都像「我家的工地」
- *   - 「会展示给业主」的字段没标出来 → 员工不知道自己在写公开内容
+ *   - 面板里还留着「会展示给业主」标记 → 业主侧已整块下线，那句话会把员工引向误判
  *
  * 所以这里既跑纯逻辑，也做 index.html 的结构守卫（这类问题截图看不出来）。
  *
@@ -737,10 +737,10 @@ test('结论显示名只在本地有一份映射，未填写时是「未填写�
   assert.equal(app.hiddenResultLabel(null), '未填写');
 });
 
-test('汇总副行：已保存显示验收日期与验收人；未保存交代业主看得到什么', () => {
+test('汇总副行：已保存显示验收日期与验收人；未保存交代这块记录给谁看', () => {
   const app = readyApp(async () => okJson({ ok: true }));
 
-  assert.equal(app.hiddenAcceptanceLine(), '保存后业主可在地址页看到三项结论、验收时间与照片');
+  assert.equal(app.hiddenAcceptanceLine(), '保存后仅供内部留存，业主扫码看不到这一块');
 
   app.hiddenAcceptance = { accepted_at: 1780012800, revision: 1, acceptor_name: '王工' };
   app.hiddenAcceptedAt = '2026-05-29';
@@ -802,16 +802,19 @@ test('index.html：结论选项静态写死，不在 x-for 里（x-model 会错�
   assert.ok(!/>(合格|不合格|不适用)</.test(markup), '结论文字被写死在 HTML 里了');
 });
 
-test('index.html：「会展示给业主」与「不公开」两个标记都在位', () => {
-  const publicTags = (hiddenRegion.match(/hidden-public-tag/g) || []).length;
-  const privateTags = (hiddenRegion.match(/hidden-private-tag/g) || []).length;
-  assert.ok(publicTags >= 2, '每项说明与不适用理由都要标「会展示给业主」，实际只有 ' + publicTags + ' 处');
-  assert.equal(privateTags, 1, '整单备注要标「不公开」，且只标一处');
-
-  // 标记要真的挂在对应输入框的标签行上，不是随便丢在面板某处
-  assert.match(hiddenRegion, /说明[\s\S]{0,120}?hidden-public-tag/, '每项说明没标「会展示给业主」');
-  assert.match(hiddenRegion, /不适用理由[\s\S]{0,200}?hidden-public-tag/, '不适用理由没标「会展示给业主」');
-  assert.match(hiddenRegion, /整单备注[\s\S]{0,120}?hidden-private-tag/, '整单备注没标「不公开」');
+test('index.html：面板只说一次「仅内部留存」，不留逐字段的公开 / 不公开标记', () => {
+  // 2026-10-06：隐蔽工程验收对业主整块下线，所以「会展示给业主 / 不公开」两个标记
+  // 必须消失。留着比删掉更危险——员工会照着「会展示给业主」决定自己写什么。
+  assert.equal((hiddenRegion.match(/hidden-public-tag/g) || []).length, 0,
+    '面板里还有「会展示给业主」标记，但业主侧已经看不到这块了');
+  assert.equal((hiddenRegion.match(/hidden-private-tag/g) || []).length, 0,
+    '面板里还有「不公开」标记：现在整块都不公开，单独标一个字段反而误导');
+  // 反面：必须有一行统一交代，而且要用元素写出来（不是只写在注释里）。
+  assert.match(hiddenRegion, /<p class="text-xs text-slate-500 leading-relaxed">本记录仅内部留存/,
+    '面板里没有「仅内部留存」的可见说明');
+  // 样式表里也不该再留着这两个类，否则下次有人照着类名把它们加回来。
+  assert.ok(!CSS.includes('.hidden-public-tag'), 'styles.css 里还留着 .hidden-public-tag');
+  assert.ok(!CSS.includes('.hidden-private-tag'), 'styles.css 里还留着 .hidden-private-tag');
 
   // 不适用理由只在结论是 na 时出现。
   // 用 x-if 而不是 x-show：本块在 x-for 里，而 loadHiddenAcceptance 会整体替换
