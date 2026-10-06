@@ -204,6 +204,39 @@ const bulkItem = (sid, stage_key, title) => ({
   stuck.addressBulkPicked = {};
   check("没有任何可勾条目时 addressBulkAllPicked 为假", stuck.addressBulkAllPicked() === false);
 
+  // 勾不动时必须给得出原因。
+  // 【为什么这条也要测】复选框 disabled、整行变灰，但旁边一个字都不说 ——
+  // 员工看到的就是「这条点不动」，只能靠猜（或者干脆放弃去挂）。
+  // 生产上真实发生过：新发布的一条是「玻扇1对1」，洞口名没填 → 勾不动 → 来问人。
+  const why = Object.create(F);
+  why.addressBulkStage = { a: "框架施工", b: "", c: "玻扇1对1" };
+  why.addressBulkLabel = { c: "" };
+  check("没选阶段 → 原因是「先选阶段」",
+    why.addressBulkBlockReason(bulkItem("b", "")) === "先选一个施工阶段，才能勾选",
+    why.addressBulkBlockReason(bulkItem("b", "")));
+  const cLabel = F.addressStageLabel("玻扇1对1");
+  check("1 对 1 类目没填洞口名 → 原因是「先填洞口名」，并带上类目显示名",
+    why.addressBulkBlockReason(bulkItem("c", "玻扇1对1")) === "「" + cLabel + "」要先填洞口/窗位名称，才能勾选",
+    why.addressBulkBlockReason(bulkItem("c", "玻扇1对1")));
+  check("原因里的类目名必须与下拉框里的显示名一致（员工要对得上）",
+    cLabel.length > 0 && why.addressBulkBlockReason(bulkItem("c", "玻扇1对1")).includes(cLabel),
+    "原因里没带上类目显示名");
+  why.addressBulkLabel = { c: "主卧飘窗" };
+  check("1 对 1 类目填了洞口名 → 不再有原因，且确实可勾",
+    why.addressBulkBlockReason(bulkItem("c", "玻扇1对1")) === ""
+    && why.addressBulkPickable(bulkItem("c", "玻扇1对1")) === true);
+  check("普通类目选了阶段 → 没有原因",
+    why.addressBulkBlockReason(bulkItem("a", "框架施工")) === "");
+  check("原因与可勾状态必须严格对应（不可勾必有原因，可勾必无原因）",
+    ["a", "b", "c"].every((k) => {
+      const item = bulkItem(k, why.addressBulkStage[k]);
+      return why.addressBulkPickable(item) === (why.addressBulkBlockReason(item) === "");
+    }),
+    JSON.stringify(["a", "b", "c"].map((k) => ({
+      k, pickable: why.addressBulkPickable(bulkItem(k, why.addressBulkStage[k])),
+      reason: why.addressBulkBlockReason(bulkItem(k, why.addressBulkStage[k])),
+    }))));
+
   // 目标地址名要能念出来——二次确认框里必须出现它。
   const named = Object.create(F);
   named.addressItems = [{ id: "addr1", label: "观海花园 3 栋 2201" }];
@@ -345,6 +378,11 @@ const bulkItem = (sid, stage_key, title) => ({
     "没找到勾选框的数组绑定");
   check("勾选框按 ADDRESS_STAGE_KEYS 渲染，不写死类目名",
     /x-for="k in ADDRESS_STAGE_KEYS"/.test(html), "勾选框没走 ADDRESS_STAGE_KEYS");
+  // 光有方法没用 —— 界面必须真的把原因渲染出来，否则员工还是只看到「点不动」。
+  // 生产上真实发生过：新发布的一条是「玻扇1对1」，洞口名没填 → 勾不动 → 来问人。
+  check("未归类清单渲染了「为什么勾不动」的原因",
+    /!addressBulkPickable\(item\)/.test(html) && /addressBulkBlockReason\(item\)/.test(html),
+    "模板里没把不可勾选的原因显示出来");
 }
 
 // ---------- P4-C：1 对 1 类目的洞口/窗位名称 ----------

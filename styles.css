@@ -538,6 +538,9 @@
     }
     .addr-bulk-ok { color: #15803d; }
     .addr-bulk-bad { color: #b91c1c; }
+    /* 勾不动时的原因。必须比 .addr-bulk-sub 显眼 ——
+       员工卡在这里时，这一行是唯一能告诉他「下一步做什么」的东西。 */
+    .addr-bulk-block { font-size: 11px; font-weight: 600; color: #b45309; }
     .addr-bulk-result {
       border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;
       font-size: 12px;

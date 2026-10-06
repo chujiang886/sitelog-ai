@@ -1534,6 +1534,14 @@
                     class="border rounded p-1 text-xs"
                     @change="addressBulkPicked[item.publication_id] = false"
                   >
+                  <!-- 勾不动时必须说清为什么 —— 否则员工只看到「这条点不动」，
+                       真正的原因（先选阶段 / 先填洞口名）一个字都没有。
+                       「1 对 1」类目尤其明显：洞口名输入框就在旁边，却没人告诉他不填就勾不了。 -->
+                  <span
+                    x-show="!addressBulkPickable(item)"
+                    class="addr-bulk-block"
+                    x-text="addressBulkBlockReason(item)"
+                  ></span>
                 </div>
               </div>
             </div>

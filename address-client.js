@@ -403,6 +403,19 @@ window.addressFeatures = {
     if (this.addressNeedsLabel(stage) && !((this.addressBulkLabel[item.publication_id] || '').trim())) return false;
     return true;
   },
+  // 勾不动时必须说清**为什么**。
+  // 原来只把复选框 disabled、整行变灰，员工看到的就是「这条点不动」——
+  // 真正的原因（先选阶段 / 先填洞口名）一个字都没有，只能靠猜。
+  // 「1 对 1」类目尤其明显：洞口名输入框就在旁边，却没人告诉他不填就勾不了。
+  // 返回空串 = 这条本来就能勾，不显示任何东西。
+  addressBulkBlockReason(item) {
+    const stage = this.addressBulkStage[item.publication_id] || '';
+    if (!stage) return '先选一个施工阶段，才能勾选';
+    if (this.addressNeedsLabel(stage) && !((this.addressBulkLabel[item.publication_id] || '').trim())) {
+      return '「' + this.addressStageLabel(stage) + '」要先填洞口/窗位名称，才能勾选';
+    }
+    return '';
+  },
   addressBulkToggleAll(on) {
     const next = Object.assign({}, this.addressBulkPicked);
     for (const item of this.addressBulkItems) {
