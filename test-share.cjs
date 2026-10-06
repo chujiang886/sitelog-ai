@@ -2,14 +2,18 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const html=fs.readFileSync('index.html','utf8');
 const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
 const APP_MAIN = fs.readFileSync('app-main.js','utf8');
+// 同上：vm 里按真实加载顺序跑（ai-style / templates 先于 app-main）
+const AI_STYLE_SRC = fs.readFileSync('ai-style.js','utf8');
+const TEMPLATES_SRC = fs.readFileSync('templates.js','utf8');
+const APP_BUNDLE = AI_STYLE_SRC + '\n' + TEMPLATES_SRC + '\n' + APP_MAIN;
 const CSS = fs.readFileSync('styles.css','utf8');
 // 整页源码：外置样式（head）+ index.html + 外置主脚本（body 末尾）。
 // 这三份原先内联在同一个 index.html 里，结构守卫要按「页面最终长什么样」看，不能只扫 index.html。
-const PAGE = CSS + '\n' + html + '\n' + APP_MAIN;
+const PAGE = CSS + '\n' + html + '\n' + AI_STYLE_SRC + '\n' + TEMPLATES_SRC + '\n' + APP_MAIN;
 for(const source of scripts)new vm.Script(source[1]);new vm.Script(APP_MAIN);
 function makeApp(fetch){
  const context={window:{},fetch,console:{...console,error(){}},confirm:()=>true,setTimeout,clearTimeout};
- vm.createContext(context);vm.runInContext(fs.readFileSync('auth-client.js','utf8'),context);vm.runInContext(APP_MAIN,context);
+ vm.createContext(context);vm.runInContext(fs.readFileSync('auth-client.js','utf8'),context);vm.runInContext(APP_BUNDLE,context);
  const app=context.siteLogApp();app.showToast=()=>{};return app;
 }
 

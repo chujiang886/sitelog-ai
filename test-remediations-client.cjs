@@ -8,10 +8,15 @@ const { test } = require('node:test');
 const SRC = fs.readFileSync(path.join(__dirname, 'address-client.js'), 'utf8');
 const HTML = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const APP_MAIN = fs.readFileSync(path.join(__dirname,'app-main.js'),'utf8');
+// app-main.js 依赖 ai-style.js / templates.js（顶层 const 共享全局词法环境）——
+// vm 里必须按真实加载顺序一起跑，否则 ReferenceError。顺序与 index.html 一致。
+const AI_STYLE_SRC = fs.readFileSync(path.join(__dirname,'ai-style.js'),'utf8');
+const TEMPLATES_SRC = fs.readFileSync(path.join(__dirname,'templates.js'),'utf8');
+const APP_BUNDLE = AI_STYLE_SRC + '\n' + TEMPLATES_SRC + '\n' + APP_MAIN;
 const CSS = fs.readFileSync(path.join(__dirname,'styles.css'),'utf8');
 // 整页源码：外置样式（head）+ index.html + 外置主脚本（body 末尾）。
 // 这三份原先内联在同一个 index.html 里，结构守卫要按「页面最终长什么样」看，不能只扫 index.html。
-const PAGE = CSS + '\n' + HTML + '\n' + APP_MAIN;
+const PAGE = CSS + '\n' + HTML + '\n' + AI_STYLE_SRC + '\n' + TEMPLATES_SRC + '\n' + APP_MAIN;
 function app(fetchImpl) {
   const calls = [];
   const fetch = async (url, options) => { calls.push({url, options}); return fetchImpl(url, options); };
@@ -19,7 +24,7 @@ function app(fetchImpl) {
   vm.createContext(c);
   vm.runInContext(fs.readFileSync(path.join(__dirname, 'auth-client.js'), 'utf8'), c);
   vm.runInContext(SRC, c);
-  vm.runInContext(APP_MAIN, c);
+  vm.runInContext(APP_BUNDLE, c);
   const a = c.siteLogApp(); a.calls = calls; a.csrf = 'csrf'; a.showToast = () => {}; a.addressDetail = { id: 'a'.repeat(32) };
   return a;
 }

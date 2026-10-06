@@ -28,10 +28,15 @@ const HTML = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const ADDRESS_SRC = fs.readFileSync(path.join(__dirname, 'address-client.js'), 'utf8');
 // 主脚本已外置到 app-main.js（原先是 index.html 末尾的内联 <script>）。
 const APP_MAIN = fs.readFileSync(path.join(__dirname,'app-main.js'),'utf8');
+// app-main.js 依赖 ai-style.js / templates.js（顶层 const 共享全局词法环境）——
+// vm 里必须按真实加载顺序一起跑，否则 ReferenceError。顺序与 index.html 一致。
+const AI_STYLE_SRC = fs.readFileSync(path.join(__dirname,'ai-style.js'),'utf8');
+const TEMPLATES_SRC = fs.readFileSync(path.join(__dirname,'templates.js'),'utf8');
+const APP_BUNDLE = AI_STYLE_SRC + '\n' + TEMPLATES_SRC + '\n' + APP_MAIN;
 const CSS = fs.readFileSync(path.join(__dirname,'styles.css'),'utf8');
 // 整页源码：外置样式（head）+ index.html + 外置主脚本（body 末尾）。
 // 这三份原先内联在同一个 index.html 里，结构守卫要按「页面最终长什么样」看，不能只扫 index.html。
-const PAGE = CSS + '\n' + HTML + '\n' + APP_MAIN;
+const PAGE = CSS + '\n' + HTML + '\n' + AI_STYLE_SRC + '\n' + TEMPLATES_SRC + '\n' + APP_MAIN;
 
 // 阶段名真源在 address-client.js 顶部；测试里这一份只用来断言「index.html 没再抄一遍」。
 const STAGE_NAMES = ['吊装施工', '框架施工', '框架1对1', '玻扇施工', '玻扇1对1', '五金安装', '离场自检', '售后保养'];
@@ -78,7 +83,7 @@ function makeApp(fetchImpl, opts = {}) {
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(__dirname, 'auth-client.js'), 'utf8'), context, { filename: 'auth-client.js' });
   vm.runInContext(ADDRESS_SRC, context, { filename: 'address-client.js' });
-  vm.runInContext(APP_MAIN, context, { filename: 'app-main.js' });
+  vm.runInContext(APP_BUNDLE, context, { filename: 'app-main.js' });
 
   // 二维码组件：本页已有 window.qrcode，记录它被喂进去的字符串——
   // 「编码的是不是后端返回的 url」只能这样钉住。
