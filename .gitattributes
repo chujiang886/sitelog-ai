@@ -1,0 +1,7 @@
+# 发布包排除测试资产。
+#
+# 前端发布是「整目录软链 + git archive」，**没有文件白名单** —— 仓库里有什么
+# 就发什么到 /opt/cj-sitelog-web/current/，而且能通过 https://cj-az.cn/sitelog/... 公开下载。
+# 视觉回归基线是 8 张 1440x1000 的 PNG（1.5MB），属于测试资产，不该占生产目录。
+# git archive 遵守 export-ignore；本机跑视觉基线用的是工作区，不受影响。
+visual-baseline/ export-ignore
