@@ -360,6 +360,11 @@ window.addressFeatures = {
     this.addressBulkResult = null;
     this.addressBulkPage = 1;
     this.addressBulkPicked = {};
+    // ⚠️ addressBulkStage 必须在这里一起清空。loadAddressBulk() 用
+    // `this.addressBulkStage[pub_id] || item.stage_key` 铺默认值，残留值会**盖掉**
+    // 后端从发布版本快照取的建议阶段 —— 表现为「上次关面板前选过的阶段，这次打开
+    // 还显示着」。closeAddressBulk() 有这一行，open 却漏了（2026-10-07 修）。
+    this.addressBulkStage = {};
     this.addressBulkLabel = {};
     // 默认目标是「当前打开的地址」——员工通常正是从这个地址点进来的。
     if (!this.addressBulkTarget && this.addressDetail) this.addressBulkTarget = this.addressDetail.id;
