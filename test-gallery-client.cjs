@@ -251,18 +251,37 @@ test('handleArrivalFileSelect：读完把 input.value 清空（否则同一文�
 });
 
 // ────────────────────────────────────────────────────────────────
-// 已知缺陷（现状钉死：修的时候这条会红，提醒一并改文案）
+// 跳过大文件后的成功提示必须报「实际入队数」（2026-10-07 修）
 // ────────────────────────────────────────────────────────────────
+// 原为已知缺陷：提示按 files.length 报，3 张里 1 张超限也说「已添加 3 张」，
+// 与「不编造数据」冲突。三处 processXxxFiles 一起改成按实际入队数报。
 
-test('【已知缺陷】跳过大文件后，成功提示报的仍是 files.length 而不是实际入队数', async () => {
-  // 3 张里 1 张超限 → 实际入队 2 张，但提示说「已添加 3 张」。
-  // 与「不编造数据」的原则冲突，但这是搬移前的既有行为，刻意**不**在
-  // 「逐字节搬移」这一次变更里顺手改（会破坏 sha256 基线）。
-  // 单独修的时候，把下面的断言改成 2，并同步改 processSopFiles / processFinishFiles。
+test('processArrivalFiles：跳过大文件后，提示报实际入队数并说明跳过了几张', async () => {
   const app = make();
   ctx.document = { getElementById: () => fakeGallery() };
   await app.processArrivalFiles([file('a.jpg'), file('b.jpg'), file('huge.jpg', 11 * MB)]);
   assert.equal(app.arrivalImages.length, 2);
   const ok = app.toasts.find((t) => t.msg.startsWith('✅'));
-  assert.ok(ok.msg.includes('3 张'), '现状：提示按提交数报，不按实际入队数 —— 见上方注释');
+  assert.ok(ok.msg.includes('已添加 2 张'), '提示必须按实际入队数报，实际是：' + ok.msg);
+  assert.ok(ok.msg.includes('1 张超过 10MB'), '被跳过的那张要说出来，实际是：' + ok.msg);
+});
+
+test('processSopFiles：同样按实际入队数报（三处必须一致，别只修一处）', async () => {
+  const app = make();
+  ctx.document = { getElementById: () => fakeGallery() };
+  await app.processSopFiles([file('a.jpg'), file('huge.jpg', 11 * MB)]);
+  assert.equal(app.sopImages.length, 1);
+  const ok = app.toasts.find((t) => t.msg.startsWith('✅'));
+  assert.ok(ok.msg.includes('已添加 1 张'), '实际是：' + ok.msg);
+  assert.ok(ok.msg.includes('1 张超过 10MB'), '实际是：' + ok.msg);
+});
+
+test('processFinishFiles：同样按实际入队数报', async () => {
+  const app = make();
+  ctx.document = { getElementById: () => fakeGallery() };
+  await app.processFinishFiles([file('a.jpg'), file('huge.jpg', 11 * MB)]);
+  assert.equal(app.finishImages.length, 1);
+  const ok = app.toasts.find((t) => t.msg.startsWith('✅'));
+  assert.ok(ok.msg.includes('已添加 1 张'), '实际是：' + ok.msg);
+  assert.ok(ok.msg.includes('1 张超过 10MB'), '实际是：' + ok.msg);
 });

@@ -64,8 +64,10 @@ const SPLITS = [
     file: 'gallery-client.js',
     label: '三组手动上传画廊（班组进场 / SOP / 完工）',
     start: 'window.galleryFeatures = {',
-    sha: 'db6e5b0a7ff7b94ab8d5b1b0cb480c46300546828f4a8dec968105b18c256527',
-    lines: 307,
+    // 2026-10-07 更新基线：三处 processXxxFiles 的成功提示改为按**实际入队数**报
+    // （原按 files.length 报 —— 3 张里 1 张超 10MB 被跳过，提示仍说「已添加 3 张」）。
+    sha: 'd2c1423c338664203816bed91f2e83080d0b7f4a25a5f7fb5edfd40ca11da119',
+    lines: 325,
     spread: 'galleryFeatures',
     forbiddenInAppMain: /^\s{8}sync(Arrival|Sop|Finish)Gallery\s*\(/m,
     methods: [

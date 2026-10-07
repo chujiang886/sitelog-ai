@@ -132,7 +132,13 @@ window.galleryFeatures = {
             const frame = this.frames.find(f => f.id === frameId);
             if (frame) frame.arrivalIds.push(...added);
           }
-          this.showToast(`✅ 进场照片已添加 ${files.length} 张，可点「AI 一键整理」分析`);
+          // 报**实际入队数**，不报提交数：超 10MB 的已在循环里跳过（各自弹过提示），
+          // 按 files.length 报会说「已添加 3 张」而实际只有 2 张 —— 与「不编造数据」冲突。
+          // （2026-10-07 修；原为搬移前的既有行为，当时刻意留在「逐字节搬移」之外。）
+          const skippedArrival = files.length - added.length;
+          this.showToast(skippedArrival
+            ? `✅ 进场照片已添加 ${added.length} 张，${skippedArrival} 张超过 10MB 已跳过`
+            : `✅ 进场照片已添加 ${added.length} 张，可点「AI 一键整理」分析`);
           if (this.isFramedTemplate()) this.syncFrames(); else this.syncArrivalGallery();
         },
 
@@ -204,6 +210,7 @@ window.galleryFeatures = {
 
         async processSopFiles(files) {
           if (files.length === 0) return;
+          let added = 0;
           for (const file of files) {
             if (file.size > 10 * 1024 * 1024) {
               this.showToast(`⚠️ ${file.name} 超过 10MB，已跳过`, 'error');
@@ -217,8 +224,13 @@ window.galleryFeatures = {
               title: file.name.replace(/\.[^.]+$/, ''),  // 用文件名作标题
               time: new Date().toLocaleString('zh-CN', { hour12: false })
             });
+            added++;
           }
-          this.showToast(`✅ SOP 已添加 ${files.length} 张照片`);
+          // 与 processArrivalFiles 同理：按实际入队数报，不按提交数。
+          const skippedSop = files.length - added;
+          this.showToast(skippedSop
+            ? `✅ SOP 已添加 ${added} 张照片，${skippedSop} 张超过 10MB 已跳过`
+            : `✅ SOP 已添加 ${added} 张照片`);
           this.syncSopGallery();
         },
 
@@ -303,6 +315,7 @@ window.galleryFeatures = {
 
         async processFinishFiles(files) {
           if (files.length === 0) return;
+          let added = 0;
           for (const file of files) {
             if (file.size > 10 * 1024 * 1024) {
               this.showToast(`⚠️ ${file.name} 超过 10MB，已跳过`, 'error');
@@ -324,8 +337,13 @@ window.galleryFeatures = {
               _analyzed: false,
               analyzing: false
             });
+            added++;
           }
-          this.showToast(`✅ 完工照片已添加 ${files.length} 张`);
+          // 与 processArrivalFiles 同理：按实际入队数报，不按提交数。
+          const skippedFinish = files.length - added;
+          this.showToast(skippedFinish
+            ? `✅ 完工照片已添加 ${added} 张，${skippedFinish} 张超过 10MB 已跳过`
+            : `✅ 完工照片已添加 ${added} 张`);
           this.syncFinishGallery();
         },
 
