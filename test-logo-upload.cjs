@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * 客户 LOGO 上传前的预处理（index.html :: prepareLogoUpload）单元测试。
+ * 客户 LOGO 上传前的预处理（app-main.js :: prepareLogoUpload）单元测试。
  *
  * 【为什么必须单独钉住这个函数】
  * LOGO 的整条链路里，只有这里能保证「传上去的东西还是 LOGO」。
@@ -17,8 +17,23 @@
  * 另一个静默点是「缩完反而更大」：小尺寸截图重新编码 PNG 经常比原图大。
  * 那种情况下必须保留原图，否则为了「压缩」白掉一次画质，体积还涨了。
  *
- * 本测试把两个方法从 index.html 里抽出来，在 Node 里用 DOM 桩真跑一遍。
+ * 本测试把两个方法从 app-main.js 里抽出来，在 Node 里用 DOM 桩真跑一遍。
  * 不启浏览器、不连后端，几百毫秒跑完。
+ *
+ * 【为什么源码来自 app-main.js 而不是 index.html】（2026-10-07 修）
+ * 2026-10-05 的 P2 拆分把内联 JS 外置了：`prepareLogoUpload` / `fileToDataUrl`
+ * / `uploadClientLogo` 现在定义在 **app-main.js**，index.html 里只剩
+ * `<script src="app-main.js">`。本测试原先仍从 index.html 抽方法，于是抽到
+ * `null`，`vm.runInContext` 拿到 undefined，直接抛
+ * 「Cannot read properties of undefined (reading 'call')」退出码 2 ——
+ * **后端 CI 因此长期在 LOGO 一致性这一步变红**。
+ * ⚠️ 这就是「凡『只扫某个文件』的守卫，拆分后都要重新核对范围」的又一实例：
+ * 它当时不是断言失败（那是好事），而是**测试自身崩了**，看日志很容易被当成
+ * 环境问题放过去。所以下面除了从 app-main.js 取值，还额外钉一条
+ * 「index.html 里不许再长出一份」，防止下次搬移时又悄悄漂移。
+ *
+ * ⚠️ 但**文案**仍在 index.html（模板里那句「最大 8MB」），所以两个文件都要读，
+ * 不能一刀切只留一个。
  *
  * 用法：node test-logo-upload.cjs
  *      SITELOG_BACKEND=/path/to/cj-share/current node test-logo-upload.cjs
@@ -31,13 +46,19 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const HERE = __dirname;
+// 方法源码在这里（2026-10-05 起 P2 拆分把内联 JS 外置到 app-main.js）
+const APP_MAIN = path.join(HERE, 'app-main.js');
+// 但界面文案仍在模板里（「最大 8MB」那句），两个文件都要读
 const INDEX_HTML = path.join(HERE, 'index.html');
 
-if (!fs.existsSync(INDEX_HTML)) {
-  console.error(`找不到 ${INDEX_HTML}\n请在本文件所在目录运行（cj-sitelog-web/current）。`);
-  process.exit(2);
+for (const f of [APP_MAIN, INDEX_HTML]) {
+  if (!fs.existsSync(f)) {
+    console.error(`找不到 ${f}\n请在本文件所在目录运行（cj-sitelog-web/current）。`);
+    process.exit(2);
+  }
 }
 
+const appMain = fs.readFileSync(APP_MAIN, 'utf8');
 const html = fs.readFileSync(INDEX_HTML, 'utf8');
 
 let passed = 0;
@@ -47,7 +68,7 @@ function check(name, condition, detail) {
   else failures.push(`${name}${detail ? ' —— ' + detail : ''}`);
 }
 
-// ---------- 从 index.html 里抽方法源码 ----------
+// ---------- 从 app-main.js 里抽方法源码 ----------
 //
 // 用花括号配平截取整个方法体。这两个方法里没有「字符串里带花括号」的情况，
 // 抽取后下面还会断言截出来的东西确实长得对（含 canvas / FileReader），
@@ -78,9 +99,9 @@ function extractMethod(source, name) {
   return null;
 }
 
-const SRC_FILE_TO_DATA_URL = extractMethod(html, 'fileToDataUrl');
-const SRC_PREPARE = extractMethod(html, 'prepareLogoUpload');
-const SRC_UPLOAD = extractMethod(html, 'uploadClientLogo');
+const SRC_FILE_TO_DATA_URL = extractMethod(appMain, 'fileToDataUrl');
+const SRC_PREPARE = extractMethod(appMain, 'prepareLogoUpload');
+const SRC_UPLOAD = extractMethod(appMain, 'uploadClientLogo');
 
 // 【为什么必须先剥注释再断言】
 // 这些函数的注释里会**提到**被禁用的写法（「这里不用 createObjectURL」、
@@ -97,15 +118,22 @@ function stripComments(src) {
 const CODE_PREPARE = stripComments(SRC_PREPARE);
 const CODE_UPLOAD = stripComments(SRC_UPLOAD);
 
-check('从 index.html 抽出了 fileToDataUrl', SRC_FILE_TO_DATA_URL !== null);
-check('从 index.html 抽出了 prepareLogoUpload', SRC_PREPARE !== null);
-check('从 index.html 抽出了 uploadClientLogo', SRC_UPLOAD !== null);
+check('从 app-main.js 抽出了 fileToDataUrl', SRC_FILE_TO_DATA_URL !== null);
+check('从 app-main.js 抽出了 prepareLogoUpload', SRC_PREPARE !== null);
+check('从 app-main.js 抽出了 uploadClientLogo', SRC_UPLOAD !== null);
 check('抽出的 prepareLogoUpload 确实带 canvas（配平没截歪）',
   CODE_PREPARE !== null && CODE_PREPARE.includes('canvas'));
 check('抽出的 fileToDataUrl 确实带 FileReader（配平没截歪）',
   SRC_FILE_TO_DATA_URL !== null && SRC_FILE_TO_DATA_URL.includes('FileReader'));
 check('抽出的 uploadClientLogo 确实带 clientLogoFiles（配平没截歪）',
   CODE_UPLOAD !== null && CODE_UPLOAD.includes('clientLogoFiles'));
+
+// 【拆分漂移守卫】方法只能有一份定义，且必须在 app-main.js 里。
+// 搬回去、或者在 index.html 里又抄一份出来，都在这里变红 —— 而不是等到
+// 上面某条 `!== null` 变成 null 才以「测试崩了」的形式暴露。
+check('index.html 里没有重复定义 prepareLogoUpload（外置后只剩 <script src>）',
+  extractMethod(html, 'prepareLogoUpload') === null,
+  'index.html 里又出现了一份 prepareLogoUpload —— 两份会各自演化');
 
 // ---------- 静态结构守卫 ----------
 //
