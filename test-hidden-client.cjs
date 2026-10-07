@@ -613,15 +613,20 @@ test('H4：删照片走 DELETE（不是 POST），并带上 CSRF 头', async () 
   assert.equal(app.hiddenPreview, '', '删掉的正是放大查看的那张时要把浮层收起');
 });
 
-test('H5：照片展示走公开路由（单数 address），不是鉴权路由', () => {
+test('H5：照片展示走鉴权路由（复数 addresses），与 H3/H4 同族', () => {
   const app = readyApp(async () => okJson({ ok: true }));
   const mid = 'm'.repeat(32);
   app.hiddenItems[0].photos = [mid];
   assert.equal(app.hiddenPhotoUrl(mid),
-    '/api/share/address/addr1/hidden-media/' + 'm'.repeat(32),
-    '契约 H5 的路径是单数 address（业主侧公开路由），不能写成 addresses');
+    '/api/share/addresses/addr1/hidden-media/' + 'm'.repeat(32),
+    '契约 H5 的路径必须是复数 addresses（员工侧鉴权路由）；单数 address 是业主侧公开前缀，2026-10-07 起不再有公开通道');
   assert.equal(app.hiddenPhotoUrl(''), '');
   assert.equal(app.hiddenPhotoUrl('z'.repeat(32)), '', '不属于当前 H1 items 的 mid 不能拼地址');
+  // ⚠️ 这条断言守的是一个**前提**，不是一个细节：鉴权路由要能被 `<img>` 直接加载，
+  // 前提是 session 走 HttpOnly cookie（同站请求浏览器自动带上）。若哪天改成
+  // Bearer token，这里必须变成 fetch + blob —— 否则照片会静默变成破图。
+  assert.ok(ADDRESS_SRC.includes("'/api/share/addresses/' + aid + '/hidden-media/' + mid"),
+    'H5 必须与 H3/H4 同族（复数 addresses），不能再用单数公开前缀');
 });
 
 // =====================================================================
@@ -874,7 +879,7 @@ test('调用的端点与契约 hiddenwork v1 逐条对得上', () => {
   assert.ok(ADDRESS_SRC.includes("'/addresses/' + aid + '/hidden-acceptance'"), 'H2 路径不对');
   assert.ok(ADDRESS_SRC.includes("'/addresses/' + aid + '/hidden-media'"), 'H3 路径不对');
   assert.ok(ADDRESS_SRC.includes("'/addresses/' + aid + '/hidden-media/' + mid"), 'H4 路径不对');
-  assert.ok(ADDRESS_SRC.includes("'/api/share/address/' + aid + '/hidden-media/' + mid"), 'H5 路径不对（单数 address）');
+  assert.ok(ADDRESS_SRC.includes("'/api/share/addresses/' + aid + '/hidden-media/' + mid"), 'H5 路径不对（复数 addresses，鉴权路由）');
   // H2 必须是 POST（errata HW-1）
   assert.match(ADDRESS_SRC, /saveHiddenAcceptance\(\)[\s\S]{0,600}?accountJSON\('\/addresses\/' \+ aid \+ '\/hidden-acceptance', this\.hiddenPayload\(\)\)/);
   // H4 必须是 DELETE，且走 sessionRequest（accountJSON 发不出 DELETE）

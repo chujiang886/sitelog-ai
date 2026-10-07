@@ -210,8 +210,10 @@ async function main() {
       obs.upload = { before, after, src };
       assert.equal(before, 0);
       assert.equal(after, 1);
-      assert.match(src, /^\/api\/share\/address\/[a-f0-9]{32}\/hidden-media\/[a-f0-9]{32}$/,
-        '照片地址必须是契约 H5 的单数 address 公开路由，实际：' + src);
+      // 2026-10-07：H5 从公开路由（单数 address）收口为鉴权路由（复数 addresses），
+      // 与 H3 上传 / H4 删除同族。员工侧 session 是 HttpOnly cookie，`<img>` 自动带上。
+      assert.match(src, /^\/api\/share\/addresses\/[a-f0-9]{32}\/hidden-media\/[a-f0-9]{32}$/,
+        '照片地址必须是契约 H5 的复数 addresses 鉴权路由，实际：' + src);
       // 照片真的能加载（不是 404 占位）。
       //
       // **必须等到它解码完再断言**：`<img>` 节点出现的那一刻 naturalWidth 还是 0

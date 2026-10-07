@@ -1214,19 +1214,31 @@ window.addressFeatures = {
     if (this.hiddenAcceptance.acceptor_name) parts.push('验收人 ' + this.hiddenAcceptance.acceptor_name);
     return parts.join(' · ');
   },
-  // 照片展示走**公开**路由（契约 H5）：单数 `address`，不是 `addresses`。
-  // 员工侧也用这一条，不再加一条鉴权路由——同一张图两个入口，迟早有一个
-  // 漏掉鉴权校验或漏掉 Cache-Control（契约要求 private, max-age=3600）。
+  // 照片展示走**鉴权**路由（契约 H5）：复数 `addresses`，与 H3 上传 / H4 删除同族。
+  //
+  // 【2026-10-07：从公开路由挪到鉴权路由】
+  // 原先这里拼的是单数 `/api/share/address/<aid>/hidden-media/<mid>`——一条
+  // **无鉴权**的公开路由（当时的理由：业主页也要显示隐蔽工程照片，而业主没有
+  // 账号）。2026-10-06 该板块对业主整块下线后，这条公开路由的唯一消费者就是
+  // 这里；照片含墙内水电走向与预埋件位置，只靠「mid 猜不到」不是访问控制。
+  //
+  // 【为什么这里仍然可以直接拼 URL，不需要 fetch + blob】
+  // 员工侧的 session 是 **HttpOnly cookie**（`cj_sitelog_session`，
+  // `Path=/api/share`，见 `account_routes.cookie_header`）。`<img src>` 发的
+  // 是同站请求，浏览器会自动带上它——所以鉴权对 `<img>` 是透明的。
+  // ⚠️ 这个前提只在「cookie + 同站」下成立。若哪天把 session 改成
+  // `Authorization: Bearer`（存 JS 内存/localStorage），`<img>` 就带不上了，
+  // 那时必须改成 fetch + blob URL —— 否则照片会静默变成一排破图。
   hiddenPhotoUrl(mid) {
     const aid = this.addressDetail && this.addressDetail.id;
     if (!aid || !mid) return '';
     // Alpine 在切地址时可能先重算旧的 x-for 节点，再执行节点删除。
-    // 只有当前 H1 返回的照片 id 才能拼公开地址；这样即使旧节点多活一帧，
+    // 只有当前 H1 返回的照片 id 才能拼地址；这样即使旧节点多活一帧，
     // 也不会出现「新 aid + 旧户 mid」的错误请求，更不会把旧照片串给新户。
     const belongsToCurrentItems = (this.hiddenItems || []).some((item) =>
       Array.isArray(item.photos) && item.photos.includes(mid));
     if (!belongsToCurrentItems) return '';
-    return '/api/share/address/' + aid + '/hidden-media/' + mid;
+    return '/api/share/addresses/' + aid + '/hidden-media/' + mid;
   },
   hiddenPhotoCount(item) { return (item && item.photos ? item.photos : []).length; },
   hiddenCanAddPhoto(item) { return this.hiddenPhotoCount(item) < this.HIDDEN_PHOTOS_PER_ITEM_MAX; },
