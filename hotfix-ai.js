@@ -10,13 +10,19 @@
       return response.text();
     };
     // ⚠️ 2026-10-05 起 index.html 的内联 CSS/JS 已外置（P2 拆分）：siteLogApp() 现在
-    // 定义在 app-main.js，且依赖 templates.js / ai-style.js 的顶层常量（加载顺序与
-    // index.html 里一致）。**不能再从 index.html 的最后一个内联脚本里取** —— 那里
-    // 现在只剩一段 97 字节的 GitHub Pages 跳转，取到的 siteLogApp 必然未定义，
-    // 表现为 alert「siteLogApp is not defined」而 AI 永远恢复不了（2026-10-07 修）。
-    const [auth, aiStyle, templates, appMain] = await Promise.all([
+    // 定义在 app-main.js，且依赖 templates.js / ai-style.js / ai-vision-client.js 的
+    // 顶层常量与方法（加载顺序与 index.html 里一致）。**不能再从 index.html 的最后一个
+    // 内联脚本里取** —— 那里现在只剩一段 97 字节的 GitHub Pages 跳转，取到的 siteLogApp
+    // 必然未定义，表现为 alert「siteLogApp is not defined」而 AI 永远恢复不了（2026-10-07 修）。
+    // 2026-10-08 起 AI 视觉识别引擎（aiOrganizeAll / reAnalyze / analyzeImage /
+    // callVisionAPI 等）已抽到 ai-vision-client.js，并挂到 window.aiVisionFeatures。
+    // 这里必须把它一并拉取并参与求值，否则重新求值的 siteLogApp() 里
+    // `...window.aiVisionFeatures` 展开成空对象，AI 方法整组消失 —— 书签恢复后
+    // 「AI 一键整理」不可用（2026-10-08 实测 CI 红灯：test-hotfix 等不到「AI 已恢复」）。
+    const [auth, aiStyle, aiVision, templates, appMain] = await Promise.all([
       get('/sitelog/auth-client.js'),
       get('/sitelog/ai-style.js'),
+      get('/sitelog/ai-vision-client.js'),
       get('/sitelog/templates.js'),
       get('/sitelog/app-main.js'),
     ]);
@@ -26,7 +32,8 @@
     // 加载了那些 client 脚本）；只有 accountFeatures 需要用刚拉到的新版覆盖掉。
     const scope = Object.create(window);
     scope.accountFeatures = features;
-    const updated = new Function('window', aiStyle + '\n' + templates + '\n' + appMain + '\nreturn siteLogApp();')(scope);
+    // 拼接顺序严格对齐 index.html：ai-style → ai-vision → templates → app-main
+    const updated = new Function('window', aiStyle + '\n' + aiVision + '\n' + templates + '\n' + appMain + '\nreturn siteLogApp();')(scope);
     const methods = ['applySession', 'refreshCompanyStatus', 'ensureCompanyAI', 'aiOrganizeAll', 'reAnalyze', 'analyzeImage', 'callVisionAPI', 'openSettings'];
     for (const name of methods) if (typeof updated[name] !== 'function') throw Error('更新文件不完整，当前工程未更改。');
     for (const name of methods) app[name] = updated[name];
