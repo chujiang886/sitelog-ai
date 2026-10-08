@@ -38,6 +38,7 @@ const { test } = require('node:test');
 const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
 const APP_MAIN = read('app-main.js');
 const HTML = read('index.html');
+const AI_VISION = read('ai-vision-client.js');
 
 // 每一块：从主脚本搬出去的文件、块起点（行首精确匹配）、块 sha256（搬出时）、块行数
 const SPLITS = [
@@ -74,6 +75,24 @@ const SPLITS = [
       'syncArrivalGallery', 'handleArrivalFileSelect', 'handleArrivalDrop', 'processArrivalFiles', 'removeArrivalImage',
       'syncSopGallery', 'handleSopFileSelect', 'handleSopDrop', 'processSopFiles', 'removeSopImage',
       'syncFinishGallery', 'handleFinishFileSelect', 'handleFinishDrop', 'processFinishFiles', 'removeFinishImage',
+    ],
+  },
+  {
+    kind: 'mixin',
+    file: 'ai-vision-client.js',
+    label: 'AI 视觉识别引擎（批量组织 / 单张重分析 / 健壮 JSON 提取 / 多模型投票去重）',
+    start: 'window.aiVisionFeatures = {',
+    // 2026-10-22 从 app-main.js（228–775 行，17 方法，548 行）原样搬来，逐字节一致。
+    sha: '761eb5de7b32d8be674de5860d519b7da8cc5466da526eb70b5e34de3f5857d2',
+    lines: 550,
+    spread: 'aiVisionFeatures',
+    forbiddenInAppMain: /^\s{8}(async\s+)?(aiOrganizeAll|applyCandidateAndAdopt|reAnalyze|captureDomEdits|ensureTitles|analyzeImage|applyAnalysisResult|buildAnalysisPrompt|dedupeDesc|dupWarnHtml|callVisionAPI|extractJSONRobust|_findMatchingBrace|_normalizeParsed|_extractFieldsByRegex|_extractSentenceFromRaw|testConnection)\s*\(/m,
+    methods: [
+      'aiOrganizeAll', 'applyCandidateAndAdopt', 'reAnalyze', 'captureDomEdits',
+      'ensureTitles', 'analyzeImage', 'applyAnalysisResult', 'buildAnalysisPrompt',
+      'dedupeDesc', 'dupWarnHtml', 'callVisionAPI', 'extractJSONRobust',
+      '_findMatchingBrace', '_normalizeParsed', '_extractFieldsByRegex',
+      '_extractSentenceFromRaw', 'testConnection',
     ],
   },
 ];
@@ -148,8 +167,8 @@ for (const s of SPLITS) {
 
 test('app-main.js 里仍在使用搬出去的符号（不是改坏了而是换写法了）', () => {
   assert.ok(APP_MAIN.includes('TEMPLATES.'), 'app-main.js 里没有 TEMPLATES 的引用');
-  assert.ok(/AI_STYLE|polishSiteLogText|scoreSiteLogText/.test(APP_MAIN),
-    'app-main.js 里没有用到 AI 文案引擎 —— 是改坏了还是换写法了？');
+  assert.ok(/AI_STYLE|polishSiteLogText|scoreSiteLogText/.test(AI_VISION),
+    'ai-vision-client.js 里没有用到 AI 文案引擎 —— 是改坏了还是换写法了？');
   assert.ok(/this\.sync(Arrival|Sop|Finish)Gallery\(\)/.test(APP_MAIN),
     'app-main.js 里没有调用画廊渲染 —— 是改坏了还是换写法了？');
 });

@@ -1597,6 +1597,8 @@
   <!-- ========== 应用逻辑 ========== -->
   <!-- AI 文案引擎（纯数据 + 纯函数），与模板同样必须先于 app-main.js 加载 -->
   <script src="ai-style.js"></script>
+  <!-- AI 视觉识别引擎（原内联在 app-main.js 的 17 个方法），依赖 ai-style.js 的全局函数，必须排在它之后、app-main.js 之前 -->
+  <script src="ai-vision-client.js"></script>
   <!-- 报告模板（763 行纯数据），必须先于 app-main.js 加载 -->
   <script src="templates.js"></script>
   <script src="app-main.js"></script>

@@ -5,11 +5,15 @@ const APP_MAIN = fs.readFileSync('app-main.js','utf8');
 // 同上：vm 里按真实加载顺序跑（ai-style / templates 先于 app-main）
 const AI_STYLE_SRC = fs.readFileSync('ai-style.js','utf8');
 const TEMPLATES_SRC = fs.readFileSync('templates.js','utf8');
-const APP_BUNDLE = AI_STYLE_SRC + '\n' + TEMPLATES_SRC + '\n' + APP_MAIN;
+// 2026-10-22：AI 视觉识别引擎已抽到 ai-vision-client.js（原内联在 app-main.js）。
+// 必须按真实加载顺序（ai-style → ai-vision → templates → app-main）拼进 bundle，
+// 否则 vm 里 siteLogApp() 合并不到 aiVisionFeatures，AI 相关测试会静默全挂。
+const AI_VISION_SRC = fs.readFileSync('ai-vision-client.js','utf8');
+const APP_BUNDLE = AI_STYLE_SRC + '\n' + AI_VISION_SRC + '\n' + TEMPLATES_SRC + '\n' + APP_MAIN;
 const CSS = fs.readFileSync('styles.css','utf8');
 // 整页源码：外置样式（head）+ index.html + 外置主脚本（body 末尾）。
 // 这三份原先内联在同一个 index.html 里，结构守卫要按「页面最终长什么样」看，不能只扫 index.html。
-const PAGE = CSS + '\n' + html + '\n' + AI_STYLE_SRC + '\n' + TEMPLATES_SRC + '\n' + APP_MAIN;
+const PAGE = CSS + '\n' + html + '\n' + AI_STYLE_SRC + '\n' + AI_VISION_SRC + '\n' + TEMPLATES_SRC + '\n' + APP_MAIN;
 for(const source of scripts)new vm.Script(source[1]);new vm.Script(APP_MAIN);
 function makeApp(fetch){
  const context={window:{},fetch,console:{...console,error(){}},confirm:()=>true,setTimeout,clearTimeout};
