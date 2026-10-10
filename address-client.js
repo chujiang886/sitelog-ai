@@ -551,6 +551,7 @@ window.addressFeatures = {
         this.ensureDimensionEntry(st.publication_id);
       }
       this.addressDetail = detail;
+      try { if (typeof window.sitelogTrack === 'function') window.sitelogTrack('share_view', addressId); } catch (e) {}
       this.addressStageGroups = this.buildAddressStageGroups(detail.stages);
       this.addressPendingStages = this.buildAddressPendingStages(detail.stages, detail.enabled_stages);
       this.addressDoneStages = this.addressDoneStageCount(detail.stages);
@@ -930,6 +931,7 @@ window.addressFeatures = {
       this.signoffLabel = data.label || this.signoffScopeLabel(this.signoffKind, this.signoffStageKey);
       this.signoffQrError = '';
       this.signoffPanelOpen = true;
+      try { if (typeof window.sitelogTrack === 'function') window.sitelogTrack('signoff', this.addressDetail && this.addressDetail.id, { kind: this.signoffKind, stage_key: this.signoffStageKey }); } catch (e) {}
       this.startSignoffTimer();
       await this.$nextTick?.();
       try { await this.drawSignoffQr(); }
@@ -1419,6 +1421,7 @@ window.addressFeatures = {
         // 重新拉会把员工正在填的结论/说明一起覆盖掉。
         if (!item.photos) item.photos = [];
         if (data.id && !item.photos.includes(data.id)) item.photos.push(data.id);
+        try { if (typeof window.sitelogTrack === 'function') window.sitelogTrack('record_upload', aid); } catch (e) {}
       }
       this.showToast(data.duplicate ? '这张照片已经传过了，不用重复上传' : '✅ 照片已上传');
     } catch (e) {
