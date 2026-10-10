@@ -45,10 +45,10 @@ const SPLITS = [
   {
     kind: 'pure',
     file: 'templates.js',
-    label: '报告模板（763 行模板字符串）',
+    label: '报告模板（含合规版合规导出模板，v9 新增 compliance）',
     start: '// ====== 模板定义',
-    sha: 'cf798d7ef10476c1015f3fa4ac7c9fbd48600645447358ad61ae5729768ad397',
-    lines: 764,
+    sha: 'a00f57f7a9c0a799decd1ab85238a3e3a16b887dcac34eda75321dddfe03f2a0',
+    lines: 870,
     forbiddenInAppMain: /const TEMPLATES/,
   },
   {

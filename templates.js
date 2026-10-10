@@ -772,5 +772,111 @@
             <span>地址：广东省汕头市</span>
           </div>
         </footer>
-      `
+      `,
+      // ═══ 合规版（v9 · 对齐 GB/T 50328 建设工程文件归档规范）═══
+      // 入口：编辑器 URL 带 ?template=compliance 时由 app-main.js 置 complianceMode。
+      // 旧阶段模板（frame/glass/...）完全不受影响；本模板仅新增一条合规导出路径。
+      compliance: () => `
+        <!-- ═══ 封面 ═══ -->
+        <div class="pdf-cover">
+          <div class="pdf-cover-band">
+            <span class="pdf-cover-brand">CHUJIANG 初匠门窗</span>
+            <span class="pdf-cover-badge">竣工归档合规版</span>
+          </div>
+          <div class="pdf-cover-body">
+            <p class="pdf-cover-eng">COMPLIANCE ARCHIVE</p>
+            <h1 class="pdf-cover-main-title">工程归档合规版</h1>
+            <p class="pdf-cover-tagline">对齐 GB/T 50328 · 隐蔽工程留档可追溯</p>
+            {{PROJECT_INFO}}
+          </div>
+        </div>
+
+        <!-- ═══ 一、工程基本信息 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">一</span>
+            <span class="pdf-section-title">工程基本信息</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-editable-box" contenteditable="true">
+工程名称、工程地址、开工/竣工日期、参建单位、项目负责人等基本信息在此补全。封面已自动带入项目名称、施工部位、归档日期与归档人。
+          </div>
+        </section>
+
+        <!-- ═══ 二、归档目录（按 GB/T 50328 分类）═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">二</span>
+            <span class="pdf-section-title">归档目录</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-editable-box" contenteditable="true">
+按《建设工程文件归档规范》GB/T 50328 分类，本工程归档文件目录：
+1. 施工管理文件（开工令、施工组织设计、技术交底、会议纪要）
+2. 施工技术文件（图纸会审、设计变更、技术核定）
+3. 施工进度文件（进度计划、工期签证）
+4. 施工质量文件（材料合格证、检测报告、隐蔽验收、检验批、分项/分部工程质量验收）
+5. 竣工验收文件（竣工验收记录、竣工图、质量评估报告）
+          </div>
+        </section>
+
+        <!-- ═══ 三、隐蔽工程验收要点清单 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">三</span>
+            <span class="pdf-section-title">隐蔽工程验收要点清单</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-editable-box" contenteditable="true">
+依据《建筑节能工程施工质量验收标准》建质〔2018〕95号，隐蔽工程验收要点：
+· 材料验收：门窗型材、玻璃、密封胶、五金件的产品合格证书、性能检测报告、进场验收记录；
+· 隐蔽验收：洞口尺寸、预埋件、防腐处理、固定节点、防水节点等隐蔽前验收记录；
+· 检验批：按检验批划分逐批验收，附检验批质量验收记录与影像佐证。
+          </div>
+        </section>
+
+        <!-- ═══ 四、留档影像索引 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">四</span>
+            <span class="pdf-section-title">留档影像索引</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <p style="margin:8px 0 12px;color:#6b7280;font-size:13px;">工序 → 影像 → 签认状态 对照如下（影像由系统按区自动归集）：</p>
+          <div class="pdf-sop-gallery" id="arrival-gallery">
+            <!-- syncArrivalGallery() 动态渲染：班组进场、材料到场、安全交底 -->
+          </div>
+          <div class="pdf-sop-gallery" id="finish-gallery">
+            <!-- syncFinishGallery() 动态渲染：完工实景 -->
+          </div>
+          <div class="pdf-sop-gallery" id="sop-gallery">
+            <!-- syncSopGallery() 动态渲染：离场留证 -->
+          </div>
+        </section>
+
+        <!-- ═══ 五、留档说明与合规声明 ═══ -->
+        <section class="pdf-section">
+          <div class="pdf-section-header">
+            <span class="pdf-section-num">五</span>
+            <span class="pdf-section-title">留档说明与合规声明</span>
+            <span class="pdf-section-line"></span>
+          </div>
+          <div class="pdf-editable-box" contenteditable="true">
+本记录由施格归档系统生成，可作为竣工归档佐证；隐蔽工程留档可追溯。AI 辅助提示须经人工确认后方可作为验收依据。归档内容真实、完整、可追溯，由归档人负责。
+          </div>
+        </section>
+
+        <!-- ═══ 页脚 ═══ -->
+        <footer class="pdf-footer">
+          <div class="pdf-footer-line-gold"></div>
+          <p class="pdf-footer-slogan">「用精工艺，给您一个可追溯的家」</p>
+          <p class="pdf-footer-company">汕头市初匠门窗科技有限公司 · CHUJIANG</p>
+          <p class="pdf-footer-sub">施格归档 · SITELOG AI 出品 · ICP备2024297744号-2</p>
+          <div class="pdf-footer-links">
+            <span>服务热线：待填写</span>
+            <span>官网：chujiang.中国</span>
+            <span>地址：广东省汕头市</span>
+          </div>
+        </footer>
+      `,
     };

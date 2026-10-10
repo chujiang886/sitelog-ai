@@ -14,6 +14,7 @@
         // ===== 状态 =====
         apiProvider: 'qwen',
         templateType: '框架施工',
+        complianceMode: false,   // v9 合规版导出：编辑器 URL 带 ?template=compliance 时置 true，走 GB/T 50328 五段模板
         images: [],             // 施工节点照片
         arrivalImages: [],      // 班组进场照片（人员到位、材料到场、安全交底）
         sopImages: [],          // 班组离场 SOP 手动上传照片（关水/关电/关门/清场）
@@ -60,6 +61,12 @@
 
         // ===== 初始化 =====
         async init() {
+          // v9 合规版导出入口：编辑器 URL 带 ?template=compliance 时，整份报告按 GB/T 50328 五段结构生成。
+          // 必须在 switchTemplate()（内部调用 getTemplateHtml）之前置位，否则首屏仍是默认阶段模板。
+          try {
+            const _params = new URLSearchParams(location.search);
+            if (_params.get('template') === 'compliance') this.complianceMode = true;
+          } catch (e) { /* 老浏览器无 URLSearchParams 也不影响默认路径 */ }
           this.switchTemplate();
           await this.refreshSession();
           await this.initializeEditor();
@@ -90,12 +97,16 @@
           }
           this.activeTemplate = this.templateType;
           this.reportHtml = this.getTemplateHtml();
-          this.reportTitle = this.templateType + '归档';
+          this.reportTitle = (this.complianceMode ? '合规版' : this.templateType) + '归档';
           // x-html 渲染后再填充各手动上传区（否则初始为空白）
           this.$nextTick(() => { this.syncToReport();this.markDraftDirty?.(); });
         },
 
         getTemplateHtml() {
+          // v9 合规版导出入口：?template=compliance 时整份报告走 GB/T 50328 五段结构。
+          // 注意：用 complianceMode 标志分支，绝不用 this.templateType === '合规版'，
+          // 否则会被 test-stage-parity.cjs 的阶段映射正则误捕获，导致阶段一致性测试失败。
+          if (this.complianceMode) return this.buildComplianceHtml();
           let html = '';
           if (this.templateType === '吊装施工') html = TEMPLATES.lifting();
           else if (this.templateType === '框架施工') html = TEMPLATES.frame();
@@ -106,7 +117,16 @@
           else if (this.templateType === '离场自检') html = TEMPLATES.departure();
           else if (this.templateType === '售后保养') html = TEMPLATES.aftercare();
           else html = TEMPLATES.frame();
+          return this.applyReportChrome(html);
+        },
 
+        // 合规版（GB/T 50328 五段）报告模板。旧阶段模板不受影响。
+        buildComplianceHtml() {
+          return this.applyReportChrome(TEMPLATES.compliance());
+        },
+
+        // 所有模板共用的收尾：补齐照片分区 + 注入 {{PROJECT_INFO}} 封面占位符。
+        applyReportChrome(html) {
           // 所有模板均保留照片分区，避免换版式后照片仍在数据中却不可见。
           // 1 对 1 模板的进场照片按框分区（arrival-gallery-f0、-f1…），没有总区；
           // 这里必须跳过，否则会多渲染一个空 section，把段落编号整体顶偏。
