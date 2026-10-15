@@ -5,20 +5,48 @@ window.projectFeatures = {
   colleagues:[],memberUser:'',memberRole:'editor',reviewNote:'',shareAudience:'public',shareDays:30,shareCode:'',
   publicationAttempt:null,reviewBusy:false,reviewMessage:'',shareStep:'',
   aiJobId:'',aiJobStatus:'',aiCancelRequested:false,aiUsage:null,aiBudget:{user_daily:100,company_daily:500},
-  async cancelAIJob(){this.aiCancelRequested=true;if(this.aiJobId)await this.projectAction(()=>this.accountJSON('/ai/jobs/'+this.aiJobId+'/cancel',{}));this.aiJobStatus='已请求取消；已提交的上游请求可能仍计费'},
+  async cancelAIJob(){this.aiCancelRequested=true;if(this.aiJobId)await this.projectAction(()=>this.aiRequest('/ai/jobs/'+this.aiJobId+'/cancel',{},Date.now()+this.aiRequestTimeoutMs));this.aiJobStatus='已请求取消；已提交的上游请求可能仍计费'},
   async loadAIUsage(){await this.projectAction(async()=>{this.aiUsage=await this.accountJSON('/ai/usage');this.aiBudget={...this.aiUsage.limits}})},
   async saveAIBudget(){await this.projectAction(async()=>{await this.accountJSON('/admin/ai-budget',{user_daily:Number(this.aiBudget.user_daily),company_daily:Number(this.aiBudget.company_daily)});await this.loadAIUsage();this.showToast('识别次数预算已保存')})},
-  async runAIJob(image,prompt,model){
-    this.aiCancelRequested=false;let job=await this.accountJSON('/ai/jobs',{image,prompt,model});this.aiJobId=job.id;this.aiJobStatus='识别任务已排队';
-    try{while(['queued','running'].includes(job.status)){if(this.aiCancelRequested)await this.accountJSON('/ai/jobs/'+job.id+'/cancel',{});await new Promise(resolve=>setTimeout(resolve,1000));job=await this.accountJSON('/ai/jobs/'+job.id);this.aiJobStatus=job.status==='queued'?'识别排队中':job.status==='running'?'正在识别…':'';}if(job.status!=='succeeded')throw Error(job.error||'识别已取消');return job.result}
-    finally{this.aiJobId='';this.aiJobStatus='';}
+  aiWaitTimeoutMs:600000,aiRequestTimeoutMs:20000,aiPollIntervalMs:1000,
+  async aiRequest(path,payload,deadline){
+    const remaining=deadline-Date.now();
+    const timeoutError=()=>{const error=Error(remaining<=0?'识别等待超时，照片及人工编辑已保留，请稍后重试':'识别请求超时，照片及人工编辑已保留；请检查网络后重试');error.code=remaining<=0?'AI_WAIT_TIMEOUT':'AI_REQUEST_TIMEOUT';return error};
+    if(remaining<=0)throw timeoutError();
+    const controller=new AbortController();let timer;
+    try{
+      return await Promise.race([
+        this.accountJSON(path,payload,{signal:controller.signal}),
+        new Promise((_,reject)=>{timer=setTimeout(()=>{const error=timeoutError();if(remaining<=this.aiRequestTimeoutMs){error.message='识别等待超时，照片及人工编辑已保留，请稍后重试';error.code='AI_WAIT_TIMEOUT'}reject(error);controller.abort()},Math.min(this.aiRequestTimeoutMs,remaining))})
+      ]);
+    }finally{clearTimeout(timer)}
   },
-  // 批量识别：一次提交多张照片，后端按提交顺序返回 items 数组。
-  async runAIBatch(images,prompt,model,opts){
-    opts=opts||{};this.aiCancelRequested=false;const body={images,prompt,model};if(opts.stage)body.stage=opts.stage;if(opts.context)body.context=opts.context;
-    let job=await this.accountJSON('/ai/jobs',body);this.aiJobId=job.id;this.aiJobStatus='识别任务已排队';
-    try{while(['queued','running'].includes(job.status)){if(this.aiCancelRequested)await this.accountJSON('/ai/jobs/'+job.id+'/cancel',{});await new Promise(resolve=>setTimeout(resolve,1000));job=await this.accountJSON('/ai/jobs/'+job.id);this.aiJobStatus=job.status==='queued'?'识别排队中':job.status==='running'?'正在识别…':'';}if(job.status!=='succeeded')throw Error(job.error||'识别已取消');return job.result}
-    finally{this.aiJobId='';this.aiJobStatus='';}
+  async waitForAI(body){
+    const deadline=Date.now()+this.aiWaitTimeoutMs;let job;
+    this.aiCancelRequested=false;
+    try{
+      job=await this.aiRequest('/ai/jobs',body,deadline);this.aiJobId=job.id;this.aiJobStatus='识别任务已排队';
+      while(['queued','running'].includes(job.status)){
+        if(this.aiCancelRequested){await this.aiRequest('/ai/jobs/'+job.id+'/cancel',{},deadline);throw Error('已停止识别，照片和人工编辑已保留')}
+        await new Promise(resolve=>setTimeout(resolve,Math.min(this.aiPollIntervalMs,Math.max(0,deadline-Date.now()))));
+        job=await this.aiRequest('/ai/jobs/'+job.id,undefined,deadline);
+        this.aiJobStatus=job.status==='queued'?'识别排队中':job.status==='running'?'正在识别…':'';
+      }
+      if(job.status!=='succeeded')throw Error(job.error||'识别已取消');
+      return job.result;
+    }catch(error){
+      // Timeout ends the whole batch. Never auto-resubmit: the original request may have reached the server.
+      if(error.code==='AI_WAIT_TIMEOUT'||error.code==='AI_REQUEST_TIMEOUT'||error instanceof TypeError){
+        this.aiCancelRequested=true;
+        if(job?.id){try{await this.aiRequest('/ai/jobs/'+job.id+'/cancel',{},Date.now()+this.aiRequestTimeoutMs)}catch{}}
+      }
+      throw error;
+    }finally{this.aiJobId='';this.aiJobStatus=''}
+  },
+  async runAIJob(image,prompt,model){return this.waitForAI({image,prompt,model})},
+  async runAIBatch(images,prompt,model,opts={}){
+    const body={images,prompt,model};if(opts.stage)body.stage=opts.stage;if(opts.context)body.context=opts.context;
+    return this.waitForAI(body);
   },
   projectSnapshotExtras(){return {id:this.cloudProjectId,revision:this.cloudRevision,status:this.cloudStatus}},
   restoreProjectExtras(value){this.cloudProjectId=value?.id||'';this.cloudRevision=value?.revision||0;this.cloudStatus=value?.status||'draft';this.cloudMessage=this.cloudProjectId?'云端修订 '+this.cloudRevision+' · 本机恢复':'尚未保存云端';this.projectDetail=null;this.publicationAttempt=null;this.reviewMessage='';this.shareStep=''},

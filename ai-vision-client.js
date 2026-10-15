@@ -87,6 +87,7 @@ window.aiVisionFeatures = {
                   });
                   this.processedCount += batch.length;
                   this.syncToReport();
+                  if (this.aiCancelRequested || e.code === 'AI_WAIT_TIMEOUT' || e.code === 'AI_REQUEST_TIMEOUT') break outer;
                   continue;
                 }
                 // 后端返回 items 数组（与提交顺序一一对应）；长度不符则降级逐张单图识别
@@ -107,6 +108,7 @@ window.aiVisionFeatures = {
                       }
                       img.aiError = e.message;
                       failures.push({ name: (img.file && img.file.name) || img.id, error: e.message });
+                      if (this.aiCancelRequested || e.code === 'AI_WAIT_TIMEOUT' || e.code === 'AI_REQUEST_TIMEOUT') break outer;
                     } finally {
                       img.analyzing = false;
                     }
@@ -127,10 +129,12 @@ window.aiVisionFeatures = {
                 this.syncToReport();
               }
             }
-            if (this.aiCancelRequested) { this.showToast('已停止后续识别，现有内容已保留'); }
+            if (this.aiCancelRequested && failures.length) { this.showToast(failures[0].error + '；已停止后续批次', 'error'); }
+            else if (this.aiCancelRequested) { this.showToast('已停止后续识别，现有内容已保留'); }
             else if (failures.length === 0) { this.showToast(`✨ AI 整理完成，本次共处理 ${this.processedCount} 张（已批量提交，更快更稳）— 点击文字可直接修改，导出时自动保留您的修改`); }
             else { this.showToast(`⚠️ ${failures.length} 张识别失败：${failures[0].error.slice(0, 80)}`, 'error'); }
           } finally {
+            todo.forEach(img => img.analyzing = false);
             this.processing = false;
           }
         },
