@@ -39,8 +39,8 @@ window.accountFeatures = {
     return response;
   },
 
-  async accountJSON(path, payload) {
-    const response = await this.sessionRequest(path, payload === undefined ? {} : { method: 'POST', body: JSON.stringify(payload) });
+  async accountJSON(path, payload, options = {}) {
+    const response = await this.sessionRequest(path, payload === undefined ? options : { ...options, method: 'POST', body: JSON.stringify(payload) });
     const data = await response.json();
     if (!response.ok || data.ok === false) {const error=new Error(data.error || '操作未完成，请重试');error.status=response.status;throw error;}
     return data;
@@ -61,7 +61,7 @@ window.accountFeatures = {
   async refreshCompanyStatus(quiet = false) {
     if (!this.accountUser) return false;
     try {
-      this.applySession(await this.accountJSON('/auth/me'));
+      this.applySession(await (this.aiRequest ? this.aiRequest('/auth/me', undefined, Date.now() + this.aiRequestTimeoutMs) : this.accountJSON('/auth/me')));
       return !this.showPassword;
     } catch (error) {
       if (!quiet) this.showToast(error.message, 'error');

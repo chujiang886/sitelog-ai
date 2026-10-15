@@ -82,9 +82,9 @@ const SPLITS = [
     file: 'ai-vision-client.js',
     label: 'AI 视觉识别引擎（批量组织 / 单张重分析 / 健壮 JSON 提取 / 多模型投票去重）',
     start: 'window.aiVisionFeatures = {',
-    // 2026-10-22 从 app-main.js（228–775 行，17 方法，548 行）原样搬来，逐字节一致。
-    sha: '761eb5de7b32d8be674de5860d519b7da8cc5466da526eb70b5e34de3f5857d2',
-    lines: 550,
+    // 2026-10-15：在原拆分基础上增加等待超时停止与状态清理；行为由 test-ai-wait 守护。
+    sha: '141efe4580074b12234d775dbbc2e28f2de945a10bbc7812c791244eb45b59c3',
+    lines: 554,
     spread: 'aiVisionFeatures',
     forbiddenInAppMain: /^\s{8}(async\s+)?(aiOrganizeAll|applyCandidateAndAdopt|reAnalyze|captureDomEdits|ensureTitles|analyzeImage|applyAnalysisResult|buildAnalysisPrompt|dedupeDesc|dupWarnHtml|callVisionAPI|extractJSONRobust|_findMatchingBrace|_normalizeParsed|_extractFieldsByRegex|_extractSentenceFromRaw|testConnection)\s*\(/m,
     methods: [
