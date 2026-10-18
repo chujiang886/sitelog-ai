@@ -199,7 +199,7 @@
           '\n                <button class="sop-remove-btn" data-id="' + photo.id + '" title="删除">×</button>' +
           '\n                <div class="node-card-header">' +
           '\n                  <span class="node-card-num">' + String(idx + 1).padStart(2, '0') + '</span>' +
-          '\n                  <span class="node-card-meta">' + metaPrefix + ' · ' + this.escapeHtml(photo.time || '') + '</span>' +
+          '\n                  <span class="node-card-meta">' + metaPrefix + ' · ' + this.escapeHtml(window.sitelogPublication?.photoDate(photo) || '拍摄时间：未提供；整理时间：'+(photo.time||'未提供')) + '</span>' +
           '\n                </div>' +
           '\n                ' + moveRow(photo) +
           '\n                <h3 class="text-base font-bold text-[#1F3D2A] mb-2 editable-block" style="padding:0 18px;">' + this.escapeHtml(photo.title || (isArrival ? '进场照片' : '未命名节点')) + '</h3>' +

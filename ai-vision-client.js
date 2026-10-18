@@ -244,7 +244,7 @@ window.aiVisionFeatures = {
           this.images.forEach(img => {
             if (!img.title || !img.title.trim()) {
               const k = resolve(img.category || '');
-              img.title = (SAFE[k] && SAFE[k].title) || `${img.category || '施工'}节点`;
+              img.title = '施工节点（待核实）';
               fixed++;
             }
             if (!img.desc || !img.desc.trim()) {
@@ -264,6 +264,12 @@ window.aiVisionFeatures = {
 
         // 把模型返回的解析结果落到 img（单图与批量复用同一套字段映射）
         applyAnalysisResult(img, result, model) {
+          if (window.sitelogPublication?.unsupportedClaim(result)) {
+            img.aiError = 'AI 建议含无法仅凭照片认定的结论，请人工核实后填写；原记录已保留';
+            img.aiConfirmed = false;
+            img._analyzed = true;
+            return;
+          }
           if (result._noJson || !result.desc) {
             img._analyzed = true;
             img.aiError = 'AI 返回内容不完整，请保留照片并重试';
@@ -288,6 +294,7 @@ window.aiVisionFeatures = {
           const glossary = '行业术语库（优先使用）：' + NL + AI_STYLE.GLOSSARY;
           const formula = AI_STYLE.FORMULA;
           const common = [
+            '证据边界优先：标题、正文、亮点须描述同一可见动作。不得仅凭照片声称符合标准、完成安全交底、全断面填充、结构增强或整体验收；不能判定时写待现场核实。成果照片仅代表当前归档阶段。',
             role, '',
             rules, '',
             glossary, '',
@@ -317,7 +324,7 @@ window.aiVisionFeatures = {
               common,
               '{',
               '  "title": "完工工序名，8-16字，只写工序，不带形容词",',
-              '  "stage": "交付状态，8-18字，如：整体完工待验收 / 细部收口完成 / 成品保护到位",',
+              '  "stage": "本阶段可见状态，不推断整体完工或验收",',
               '  "desc": "节点说明，50-110字，按写作公式写成一两句连贯的工程书面语",',
               '  "highlights": ["要点1", "要点2", "要点3"]',
               '}',
@@ -325,8 +332,8 @@ window.aiVisionFeatures = {
               '本节点场景：' + NL + AI_STYLE.SECTION.finish,
               '',
               '❌ 反面（会被判废）："门窗安装完成" / "照片中展示了安装好的窗户" / "整体效果美观，做工精细"',
-              '✅ 正面："推拉门整体安装完成，室外侧框墙接缝硅酮耐候密封胶饱满连续无断点，披水板排水孔通畅，玻璃保护膜保留待业主验收后撕除。"',
-              '✅ 正面："开启扇执手启闭灵活，锁点锁座啮合到位，关闭后无自开现象；五金传动器已调试，扇体四周间隙均匀。"'
+              '✅ 正面："框体表面保留保护膜；整体安装、密封与排水性能待现场核实。"',
+              '✅ 正面："可见开启扇与执手；启闭和锁闭性能须由现场试验确认。"'
             ].join(NL);
           }
           return [
