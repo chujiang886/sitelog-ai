@@ -1,0 +1,92 @@
+{
+  "production_frontend_commit": "686c736ff7a3c3a3fa5511a00a5ee78a086ba3d6",
+  "permitted_runtime_changes": [
+    "vendor/purify.min.js"
+  ],
+  "runtime_sha256": {
+    "address-client.js": {
+      "sha256": "2512685fcf568b3c917a71ad493178bd13994397a775582270cf52b0eb6e0a99"
+    },
+    "ai-style.js": {
+      "sha256": "ce731197f1fdd24adfc5f07b62ff594248a0a73b25f7d90bd6014cb9a781dac3"
+    },
+    "ai-vision-client.js": {
+      "sha256": "d99923f87b98a349a1e968f219df253d78841ee91f8f53c777fcdd85981826d6"
+    },
+    "app-main.js": {
+      "sha256": "6e7ad1333748b622e24c0de9805c6add576c49ddc90548fcc30f844445aed8f8"
+    },
+    "app.css": {
+      "sha256": "944aefe2b2c48fe706da5f0b970bf277b1c1302a5c76d6c2167c754eb93767c6"
+    },
+    "auth-client.js": {
+      "sha256": "34dbf27253e039047d89bc267bd6702fe57b1daf3080ab5acfa10cced74077a7"
+    },
+    "editor-state.js": {
+      "sha256": "3446d64df5c82083d1a69966d672539fa11f5359d037117c48b1d7b261936935"
+    },
+    "field-client.js": {
+      "sha256": "8c5e6bf13eabb99893c05c71c537fcbb1c771f64b26ead894b37b52786e3450e"
+    },
+    "field-panel.html": {
+      "sha256": "8edb61ff10daafaaff2e45f1c1db3c202f34f35c79f84c992ffac2bda443a23c"
+    },
+    "frame-client.js": {
+      "sha256": "ceceaf361e6575790d493650bc6c78a1f96c093ae4713f0babfa86767af78197"
+    },
+    "gallery-client.js": {
+      "sha256": "6d8ea45427aaffa9d530f751a505fbad70e39206350e80ded3316a12b7a68516"
+    },
+    "hotfix-ai.js": {
+      "sha256": "b941b2d0912e8dc738a8fed099aa595a11fd181cba00185a569f0e35fc9676ec"
+    },
+    "html2pdf-glue.js": {
+      "sha256": "71b6ba36fdbb6f9b8fb544e0ed2c66a587b32c7c4dbe522eee7441dc7534dc0a"
+    },
+    "index.html": {
+      "sha256": "2d199157f92b3db7d898b92474b9300353cc8bfd222d6e0eeb9f6298110b32de"
+    },
+    "legacy-client.js": {
+      "sha256": "c19e77b4abca5c9cdc8a0b522fbb95341d2ddb1fb3802090f14571cd2553a8e9"
+    },
+    "project-client.js": {
+      "sha256": "bf27eefd149bd8fc849055c5269904ef2a38d042a1095b3c50acc627c6430f34"
+    },
+    "project-panel.html": {
+      "sha256": "0ac975b27d9bbb5c241452465fc6f41e6e1a723388a71f088129c4df3d98f7cd"
+    },
+    "repair-ai.html": {
+      "sha256": "1365a804175e879ea860d29acd7148da4f8cb1e0ddf34025ec754ee2406b46ea"
+    },
+    "share-key.html": {
+      "sha256": "06b733c4400e18446cc7353ae5ca56879b669a3ae46b05e4e4c7c383f3c3f087"
+    },
+    "styles.css": {
+      "sha256": "b85fc6dc44500ca7d17a166ecd4595d2fefee13e505a8abe6bb454899898f237"
+    },
+    "templates.js": {
+      "sha256": "a3d9f52065e333895434f7be5b7a0fb6f09224207ba799f2f0e6d8159c96046e"
+    },
+    "vendor/alpine.min.js": {
+      "sha256": "ca057831ef9be3d8ee47e14078089fd2381dc7820b4bb7fbdb85a490f5b8f68c"
+    },
+    "vendor/app.css": {
+      "sha256": "baa1350aa0b5a90ae0f0894e4142b8568a5235616b9b793c8e556653b18ac1c8"
+    },
+    "vendor/html2canvas.min.js": {
+      "sha256": "e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb"
+    },
+    "vendor/jspdf.umd.min.js": {
+      "sha256": "98ccf17aa10c20bb1301762618fcc9b6ab3a4e7f26b6071d64d0b41154df3875"
+    },
+    "vendor/purify.min.js": {
+      "sha256": "f263b05369e050fa175d4ecb9c9358eb4253602d510297adfb31df48b2f1c4d5"
+    },
+    "vendor/qrcode.min.js": {
+      "sha256": "bb2365e4902f4f84852cf4025e6f6a60325a682aeafa43fb63b7fc8f098d1ef2"
+    },
+    "workflow-client.js": {
+      "sha256": "3666904d6dca692d8bf982928db91540c7483523b42ccc7a2001df2959ea3e2a"
+    }
+  }
+}
