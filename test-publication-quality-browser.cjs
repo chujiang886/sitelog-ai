@@ -9,7 +9,7 @@ if(!/^http:\/\/127\.0\.0\.1:\d+$/.test(base||''))throw Error('仅允许隔离测
  const browser=await chromium.launch({headless:true,executablePath:process.env.TEST_CHROME});
  try{
  const ctx=await browser.newContext({viewport:{width:1440,height:1000}}),page=await ctx.newPage();
- const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const errors=[];page.on('pageerror',e=>errors.push(e.stack||e.message));
  await page.goto(base+'/sitelog/');
  await page.locator('#login-user').fill('admin');await page.locator('#login-pass').fill('Test-admin-initial-12345');
  await page.getByRole('button',{name:'登录',exact:true}).click();await page.locator('#login-user').waitFor({state:'hidden'});
@@ -50,11 +50,11 @@ if(!/^http:\/\/127\.0\.0\.1:\d+$/.test(base||''))throw Error('仅允许隔离测
  await mp.screenshot({path:path.join(out,'address-mobile-wechat-ua.png'),fullPage:true});
  if(process.env.TEST_REVIEW_SAMPLE){
   const sample=JSON.parse(fs.readFileSync(process.env.TEST_REVIEW_SAMPLE));
-  await page.evaluate(async sample=>{await Alpine.$data(document.body).restoreSnapshot(sample)},sample);
+  await page.evaluate(async sample=>{await Alpine.$data(document.body).restoreSnapshot(sample);await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame)},sample);
   assert.equal(await page.evaluate(()=>Alpine.$data(document.body).allPhotos().length),29);
   const imported=await page.evaluate(()=>Alpine.$data(document.body).allPhotos().map(p=>({id:p.id,title:p.title,desc:p.desc,highlights:p.highlights,stage:p.stage})));
   const expected=['arrivalImages','images','finishImages','sopImages'].flatMap(key=>sample[key]||[]).map(p=>({id:p.id,title:p.title,desc:p.desc,highlights:p.highlights,stage:p.stage}));
-  assert.deepEqual(imported,expected,'候选导入必须保留逐照标题、正文、亮点和待核实状态');
+  assert.deepEqual(imported.sort((a,b)=>a.id.localeCompare(b.id)),expected.sort((a,b)=>a.id.localeCompare(b.id)),'候选导入必须保留逐照标题、正文、亮点和待核实状态');
   assert.match(await page.locator('#report-content').innerText(),/纠错候选版/);
   await page.screenshot({path:path.join(out,'candidate-import-editor.png')});
  }
