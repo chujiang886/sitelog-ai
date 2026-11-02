@@ -52,6 +52,9 @@ if(!/^http:\/\/127\.0\.0\.1:\d+$/.test(base||''))throw Error('仅允许隔离测
   const sample=JSON.parse(fs.readFileSync(process.env.TEST_REVIEW_SAMPLE));
   await page.evaluate(async sample=>{await Alpine.$data(document.body).restoreSnapshot(sample)},sample);
   assert.equal(await page.evaluate(()=>Alpine.$data(document.body).allPhotos().length),29);
+  const imported=await page.evaluate(()=>Alpine.$data(document.body).allPhotos().map(p=>({id:p.id,title:p.title,desc:p.desc,highlights:p.highlights,stage:p.stage})));
+  const expected=['arrivalImages','images','finishImages','sopImages'].flatMap(key=>sample[key]||[]).map(p=>({id:p.id,title:p.title,desc:p.desc,highlights:p.highlights,stage:p.stage}));
+  assert.deepEqual(imported,expected,'候选导入必须保留逐照标题、正文、亮点和待核实状态');
   assert.match(await page.locator('#report-content').innerText(),/纠错候选版/);
   await page.screenshot({path:path.join(out,'candidate-import-editor.png')});
  }
