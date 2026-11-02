@@ -96,7 +96,7 @@ window.projectFeatures = {
     const canReview=!detail||this.accountUser.role==='admin'||detail.owner===actor||detail.members?.some(m=>m.user_id===actor&&m.role==='reviewer');
     if(!canReview&&!forShare)throw Error('当前账号只有编辑权限，请由工程负责人或审核人确认');
     // 用户点击“审核通过”或“确认完成”明确确认当前照片与文字；无需另到现场助手重复勾选。
-    if(canReview){for(const photo of this.allPhotos())if(photo._analyzed)photo.aiConfirmed=true;this.markDraftDirty();}
+    if(canReview){for(const photo of this.allPhotos()){if(photo._analyzed)photo.aiConfirmed=true;if(photo.textReview||photo._manual)window.sitelogPublication?.confirmPhoto(photo);}this.markDraftDirty();}
     this.shareStep='1/3 正在保存当前工程…';this.reviewMessage=this.shareStep;
     const saved=await this.saveCloudProject(),pid=this.cloudProjectId;
     const unchanged=()=>{
@@ -132,6 +132,7 @@ window.projectFeatures = {
     this.shareStep='3/3 正在生成分享码…';
     this.applyClientLogo();
     const clone=document.getElementById('report-content').cloneNode(true);
+    window.sitelogPublication?.clean(clone);
     clone.querySelectorAll('button,input,details.debug-panel,.sop-upload-zone,.sop-grid-top-row,.sop-remove-btn').forEach(el=>el.remove());clone.querySelectorAll('[contenteditable]').forEach(el=>el.removeAttribute('contenteditable'));
     for(const image of clone.querySelectorAll('img')){const photo=this.allPhotos().find(p=>p.dataUrl===image.getAttribute('src'));if(!photo?.mediaId)throw Error('有照片尚未保存，请重新保存云端工程');image.src='/api/share/media/'+photo.mediaId;}
     const payload={revision:this.cloudRevision,idempotency:crypto.randomUUID(),audience:this.shareAudience,expires:Number(this.shareDays)>0?Date.now()/1000+Number(this.shareDays)*86400:null,code:this.shareCode,html:clone.innerHTML,css:window.reportCssText()};

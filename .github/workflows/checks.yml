@@ -13,6 +13,7 @@ jobs:
         with:
           node-version: '24'
       - run: npm ci
+      - run: npm audit --audit-level=moderate
       - run: npm test
       # 本机通常全绿、CI 偶红时，日志下载需要认证，排障很慢。把失败详情写进
       # job summary（run 页面公开可读），不用下载日志也能看到是哪条挂了。
@@ -41,4 +42,6 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/chujiang886/sitelog-ai/commits/$SHA/comments" \
             -d @/tmp/body.json
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:security:browser
       - run: npm run build

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// 2026-10-18：专项修复阶段成果标题、时间来源、AI证据边界；更新有意变化的拆移基线。
 'use strict';
 /*
  * app-main.js 拆分守护：从主脚本搬出去的每一块，都在这里钉死。
@@ -47,7 +48,8 @@ const SPLITS = [
     file: 'templates.js',
     label: '报告模板（含合规版合规导出模板，v9 新增 compliance）',
     start: '// ====== 模板定义',
-    sha: 'a00f57f7a9c0a799decd1ab85238a3e3a16b887dcac34eda75321dddfe03f2a0',
+    // 2026-11-02：保留 main 合规模板，整合阶段成果标题修正。
+    sha: '9ccde812e68a58c92f275a5a086fa4410aff09c59d1a6f85c9ed32be6a8ed75d',
     lines: 870,
     forbiddenInAppMain: /const TEMPLATES/,
   },
@@ -56,7 +58,7 @@ const SPLITS = [
     file: 'ai-style.js',
     label: 'AI 文案引擎（写作铁律 + 术语库 + 清洗 + 评分）',
     start: 'const NL = String.fromCharCode(10);',
-    sha: 'd135bab5551a1a4891518fd7ad670010b441bc05d4256d397f3d96032e8cce7f',
+    sha: '4e295bf63fc73ef329e2f90a55183c8cc3753a7a6b131fdcdb55514c0c1755ba',
     lines: 138,
     forbiddenInAppMain: /const AI_STYLE|function polishSiteLogText|function scoreSiteLogText/,
   },
@@ -67,8 +69,8 @@ const SPLITS = [
     start: 'window.galleryFeatures = {',
     // 2026-10-07 更新基线：三处 processXxxFiles 的成功提示改为按**实际入队数**报
     // （原按 files.length 报 —— 3 张里 1 张超 10MB 被跳过，提示仍说「已添加 3 张」）。
-    sha: 'd2c1423c338664203816bed91f2e83080d0b7f4a25a5f7fb5edfd40ca11da119',
-    lines: 325,
+    sha: 'c074888fba1a8798ee286f2c38fcb911984b08f5d9a5105647548a19de30a75a',
+    lines: 330,
     spread: 'galleryFeatures',
     forbiddenInAppMain: /^\s{8}sync(Arrival|Sop|Finish)Gallery\s*\(/m,
     methods: [
@@ -83,8 +85,8 @@ const SPLITS = [
     label: 'AI 视觉识别引擎（批量组织 / 单张重分析 / 健壮 JSON 提取 / 多模型投票去重）',
     start: 'window.aiVisionFeatures = {',
     // 2026-10-15：在原拆分基础上增加等待超时停止与状态清理；行为由 test-ai-wait 守护。
-    sha: '141efe4580074b12234d775dbbc2e28f2de945a10bbc7812c791244eb45b59c3',
-    lines: 554,
+    sha: 'c9fdcf6edfdc40e024e7b44b0093440635f67246ee2da6512ed6984998e3a3d3',
+    lines: 561,
     spread: 'aiVisionFeatures',
     forbiddenInAppMain: /^\s{8}(async\s+)?(aiOrganizeAll|applyCandidateAndAdopt|reAnalyze|captureDomEdits|ensureTitles|analyzeImage|applyAnalysisResult|buildAnalysisPrompt|dedupeDesc|dupWarnHtml|callVisionAPI|extractJSONRobust|_findMatchingBrace|_normalizeParsed|_extractFieldsByRegex|_extractSentenceFromRaw|testConnection)\s*\(/m,
     methods: [

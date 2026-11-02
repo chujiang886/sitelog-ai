@@ -61,11 +61,11 @@
           <div id="images-container"></div>
         </section>
 
-        <!-- ═══ 四、完工照片 ═══ -->
+        <!-- ═══ 四、本阶段成果照片 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
             <span class="pdf-section-num">四</span>
-            <span class="pdf-section-title">完工照片</span>
+            <span class="pdf-section-title">本阶段成果照片</span>
             <span class="pdf-section-line"></span>
           </div>
           <div class="pdf-sop-gallery" id="finish-gallery">
@@ -160,11 +160,11 @@
           <div id="images-container"></div>
         </section>
 
-        <!-- ═══ 四、完工照片 ═══ -->
+        <!-- ═══ 四、本阶段成果照片 ═══ -->
         <section class="pdf-section">
           <div class="pdf-section-header">
             <span class="pdf-section-num">四</span>
-            <span class="pdf-section-title">完工照片</span>
+            <span class="pdf-section-title">本阶段成果照片</span>
             <span class="pdf-section-line"></span>
           </div>
           <div class="pdf-sop-gallery" id="finish-gallery">

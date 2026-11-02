@@ -49,6 +49,7 @@
         projectName: '',
         siteLocation: '',
         archiveDate: new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' }).format(new Date()),
+        constructionDate: '',
         archivePerson: '',
         processing: false,
         processedCount: 0,
@@ -148,10 +149,10 @@
             <div class="pdf-meta-grid">
               <div class="pdf-meta-item"><span class="pdf-meta-label">📋 项目名称</span><span class="pdf-meta-value">${this.escapeHtml(this.projectName) || '未命名项目'}</span></div>
               <div class="pdf-meta-item"><span class="pdf-meta-label">📍 施工部位</span><span class="pdf-meta-value">${this.escapeHtml(this.siteLocation) || '—'}</span></div>
-              <div class="pdf-meta-item"><span class="pdf-meta-label">📅 归档日期</span><span class="pdf-meta-value">${this.escapeHtml(this.archiveDate) || sitelogEditor.localDate()}</span></div>
+              <div class="pdf-meta-item"><span class="pdf-meta-label">📅 资料归档日期（人工填）</span><span class="pdf-meta-value">${this.escapeHtml(this.archiveDate) || sitelogEditor.localDate()}</span></div>
               <div class="pdf-meta-item"><span class="pdf-meta-label">👤 归档人</span><span class="pdf-meta-value">${this.escapeHtml(this.archivePerson) || '—'}</span></div>
               <div class="pdf-meta-item"><span class="pdf-meta-label">📄 文档编号</span><span class="pdf-meta-value pdf-meta-mono">${docId}</span></div>
-              <div class="pdf-meta-item"><span class="pdf-meta-label">🔒 分享范围</span><span class="pdf-meta-value">发布时确认</span></div>
+              <div class="pdf-meta-item"><span class="pdf-meta-label">施工日期（人工填）</span><span class="pdf-meta-value">${this.escapeHtml(this.constructionDate) || '未提供'}</span></div>
             </div>`;
           return html.replace('{{PROJECT_INFO}}', infoHtml);
         },
@@ -186,6 +187,7 @@
               dataUrl: dataUrl,
               category: this.guessCategory(file.name),
               section: 'construction',
+              uploadedAt: new Date().toISOString(),
               time: new Date().toLocaleString('zh-CN', { hour12: false }),
               title: '',
               desc: '',
@@ -308,7 +310,7 @@
               <div class="node-card node-block group" data-img-id="${img.id}">
                 <div class="node-card-header">
                   <span class="node-card-num">${String(idx + 1).padStart(2, '0')}</span>
-                  <span class="node-card-meta">${this.escapeHtml(img.category)} · ${this.escapeHtml(img.time)}</span>
+                  <span class="node-card-meta">${this.escapeHtml(img.category)} · ${this.escapeHtml(window.sitelogPublication?.photoDate(img) || '拍摄时间：未提供；整理时间：'+(img.time||'未提供'))}</span>
                 </div>
                 <h3 class="text-base font-bold text-[#1F3D2A] mb-2 px-5 editable-block" contenteditable="true" style="padding-left:18px;padding-right:18px;">${this.escapeHtml(img.title) || '未命名节点'}</h3>
                 ${img.stage ? `<div style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 ${this.escapeHtml(img.stage)}</span></div>` : ''}
@@ -367,12 +369,15 @@
             ['施工部位', this.siteLocation || '—'],
             ['归档日期', this.archiveDate || sitelogEditor.localDate()],
             ['归档人', this.archivePerson || '—'],
+            ['施工日期', this.constructionDate || '未提供'],
           ];
           cover.querySelectorAll('.pdf-meta-item').forEach(item => {
             const label = item.querySelector('.pdf-meta-label');
             const value = item.querySelector('.pdf-meta-value');
             if (!label || !value) return;
             const txt = label.textContent;
+            if (txt.includes('归档日期')) label.textContent='📅 资料归档日期（人工填）';
+            if (txt.includes('分享范围') && value.textContent.includes('发布时确认')) item.remove();
             const entry = map.find(m => txt.includes(m[0]));
             if (entry) { value.textContent = entry[1]; }
           });
@@ -429,6 +434,7 @@
             const css = window.reportCssText();
 
             const clone = container.cloneNode(true);
+          window.sitelogPublication?.clean(clone);
             clone.removeAttribute('id');
             clone.setAttribute('id', 'report-content');
             clone.querySelectorAll('button, [data-action], details.debug-panel').forEach(el => el.remove());
@@ -483,6 +489,7 @@
           if (!container) { this.showToast('❌ 未找到报告内容，请刷新后重试', 'error'); return; }
           const css = window.reportCssText();
           const clone = container.cloneNode(true);
+          window.sitelogPublication?.clean(clone);
           clone.removeAttribute('id');
           clone.setAttribute('id', 'report-content');
           clone.querySelectorAll('button, [data-action], details.debug-panel').forEach(el => el.remove());
@@ -642,6 +649,7 @@
           if (!container) throw new Error('未找到报告内容，请刷新页面');
           const css = window.reportCssText();
           const clone = container.cloneNode(true);
+          window.sitelogPublication?.clean(clone);
           clone.querySelectorAll('button, select, details.debug-panel, .sop-upload-zone, .sop-grid-top-row, .sop-remove-btn, .frame-add-row, .frame-move-row').forEach(el => el.remove());
           clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
           const imgs = Array.from(clone.querySelectorAll('img'));

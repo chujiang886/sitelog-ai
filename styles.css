@@ -28,6 +28,7 @@
       .node-cards-container { display: block !important; }
       .node-cards-container > .node-card { margin-bottom: 20px; }
       .node-card { page-break-inside: avoid; border: 1px solid #d8d0c0 !important; box-shadow: none !important; }
+      .pdf-footer { margin-top: 16px !important; break-inside: avoid; page-break-inside: avoid; }
       .pdf-cover, .pdf-footer, .pdf-cover-band, .pdf-callout, .pdf-sop-gallery {
         -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
       }
@@ -51,6 +52,7 @@
 
     /* ===== 报告内容区 ===== */
     #report-content {
+      box-sizing: border-box;
       font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
       color: #1a1a1a; line-height: 1.75; background: #FAFAF8;
       padding: 40px; max-width: 820px; margin: 0 auto;
@@ -723,6 +725,12 @@
 
     @media screen and (max-width: 767px) {
       #report-content:not(.pdf-exporting) { padding: 12px; }
+      #report-content * { box-sizing: border-box; }
+      #report-content .node-card-body { grid-template-columns: minmax(0, 1fr); }
+      #report-content .node-card-detail { padding: 12px 18px; min-width: 0; }
+      #report-content .node-card-meta { min-width: 0; overflow-wrap: anywhere; }
+      #report-content .pdf-cover-band { flex-wrap: wrap; }
+      #report-content .pdf-sop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .pdf-cover-band { padding: 18px 14px; gap: 12px; }
       .pdf-cover-body { padding: 24px 14px; }
       .pdf-cover-main-title { font-size: 28px; letter-spacing: 1px; }

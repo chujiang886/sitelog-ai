@@ -1,7 +1,7 @@
 // 编辑内容以数据为准；正文输入即时回写，渲染不再读取旧 DOM 覆盖新数据。
 (() => {
   const collections = ['images', 'arrivalImages', 'finishImages', 'sopImages'];
-  const metadata = ['projectName', 'siteLocation', 'archiveDate', 'archivePerson', 'templateType', 'reportTitle', 'pdfFilename', 'pdfFilenameTouched', 'documentId', 'clientLogoId'];
+  const metadata = ['projectName', 'siteLocation', 'constructionDate', 'archiveDate', 'archivePerson', 'templateType', 'reportTitle', 'pdfFilename', 'pdfFilenameTouched', 'documentId', 'clientLogoId'];
   // 编辑器能渲染的全部阶段。这是**第五处副本**（另外四处见 test-stage-parity.cjs 的文件头），
   // 必须与后端 stages.STAGE_KEYS 同序一致，由该测试守护。
   //
@@ -125,6 +125,7 @@
             else { const edit = event.target.closest('[contenteditable]'); if (edit) { img.highlights = edit.innerText.split(/\n|✦/).map(x => x.trim()).filter(Boolean); img._manual.highlights = true; } }
           }
         }
+        if(block){const id=block.dataset.imgId||block.dataset.arrivalId||block.dataset.finishId;const photo=this.allPhotos().find(p=>p.id===id);if(photo){photo.aiConfirmed=false;this.showToast('文字已修改，请同步核对标题、正文和工艺亮点后重新确认', 'info', 5000);}}
         this.markDraftDirty();
       });
       report.addEventListener('paste', event => {
@@ -187,7 +188,7 @@
       const clone = document.getElementById('report-content').cloneNode(true);
       // 交互控件不能进档案：删除框的 ×、各上传区的 file input、移到其他框的下拉，
       // 以及「+ 增加一个框」整行（它是按钮 + 说明文字的组合）。业主看到的报告里不该有这些。
-      clone.querySelectorAll('button,input,select,details.debug-panel,.frame-add-row').forEach(node => node.remove());
+      clone.querySelectorAll('button,input,select,details.debug-panel,.frame-add-row,.sop-upload-zone,.sop-grid-top-row,.frame-move-row').forEach(node => node.remove());
       for (const img of clone.querySelectorAll('img')) {
         const photo = this.allPhotos().find(p => p.dataUrl === img.getAttribute('src'));
         if (photo) { img.removeAttribute('src'); img.dataset.photoRef = photo.id; }

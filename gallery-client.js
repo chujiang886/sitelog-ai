@@ -60,7 +60,7 @@ window.galleryFeatures = {
                 <button class="sop-remove-btn" data-id="${img.id}" title="删除">×</button>
                 <div class="node-card-header">
                   <span class="node-card-num">${String(idx + 1).padStart(2, '0')}</span>
-                  <span class="node-card-meta">班组进场 · ${this.escapeHtml(img.time || '')}</span>
+                  <span class="node-card-meta">班组进场 · ${this.escapeHtml(window.sitelogPublication?.photoDate(img) || '拍摄时间：未提供；整理时间：'+(img.time||'未提供'))}</span>
                 </div>
                 <h3 class="text-base font-bold text-[#1F3D2A] mb-2 editable-block" contenteditable="true" style="padding:0 18px;">${this.escapeHtml(img.title || '进场照片')}</h3>
                 ${img.stage ? `<div style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 ${this.escapeHtml(img.stage)}</span></div>` : ''}
@@ -121,6 +121,7 @@ window.galleryFeatures = {
               stage: '',
               category: '班组进场',
               section: 'arrival',
+              uploadedAt: new Date().toISOString(),
               time: new Date().toLocaleString('zh-CN', { hour12: false }),
               aiConfirmed: false,
               _analyzed: false,
@@ -179,7 +180,7 @@ window.galleryFeatures = {
               <div class="sop-photo-card">
                 <button class="sop-remove-btn" data-id="${img.id}" title="删除">×</button>
                 <img src="${img.dataUrl}" alt="${this.escapeHtml(img.title || '离场自检')}" loading="lazy">
-                <div class="sop-photo-caption">${this.escapeHtml(img.title || '离场自检')}</div>
+                <div class="sop-photo-caption">${this.escapeHtml(img.title || '离场自检')}</div><div class="sop-photo-time">${this.escapeHtml(window.sitelogPublication?.photoDate(img) || '拍摄时间：未提供')}</div>
               </div>`;
           });
           gallery.innerHTML =
@@ -222,6 +223,7 @@ window.galleryFeatures = {
               file: file,
               dataUrl: dataUrl,
               title: file.name.replace(/\.[^.]+$/, ''),  // 用文件名作标题
+              uploadedAt: new Date().toISOString(),
               time: new Date().toLocaleString('zh-CN', { hour12: false })
             });
             added++;
@@ -243,6 +245,8 @@ window.galleryFeatures = {
         syncFinishGallery() {
           const gallery = document.getElementById('finish-gallery');
           if (!gallery) return;
+          const sectionTitle = gallery.closest?.('.pdf-section')?.querySelector('.pdf-section-title');
+          if (sectionTitle) sectionTitle.textContent = '本阶段成果照片';
           const self = this;
           const bindZone = (zone, input) => {
             if (!zone || !input) return;
@@ -256,8 +260,8 @@ window.galleryFeatures = {
             gallery.innerHTML = `
               <div class="sop-upload-zone" id="finish-zone-empty">
                 <div class="sop-upload-icon">📤</div>
-                <p class="sop-upload-text">点击或拖拽上传完工照片</p>
-                <p class="sop-upload-hint">最终交付 · 整体效果 · 细部特写</p>
+                <p class="sop-upload-text">点击或拖拽上传本阶段成果照片</p>
+                <p class="sop-upload-hint">本阶段成果 · 整体效果 · 细部留档</p>
                 <input type="file" id="finish-input-empty" accept="image/*" multiple class="hidden">
               </div>`;
             bindZone(gallery.querySelector('#finish-zone-empty'), gallery.querySelector('#finish-input-empty'));
@@ -271,13 +275,13 @@ window.galleryFeatures = {
                 <button class="sop-remove-btn" data-id="${img.id}" title="删除">×</button>
                 <div class="node-card-header">
                   <span class="node-card-num">${String(idx + 1).padStart(2, '0')}</span>
-                  <span class="node-card-meta">完工照片 · ${this.escapeHtml(img.time || '')}</span>
+                  <span class="node-card-meta">本阶段成果 · ${this.escapeHtml(window.sitelogPublication?.photoDate(img) || '拍摄时间：未提供；整理时间：'+(img.time||'未提供'))}</span>
                 </div>
-                <h3 class="text-base font-bold text-[#1F3D2A] mb-2 editable-block" contenteditable="true" style="padding:0 18px;">${this.escapeHtml(img.title || '完工照片')}</h3>
+                <h3 class="text-base font-bold text-[#1F3D2A] mb-2 editable-block" contenteditable="true" style="padding:0 18px;">${this.escapeHtml(img.title || '本阶段成果照片')}</h3>
                 ${img.stage ? `<div style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 ${this.escapeHtml(img.stage)}</span></div>` : ''}
                 <div class="node-card-body">
                   <div class="node-card-image">
-                    <img src="${img.dataUrl}" alt="${this.escapeHtml(img.title || '完工照片')}" loading="lazy">
+                    <img src="${img.dataUrl}" alt="${this.escapeHtml(img.title || '本阶段成果照片')}" loading="lazy">
                   </div>
                   <div class="node-card-detail">
                     <p class="node-card-desc editable-block" contenteditable="true">${this.escapeHtml(img.desc || '') || '<span style="color:#bbb">[请填写说明]</span>'}</p>
@@ -288,7 +292,7 @@ window.galleryFeatures = {
               </div>`;
           });
           gallery.innerHTML =
-            '<div class="pdf-sop-gallery-title">📸 完工实景 · 最终交付照片</div>' +
+            '<div class="pdf-sop-gallery-title">'+this.escapeHtml(window.sitelogPublication?.finishLabel(this.templateType)||'本阶段成果照片')+'（不代表整体验收）</div>' +
             '<div class="sop-grid-top-row">' +
             '<div class="sop-upload-zone sop-upload-small" id="finish-zone-add">+ 添加照片</div>' +
             '<input type="file" id="finish-input-add" accept="image/*" multiple class="hidden">' +
@@ -332,6 +336,7 @@ window.galleryFeatures = {
               stage: '',
               category: '完工照片',
               section: 'finish',
+              uploadedAt: new Date().toISOString(),
               time: new Date().toLocaleString('zh-CN', { hour12: false }),
               aiConfirmed: false,
               _analyzed: false,

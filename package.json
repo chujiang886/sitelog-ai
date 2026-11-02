@@ -6,17 +6,18 @@
     "build": "tailwindcss -i app.css -o vendor/app.css --minify --content ./index.html,./app-main.js,./html2pdf-glue.js,./auth-client.js,./frame-client.js,./gallery-client.js,./ai-vision-client.js",
     "dev": "npx serve -s . -l 3000",
     "start": "npx serve -s . -l 3000",
-    "test": "node --test test-ai-wait.cjs test-share.cjs test-workflow-unit.cjs test-storage.cjs test-frame-client.cjs test-address-client.cjs test-signoff-client.cjs test-hidden-client.cjs test-remediations-client.cjs test-dimensions-client.cjs test-materials-client.cjs test-app-main-splits.cjs test-gallery-client.cjs test-ai-vision-client.cjs test-report-css.cjs",
+    "test": "node --test test-publication-quality.cjs test-ai-wait.cjs test-share.cjs test-workflow-unit.cjs test-storage.cjs test-frame-client.cjs test-address-client.cjs test-signoff-client.cjs test-hidden-client.cjs test-remediations-client.cjs test-dimensions-client.cjs test-materials-client.cjs test-app-main-splits.cjs test-gallery-client.cjs test-ai-vision-client.cjs test-report-css.cjs test-dependency-dompurify.cjs test-dependency-selector.cjs test-dependency-source-map.cjs",
     "test:parity": "node test-stage-parity.cjs",
     "test:signoff": "node test-signoff-client.cjs",
     "test:frame": "node test-frame-client.cjs",
     "test:address": "node test-address-client.cjs",
     "test:logo": "node test-logo-upload.cjs",
-    "test:logo:mutate": "python3 mutate-logo-upload.py"
+    "test:logo:mutate": "python3 mutate-logo-upload.py",
+    "test:security:browser": "node test-security-browser.cjs"
   },
   "devDependencies": {
     "alpinejs": "^3.13.5",
-    "dompurify": "3.4.15",
+    "dompurify": "3.4.17",
     "jsqr": "^1.4.0",
     "playwright": "^1.62.1",
     "pngjs": "^7.0.0",
