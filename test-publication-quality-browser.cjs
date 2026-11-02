@@ -26,14 +26,20 @@ if(!/^http:\/\/127\.0\.0\.1:\d+$/.test(base||''))throw Error('仅允许隔离测
  const publication=await page.evaluate(async()=>{const a=Alpine.$data(document.body);a.reviewNote='合成测试人工核对记录：此文字仅验证门禁，不代表真实工程';return await a.publishCloudProject()});
  const doc=await ctx.newPage();await doc.goto(base+'/api/share/publication/'+publication.id+'/document');
  const text=await doc.locator('body').innerText();
- for(const bad of ['添加照片','服务热线：待填写','发布时确认','IMG_001.jpg','最终交付照片'])assert.ok(!text.includes(bad),bad);
+ for(const bad of ['添加照片','服务热线：待填写','发布时确认','IMG_001.jpg','最终交付照片','建议 100-200 字','[请编辑','施工照片（待补充说明）','班组进场','班组离场 SOP'])assert.ok(!text.includes(bad),bad);
  for(const good of ['本阶段成果照片','拍摄时间：未提供','历史整理时间','审核通过时间','发布时间'])assert.ok(text.includes(good),good);
+ assert.ok(text.includes('本阶段可见状态留底'));assert.equal(await doc.locator('img').count()>=2,true);
  assert.match(await doc.locator('.node-card-meta').first().innerText(),/拍摄时间：未提供/);
  assert.equal(await doc.locator('[contenteditable],input,button,.sop-upload-zone').count(),0);
  await doc.screenshot({path:path.join(out,'new-publication-desktop.png'),fullPage:true});await doc.pdf({path:path.join(out,'new-publication.pdf'),format:'A4',printBackground:true});
  // 真实生成PDF使用的克隆DOM也必须清理，不能只验证服务器正文。
  const exported=await page.evaluate(async()=>await Alpine.$data(document.body).buildSharePayload());
  assert.ok(!exported.html.includes('待填写'));assert.ok(!exported.html.includes('添加照片'));
+ const exportedText=await page.evaluate(html=>new DOMParser().parseFromString(html,'text/html').body.textContent,exported.html);
+ for(const bad of ['建议 100-200 字','[请编辑','施工照片（待补充说明）','班组进场','班组离场 SOP'])assert.ok(!exportedText.includes(bad),bad);
+ assert.ok(exported.html.includes('本阶段可见状态留底'));assert.ok(exported.html.includes('<img'));
+ // 页面中的草稿仍保留指导，发布与导出只能清理克隆，不能改历史或编辑正文。
+ assert.ok((await page.locator('#report-content').innerText()).includes('建议 100-200 字'));
  await doc.setViewportSize({width:390,height:844});await doc.screenshot({path:path.join(out,'new-publication-mobile.png')});
  assert.ok(await doc.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'手机正文不得横向溢出');
  const aid=await page.evaluate(async sid=>{const a=Alpine.$data(document.body);const address=await a.accountJSON('/addresses',{label:'专项回归合成地址'});await a.accountJSON('/addresses/'+address.id+'/attach',{stage_key:'框架施工',publication_id:sid});return address.id},publication.id);

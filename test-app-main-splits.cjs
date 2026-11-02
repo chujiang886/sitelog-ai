@@ -48,7 +48,8 @@ const SPLITS = [
     file: 'templates.js',
     label: '报告模板（含合规版合规导出模板，v9 新增 compliance）',
     start: '// ====== 模板定义',
-    sha: 'a00f57f7a9c0a799decd1ab85238a3e3a16b887dcac34eda75321dddfe03f2a0',
+    // 2026-11-02：保留 main 合规模板，整合阶段成果标题修正。
+    sha: '9ccde812e68a58c92f275a5a086fa4410aff09c59d1a6f85c9ed32be6a8ed75d',
     lines: 870,
     forbiddenInAppMain: /const TEMPLATES/,
   },
