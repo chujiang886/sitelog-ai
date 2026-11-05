@@ -285,3 +285,41 @@ test('processFinishFiles：同样按实际入队数报', async () => {
   assert.ok(ok.msg.includes('已添加 1 张'), '实际是：' + ok.msg);
   assert.ok(ok.msg.includes('1 张超过 10MB'), '实际是：' + ok.msg);
 });
+
+// ────────────────────────────────────────────────────────────────
+// 分区标题：只有旧版的「完工照片」才升级，别改别人的标题
+// ────────────────────────────────────────────────────────────────
+// 2026-11-05 缺陷：syncFinishGallery 原来**无条件**把所在分区的标题写成
+// 「本阶段成果照片」。合规版（GB/T 50328）第四段是「留档影像索引」，
+// 被这么一改，五段结构只剩四段对 —— 报告看上去正常，但合规目录错了。
+// 这类错不会报错、不会白屏，只能靠断言钉住。
+
+/** 造一个带分区标题的假画廊：返回 { gallery, title } */
+function galleryWithTitle(text) {
+  const title = { textContent: text };
+  const section = { querySelector: (sel) => (sel === '.pdf-section-title' ? title : null) };
+  const gallery = Object.assign(fakeGallery(), {
+    closest: (sel) => (sel === '.pdf-section' ? section : null),
+  });
+  return { gallery, title };
+}
+
+test('合规版第四段「留档影像索引」不得被 syncFinishGallery 改写', () => {
+  const { gallery, title } = galleryWithTitle('留档影像索引');
+  ctx.document = { getElementById: () => gallery };
+  make().syncFinishGallery();
+  assert.equal(title.textContent, '留档影像索引', '合规版分区标题被改成了：' + title.textContent);
+});
+
+test('旧版「完工照片」仍会升级成「本阶段成果照片」', () => {
+  const { gallery, title } = galleryWithTitle('完工照片');
+  ctx.document = { getElementById: () => gallery };
+  make().syncFinishGallery();
+  assert.equal(title.textContent, '本阶段成果照片');
+});
+
+test('合规模板必须自带「留档影像索引」这一段的标题', () => {
+  // 标题是模板给的，不是渲染时补的；改模板时别把它删掉。
+  const templates = fs.readFileSync(path.join(__dirname, 'templates.js'), 'utf8');
+  assert.ok(templates.includes('>留档影像索引<'), 'templates.js 里找不到「留档影像索引」分区标题');
+});

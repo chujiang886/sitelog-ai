@@ -79,8 +79,10 @@ const SPLITS = [
     // 2026-10-07 更新基线：三处 processXxxFiles 的成功提示改为按**实际入队数**报
     // （原按 files.length 报 —— 3 张里 1 张超 10MB 被跳过，提示仍说「已添加 3 张」）。
     // 2026-11-05 更新基线：按产品要求移除照片卡片的「拍摄时间/上传整理时间」标注。
-    sha: '372cd0f025d097a31a830926f535547dc57ac7a9494773905ebf7634b1ef3453',
-    lines: 330,
+    // 2026-11-05 再次更新：syncFinishGallery 只在原标题为「完工照片」时才改名，
+    // 修掉「合规版第四段『留档影像索引』被无条件改成『本阶段成果照片』」的缺陷。
+    sha: '17501cb50db9270f702ed3e55b619538bca9f0df18a94fb9ea0d494873f60c14',
+    lines: 333,
     spread: 'galleryFeatures',
     forbiddenInAppMain: /^\s{8}sync(Arrival|Sop|Finish)Gallery\s*\(/m,
     methods: [

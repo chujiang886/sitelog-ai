@@ -246,7 +246,10 @@ window.galleryFeatures = {
           const gallery = document.getElementById('finish-gallery');
           if (!gallery) return;
           const sectionTitle = gallery.closest?.('.pdf-section')?.querySelector('.pdf-section-title');
-          if (sectionTitle) sectionTitle.textContent = '本阶段成果照片';
+          // 只有旧版模板的「完工照片」才需要改名成「本阶段成果照片」。
+          // 2026-11-05 修复：原来无条件覆盖，把合规版（GB/T 50328）第四段
+          // 「留档影像索引」改成了「本阶段成果照片」，五段结构被改坏。
+          if (sectionTitle && sectionTitle.textContent.trim() === '完工照片') sectionTitle.textContent = '本阶段成果照片';
           const self = this;
           const bindZone = (zone, input) => {
             if (!zone || !input) return;
