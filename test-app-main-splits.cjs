@@ -50,6 +50,73 @@ const scriptTagIndex = (html, file) => {
 };
 const AI_VISION = read('ai-vision-client.js');
 
+// ────────────────────────────────────────────────────────────────
+// ai-style.js 的术语口径语义守卫
+//
+// 【为什么 sha 基线不够】上面的 sha256 只能证明「这块内容没被意外改动」。
+// 但如果有人把「无尘防护」误删、或把「防尘保护」错登进 TERMS，
+// 只要同步更新 sha，测试照样全绿 —— 而 AI 又会开始被带偏。
+// 所以口径本身必须另立语义断言。
+//
+// 【背景】轩哥 2026-11-06 确认：「无尘防护」是行业内部正式口径，
+// 「防尘保护」不是。生产实测 AI 不认识这个词，只会拿通用词去猜
+// （写成「嵌缝处理」「施打密封胶」）—— 59 条学习配对里「密封胶」
+// 被人工删掉 9 次，是最高频的修正模式。
+// ────────────────────────────────────────────────────────────────
+
+/** 把 ai-style.js 装进 vm，取出 AI_STYLE 与 scoreSiteLogText（两者都是顶层声明，不挂 window） */
+function loadAiStyle() {
+  const ctx = { console };
+  vm.createContext(ctx);
+  const got = vm.runInContext(read('ai-style.js') + '\n;({ AI_STYLE, scoreSiteLogText })', ctx);
+  // vm 里的对象属于另一个 realm，JSON 往返拉回本 realm（与 test-ai-vision-client.cjs 同手法）
+  return { style: JSON.parse(JSON.stringify(got.AI_STYLE)), score: got.scoreSiteLogText };
+}
+
+// 正式口径与已确认的错误说法。改这两个常量前先问业务负责人。
+const OFFICIAL_TERM = '无尘防护';
+const WRONG_TERMS = ['防尘保护', '防尘处理'];
+
+test('ai-style.js：GLOSSARY 登记了正式口径「无尘防护」（GLOSSARY 直接进提示词）', () => {
+  const { style } = loadAiStyle();
+  assert.ok(style.GLOSSARY.includes(OFFICIAL_TERM),
+    `GLOSSARY 里没有「${OFFICIAL_TERM}」—— AI 不认识这个正式口径，` +
+    '会拿「嵌缝」「施打密封胶」等通用词去猜，导致每张照片都要人工改');
+});
+
+test('ai-style.js：GLOSSARY 同时点名了不要写成的自造说法', () => {
+  const { style } = loadAiStyle();
+  // 只给正确词、不说哪些是错的，模型仍可能自造近义词。
+  // 这条钉住「反例也在提示词里」，简化文案时不许删掉。
+  for (const wrong of WRONG_TERMS) {
+    assert.ok(style.GLOSSARY.includes(wrong),
+      `GLOSSARY 应点名「${wrong}」不是本公司口径，避免 AI 自造近义词`);
+  }
+});
+
+test('ai-style.js：TERMS 登记了正式口径，且绝不登记错误说法', () => {
+  const { style } = loadAiStyle();
+  // TERMS 用于 scoreSiteLogText 的术语命中加分（每命中 +7，上限 6 个）。
+  // 不登记 → 写对口径的文案反而不得分，多模型选优时会输给写错的那条。
+  assert.ok(style.TERMS.includes(OFFICIAL_TERM),
+    `TERMS 里没有「${OFFICIAL_TERM}」—— 写对正式口径的文案拿不到术语加分`);
+  for (const wrong of WRONG_TERMS) {
+    assert.ok(!style.TERMS.includes(wrong),
+      `TERMS 里不能有「${wrong}」—— 那不是本公司口径，登记进去等于给它加分`);
+    assert.ok(!style.BANNED.includes(wrong),
+      `BANNED 的语义是「拍照腔/套话」，不要往里塞错误术语（口径约束归 GLOSSARY 管）`);
+  }
+});
+
+test('ai-style.js：写对正式口径的文案，评分高于同长度的无术语文案', () => {
+  const { score } = loadAiStyle();
+  // 两句除术语外长度与结构基本一致，差值只能来自 TERMS 命中。
+  const official = '框体底部与混凝土台面交接处已完成无尘防护处理，周边缝隙清洁无残留，玻璃面板安装到位待复核。';
+  const plain = '框体底部与混凝土台面交接处已完成相关处理工作，周边缝隙清洁无残留，玻璃面板安装到位待复核。';
+  assert.ok(score(official, '框体收口', '玻扇施工') > score(plain, '框体收口', '玻扇施工'),
+    '登记正式口径后，写对术语的文案必须得分更高（否则多模型选优会选回写错的那条）');
+});
+
 // 每一块：从主脚本搬出去的文件、块起点（行首精确匹配）、块 sha256（搬出时）、块行数
 const SPLITS = [
   {
@@ -67,7 +134,11 @@ const SPLITS = [
     file: 'ai-style.js',
     label: 'AI 文案引擎（写作铁律 + 术语库 + 清洗 + 评分）',
     start: 'const NL = String.fromCharCode(10);',
-    sha: '4e295bf63fc73ef329e2f90a55183c8cc3753a7a6b131fdcdb55514c0c1755ba',
+    // 2026-11-06：GLOSSARY 与 TERMS 登记本公司正式口径「无尘防护」（轩哥确认；
+    // 「防尘保护」不是口径）。生产实测 AI 不认识这个词，只会拿通用词去猜
+    // （写成「嵌缝处理」「施打密封胶」），59 条学习配对里「密封胶」被人工删掉 9 次。
+    // 两处都加在**现有行内**，所以行数仍是 138 —— 只有 sha 变。
+    sha: '1abdc3cac3979cabb845f17d885e43d3cdb459fe6e52837ba03eb913a02a7344',
     lines: 138,
     forbiddenInAppMain: /const AI_STYLE|function polishSiteLogText|function scoreSiteLogText/,
   },
