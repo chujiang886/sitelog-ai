@@ -150,11 +150,19 @@
       this.draftTimer = setTimeout(() => this.saveLocalDraft(), 800);
     },
     draftKey() { if(!this.draftStorageKey)this.draftStorageKey='account:'+this.draftOwner+':project:'+crypto.randomUUID();return this.draftStorageKey; },
+    // 合规版（?template=compliance）是**导出视图**，不是编辑模板。草稿里记下它是哪种模式，
+    // 恢复时与当前入口不一致就丢弃：否则合规版正文会被当成阶段草稿恢复，普通入口
+    // 打开就显示五段合规结构，而且 switchTemplate() 也切不回来（templateType 没变，
+    // 重渲染被跳过）——2026-11-05 实测复现。
+    draftMode() { return this.complianceMode ? 'compliance' : 'stage'; },
+    // 老草稿没有 mode 字段，按阶段模板处理（合规版是 2026-11 才有的入口）。
+    draftModeMatches(stored) { return ((stored && stored.mode) || 'stage') === this.draftMode(); },
     async listLocalDrafts(){const rows=await transaction('readonly',store=>store.getAll());this.localDraftItems=rows.filter(r=>r.snapshot&&r.key.startsWith('account:'+this.accountUser.id+':')||r.snapshot&&r.key==='account:'+this.accountUser.id).map(r=>({key:r.key,title:r.snapshot.meta.projectName||'未命名工程',savedAt:r.savedAt})).reverse()},
     async openLocalDraft(key){
       if(!this.accountUser||!(key.startsWith('account:'+this.accountUser.id+':')||key==='account:'+this.accountUser.id))return;
       if(this.draftDirty&&!await this.saveLocalDraft())return;
       const stored=await transaction('readonly',store=>store.get(key));if(!stored)return;
+      if(!this.draftModeMatches(stored)){this.showToast('这份草稿属于'+(stored.mode==='compliance'?'合规版':'阶段模板')+'，请从对应入口打开','error');return;}
       const snapshot=stored.snapshot;for(const group of collections)for(const photo of snapshot[group])if(photo.blob){photo.dataUrl=await this.fileToDataUrl(photo.blob);delete photo.blob;}
       this.undoSnapshot=this.snapshot();await this.restoreSnapshot(snapshot);this.draftStorageKey=stored.key;this.draftRevision=stored.revision;this.draftConflict=false;this.draftStatus='已恢复本机草稿';this.projectPanel=false;
       await transaction('readwrite',store=>store.put({key:'active:'+this.draftOwner,activeKey:key}));
@@ -171,7 +179,12 @@
         const pointer=await transaction('readonly',store=>store.get('active:'+next));
         const stored = await transaction('readonly', store => store.get(pointer?.activeKey||'account:'+next));
         if (this.accountUser?.id !== next) return;
-        if (stored) {
+        if (stored && !this.draftModeMatches(stored)) {
+          // 模式不一致：宁可让师傅看到空白模板，也不要把合规版五段正文塞进阶段编辑器。
+          // 不设 draftStorageKey，后续保存会另起一份草稿，两份互不覆盖。
+          this.draftStatus = '已跳过另一模板的本机草稿';
+          this.showToast('检测到「' + (stored.mode === 'compliance' ? '合规版' : '阶段模板') + '」的本机草稿，与当前入口不一致，已跳过', 'info');
+        } else if (stored) {
           const snapshot = stored.snapshot;
           for (const key of collections) for (const img of snapshot[key]) if (img.blob) {
             img.dataUrl = await this.fileToDataUrl(img.blob);delete img.blob;
@@ -265,7 +278,7 @@
           let next;
           request.onsuccess = () => {
             if (!force && (request.result?.revision || 0) !== this.draftRevision) { tx.abort();return; }
-            next = (request.result?.revision || 0) + 1;store.put({ key, snapshot, revision: next, savedAt });store.put({key:'active:'+owner,activeKey:key});
+            next = (request.result?.revision || 0) + 1;store.put({ key, snapshot, revision: next, savedAt, mode: this.draftMode() });store.put({key:'active:'+owner,activeKey:key});
           };
           tx.oncomplete = () => resolve(next);
           tx.onabort = () => reject(tx.error || Error('另一个窗口已修改草稿，请先导出当前工程包，再恢复最新草稿'));
