@@ -137,7 +137,18 @@
             if (framed && id === 'arrival-gallery') continue;
             if (!html.includes('id="' + id + '"')) missing += '<section class="pdf-section"><h2 class="pdf-section-header">' + title + '</h2><div class="pdf-sop-gallery" id="' + id + '"></div></section>';
           }
-          html = html.includes('<footer') ? html.replace('<footer', missing + '<footer') : html + missing;
+          // 合规价值说明（Issue #3 / PR-2-2）：标准阶段模板在报告末尾、footer 之前
+          // 注入一条「归档合规说明」。纯展示，不删不改既有文案，也不进 {{PROJECT_INFO}} 首屏。
+          // 合规版（complianceMode）第五段「留档说明与合规声明」已有同义内容，跳过以免重复。
+          // 位置在 footer 前 = 报告最末尾（实测在首屏 fold 之外），不影响视觉基线 02 的首屏截图；
+          // 业主公开页 07/08 用后端 fixture 正文、不经本函数，同样不受影响。
+          const complianceNote = this.complianceMode ? '' :
+            '<div class="pdf-compliance-note">' +
+            '<div class="pdf-compliance-note-title">归档合规说明</div>' +
+            '<p>本记录可作为竣工归档佐证；隐蔽工程留档可追溯。归档内容真实、完整，由归档人负责；' +
+            'AI 辅助提示须经人工确认后方可作为验收依据。</p>' +
+            '</div>';
+          html = html.includes('<footer') ? html.replace('<footer', missing + complianceNote + '<footer') : html + missing + complianceNote;
 
           // 注入项目信息到封面占位符（{{PROJECT_INFO}}）
           const docId = this.documentId || ('CJ-SL-' + new Date().getFullYear()

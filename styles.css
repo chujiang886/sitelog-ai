@@ -29,7 +29,8 @@
       .node-cards-container > .node-card { margin-bottom: 20px; }
       .node-card { page-break-inside: avoid; border: 1px solid #d8d0c0 !important; box-shadow: none !important; }
       .pdf-footer { margin-top: 16px !important; break-inside: avoid; page-break-inside: avoid; }
-      .pdf-cover, .pdf-footer, .pdf-cover-band, .pdf-callout, .pdf-sop-gallery {
+      .pdf-compliance-note { break-inside: avoid; page-break-inside: avoid; }
+      .pdf-cover, .pdf-footer, .pdf-cover-band, .pdf-callout, .pdf-sop-gallery, .pdf-compliance-note {
         -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
       }
       .pdf-callout-title { font-size: 15pt !important; font-weight: 800 !important; }
@@ -286,6 +287,22 @@
     }
     /* SOP 章节内的可编辑框放大 */
     .pdf-callout .pdf-editable-box { font-size: 15.5px; line-height: 2; padding: 20px 24px; }
+
+    /* ═════ 归档合规说明（Issue #3 / PR-2-2）═════
+       标准阶段模板在报告末尾、footer 之前注入。纯展示，语气克制：
+       是「可作为佐证 / 可追溯」的事实陈述，不是「保证合规」的承诺。
+       视觉沿用品牌墨绿 + 米白，与 callout 区分（虚线左边、更浅底），
+       避免和正文里的「阶段实施概况」等可编辑框混淆。 */
+    .pdf-compliance-note {
+      background: #FAFAF8; border: 1px solid #E8E2D0; border-left: 4px solid #B8924A;
+      border-radius: 0 8px 8px 0; padding: 20px 26px; margin: 28px 0 8px;
+    }
+    .pdf-compliance-note-title {
+      font-size: 16px; font-weight: 800; color: #1F3D2A; margin-bottom: 10px; letter-spacing: 0.02em;
+    }
+    .pdf-compliance-note p {
+      margin: 0; font-size: 13.5px; line-height: 1.95; color: #4A5A50;
+    }
 
     /* ═════ 节点卡片（图片+AI识别） ═════ */
     .node-cards-container { display: flex; flex-direction: column; gap: 20px; }
