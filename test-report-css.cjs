@@ -62,7 +62,8 @@ test('除 editor-state.js 外，任何自有脚本都不得再裸抓内联 <styl
 
 test('index.html 必须仍然链着 styles.css', () => {
   const html = read('index.html');
-  assert.match(html, /<link[^>]+href="styles\.css"/, 'index.html 不再引用 styles.css，reportCssText 会取不到东西');
+  // 允许带缓存版本号（styles.css?v=20261105）：版本号不影响取 CSS 文本。
+  assert.match(html, /<link[^>]+href="styles\.css(?:\?v=[^"]*)?"/, 'index.html 不再引用 styles.css，reportCssText 会取不到东西');
 });
 
 test('五个取值点必须全部改走 window.reportCssText()', () => {

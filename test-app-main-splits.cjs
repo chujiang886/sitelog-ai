@@ -39,6 +39,15 @@ const { test } = require('node:test');
 const read = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8');
 const APP_MAIN = read('app-main.js');
 const HTML = read('index.html');
+
+// index.html 里的脚本引用可能带缓存版本号（`app-main.js?v=20261105`）。
+// 缓存版本号是发布纪律：不带版本号时，某些浏览器/WebView 会继续用旧 JS，
+// 用户「刷新了还是旧界面」。这里统一按「可带 ?v= 也可不带」匹配。
+const scriptTagIndex = (html, file) => {
+  const escaped = file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = html.match(new RegExp(`<script src="${escaped}(?:\\?v=[^"]*)?">`));
+  return m ? m.index : -1;
+};
 const AI_VISION = read('ai-vision-client.js');
 
 // 每一块：从主脚本搬出去的文件、块起点（行首精确匹配）、块 sha256（搬出时）、块行数
@@ -129,8 +138,8 @@ for (const s of SPLITS) {
 
   test(`index.html：${s.file} 必须排在 app-main.js 之前`, () => {
     // 按 <script src> 精确匹配：注释里也会提到文件名，用裸文件名会找错位置
-    const dep = HTML.indexOf(`<script src="${s.file}">`);
-    const app = HTML.indexOf('<script src="app-main.js">');
+    const dep = scriptTagIndex(HTML, s.file);
+    const app = scriptTagIndex(HTML, 'app-main.js');
     assert.ok(dep > 0, `index.html 里缺少 ${s.file} 的 <script src>`);
     assert.ok(app > 0, 'index.html 里缺少 app-main.js 的 <script src>');
     assert.ok(dep < app, `${s.file} 必须出现在 app-main.js 之前，否则运行时是 ReferenceError`);
@@ -222,9 +231,19 @@ test('app-main.js 里每个 ...window.XFeatures 都有对应的 <script src>（�
       `app-main.js 展开了 window.${sp}，但没有任何文件给 window.${sp} 赋值 —— ` +
       `对象展开 undefined 不报错，会静默丢掉整组方法`);
     const owner = [...mixins.entries()].find(([, v]) => v.name === sp)[0];
-    assert.ok(HTML.includes(`<script src="${owner}">`),
+    assert.ok(scriptTagIndex(HTML, owner) > 0,
       `index.html 里缺少 ${owner} 的 <script src>（它负责 window.${sp}）`);
   }
+});
+
+test('index.html：自有脚本与样式必须带缓存版本号（?v=）', () => {
+  // 2026-11-05 事故：前端已发布新代码，但用户「刷新后仍是旧界面」——
+  // 旧 JS 里还留着已下线的「拍摄时间」标注。nginx 给的是 no-cache（每次回源校验），
+  // 但部分 WebView / 代理缓存不按语义办事，只有 URL 变了才必然取新文件。
+  // 因此自有资源一律挂 ?v=；vendor 下的第三方库不随我们发版，不挂。
+  const refs = [...HTML.matchAll(/<(?:script src|link rel="stylesheet" href)="([^"]+)"/g)].map((m) => m[1]);
+  const missing = refs.filter((r) => !r.startsWith('vendor/') && !r.includes('?v='));
+  assert.deepEqual(missing, [], `这些自有资源没带 ?v= 缓存版本号：${missing.join(', ')}`);
 });
 
 test('跨文件成员名不得重复（对象展开按顺序静默覆盖，重名不报错）', () => {
