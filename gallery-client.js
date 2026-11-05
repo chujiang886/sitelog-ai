@@ -60,7 +60,7 @@ window.galleryFeatures = {
                 <button class="sop-remove-btn" data-id="${img.id}" title="删除">×</button>
                 <div class="node-card-header">
                   <span class="node-card-num">${String(idx + 1).padStart(2, '0')}</span>
-                  <span class="node-card-meta">班组进场 · ${this.escapeHtml(window.sitelogPublication?.photoDate(img) || '拍摄时间：未提供；整理时间：'+(img.time||'未提供'))}</span>
+                  <span class="node-card-meta">班组进场</span>
                 </div>
                 <h3 class="text-base font-bold text-[#1F3D2A] mb-2 editable-block" contenteditable="true" style="padding:0 18px;">${this.escapeHtml(img.title || '进场照片')}</h3>
                 ${img.stage ? `<div style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 ${this.escapeHtml(img.stage)}</span></div>` : ''}
@@ -180,7 +180,7 @@ window.galleryFeatures = {
               <div class="sop-photo-card">
                 <button class="sop-remove-btn" data-id="${img.id}" title="删除">×</button>
                 <img src="${img.dataUrl}" alt="${this.escapeHtml(img.title || '离场自检')}" loading="lazy">
-                <div class="sop-photo-caption">${this.escapeHtml(img.title || '离场自检')}</div><div class="sop-photo-time">${this.escapeHtml(window.sitelogPublication?.photoDate(img) || '拍摄时间：未提供')}</div>
+                <div class="sop-photo-caption">${this.escapeHtml(img.title || '离场自检')}</div>
               </div>`;
           });
           gallery.innerHTML =
@@ -275,7 +275,7 @@ window.galleryFeatures = {
                 <button class="sop-remove-btn" data-id="${img.id}" title="删除">×</button>
                 <div class="node-card-header">
                   <span class="node-card-num">${String(idx + 1).padStart(2, '0')}</span>
-                  <span class="node-card-meta">本阶段成果 · ${this.escapeHtml(window.sitelogPublication?.photoDate(img) || '拍摄时间：未提供；整理时间：'+(img.time||'未提供'))}</span>
+                  <span class="node-card-meta">本阶段成果</span>
                 </div>
                 <h3 class="text-base font-bold text-[#1F3D2A] mb-2 editable-block" contenteditable="true" style="padding:0 18px;">${this.escapeHtml(img.title || '本阶段成果照片')}</h3>
                 ${img.stage ? `<div style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 ${this.escapeHtml(img.stage)}</span></div>` : ''}

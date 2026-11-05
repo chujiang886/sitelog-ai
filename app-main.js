@@ -310,7 +310,7 @@
               <div class="node-card node-block group" data-img-id="${img.id}">
                 <div class="node-card-header">
                   <span class="node-card-num">${String(idx + 1).padStart(2, '0')}</span>
-                  <span class="node-card-meta">${this.escapeHtml(img.category)} · ${this.escapeHtml(window.sitelogPublication?.photoDate(img) || '拍摄时间：未提供；整理时间：'+(img.time||'未提供'))}</span>
+                  <span class="node-card-meta">${this.escapeHtml(img.category)}</span>
                 </div>
                 <h3 class="text-base font-bold text-[#1F3D2A] mb-2 px-5 editable-block" contenteditable="true" style="padding-left:18px;padding-right:18px;">${this.escapeHtml(img.title) || '未命名节点'}</h3>
                 ${img.stage ? `<div style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 ${this.escapeHtml(img.stage)}</span></div>` : ''}

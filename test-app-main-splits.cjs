@@ -69,7 +69,8 @@ const SPLITS = [
     start: 'window.galleryFeatures = {',
     // 2026-10-07 更新基线：三处 processXxxFiles 的成功提示改为按**实际入队数**报
     // （原按 files.length 报 —— 3 张里 1 张超 10MB 被跳过，提示仍说「已添加 3 张」）。
-    sha: 'c074888fba1a8798ee286f2c38fcb911984b08f5d9a5105647548a19de30a75a',
+    // 2026-11-05 更新基线：按产品要求移除照片卡片的「拍摄时间/上传整理时间」标注。
+    sha: '372cd0f025d097a31a830926f535547dc57ac7a9494773905ebf7634b1ef3453',
     lines: 330,
     spread: 'galleryFeatures',
     forbiddenInAppMain: /^\s{8}sync(Arrival|Sop|Finish)Gallery\s*\(/m,

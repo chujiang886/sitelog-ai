@@ -26,10 +26,10 @@ if(!/^http:\/\/127\.0\.0\.1:\d+$/.test(base||''))throw Error('仅允许隔离测
  const publication=await page.evaluate(async()=>{const a=Alpine.$data(document.body);a.reviewNote='合成测试人工核对记录：此文字仅验证门禁，不代表真实工程';return await a.publishCloudProject()});
  const doc=await ctx.newPage();await doc.goto(base+'/api/share/publication/'+publication.id+'/document');
  const text=await doc.locator('body').innerText();
- for(const bad of ['添加照片','服务热线：待填写','发布时确认','IMG_001.jpg','最终交付照片','建议 100-200 字','[请编辑','施工照片（待补充说明）','班组进场','班组离场 SOP'])assert.ok(!text.includes(bad),bad);
- for(const good of ['本阶段成果照片','拍摄时间：未提供','历史整理时间','审核通过时间','发布时间'])assert.ok(text.includes(good),good);
+ for(const bad of ['添加照片','服务热线：待填写','发布时确认','IMG_001.jpg','最终交付照片','建议 100-200 字','[请编辑','施工照片（待补充说明）','班组进场','班组离场 SOP','拍摄时间','整理时间'])assert.ok(!text.includes(bad),bad);
+ for(const good of ['本阶段成果照片','审核通过时间','发布时间'])assert.ok(text.includes(good),good);
  assert.ok(text.includes('本阶段可见状态留底'));assert.equal(await doc.locator('img').count()>=2,true);
- assert.match(await doc.locator('.node-card-meta').first().innerText(),/拍摄时间：未提供/);
+ assert.ok(!(await doc.locator('.node-card-meta').first().innerText()).includes('拍摄时间'));
  assert.equal(await doc.locator('[contenteditable],input,button,.sop-upload-zone').count(),0);
  await doc.screenshot({path:path.join(out,'new-publication-desktop.png'),fullPage:true});await doc.pdf({path:path.join(out,'new-publication.pdf'),format:'A4',printBackground:true});
  // 真实生成PDF使用的克隆DOM也必须清理，不能只验证服务器正文。
