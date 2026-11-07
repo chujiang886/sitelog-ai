@@ -196,3 +196,120 @@ test('buildAnalysisPrompt：三个分区各有不同场景约束且都带 JSON s
   // 默认分区
   assert.ok(AV.buildAnalysisPrompt().includes('框架施工'));
 });
+
+// ────────────────────────────────────────────────────────────────
+// 容灾归因（契约 ai-provider-fallback v1 / frozen）
+//
+// 【为什么必须测】主服务商额度耗尽时会自动改用备用服务商。
+// 这段文案是**另一家模型**写的 —— 不告诉员工，员工就会把它的文风当成
+// 公司标准继续往下改，文风漂移且无法度量（这正是契约禁止回灌备用素材的原因）。
+// 所以「本次由备用服务商完成」这个提示是功能的一部分，不是装饰。
+//
+// 归因链：后端结果信封 service/slot → 前端 r._service / r._slot →
+// aiSource.service / aiSource.slot →（editor-state.js 整块拷贝）→ aiBaseline.source
+// ────────────────────────────────────────────────────────────────
+const FALLBACK_RESULT = {
+  model: 'backup-vision-model',
+  service: '备用服务商乙',
+  slot: 'fallback',
+  items: [{
+    title: '框体就位', category: '框架施工', stage: '',
+    desc: '框体采用化学锚栓穿透固定片与结构墙连接，四周预留注胶间隙，复核垂直度后转入注胶工序。',
+    highlights: ['饱满连续'], uncertainties: [],
+  }],
+};
+const PRIMARY_RESULT = { ...FALLBACK_RESULT, model: 'primary-vision-model', service: '主服务商甲', slot: 'primary' };
+
+/** 造一个能跑 aiOrganizeAll 的假组件（桩掉 app-main.js 里的方法） */
+function organizeApp(result, toasts) {
+  return make({
+    images: [{ id: 'photo1', section: 'construction', dataUrl: 'data:image/png;base64,aGVsbG8=',
+      title: '', desc: '', highlights: [], _manual: {} }],
+    arrivalImages: [], finishImages: [],
+    companyAIModel: 'primary-vision-model',
+    processing: false, aiChecking: false, aiCancelRequested: false, processedCount: 0,
+    showToast: (msg, kind) => toasts.push({ msg, kind }),
+    ensureCompanyAI: async () => true,
+    compressDataUrl: async (d) => d,
+    runAIBatch: async () => result,
+    syncToReport: () => {},
+  });
+}
+
+test('备用服务商完成时，提示里出现「本次由备用服务商」并点名是哪一家', async () => {
+  const toasts = [];
+  const app = organizeApp(FALLBACK_RESULT, toasts);
+  await app.aiOrganizeAll();
+  assert.ok(toasts.length >= 1, '识别完成必须有提示');
+  assert.ok(toasts[0].msg.includes('本次由备用服务商「备用服务商乙」完成'),
+    `备用归因提示缺失，实际提示：${toasts[0].msg}`);
+});
+
+test('主服务商完成时，不得出现「本次由备用服务商」（否则员工会误以为文案来自别家）', async () => {
+  const toasts = [];
+  const app = organizeApp(PRIMARY_RESULT, toasts);
+  await app.aiOrganizeAll();
+  assert.ok(toasts.length >= 1);
+  assert.ok(!toasts[0].msg.includes('备用服务商'),
+    `主服务商结果不该出现备用归因提示，实际提示：${toasts[0].msg}`);
+});
+
+test('aiSource 必须带上 service 与 slot（ai_learning 的回灌过滤靠它判定来源）', async () => {
+  const toasts = [];
+  const app = organizeApp(FALLBACK_RESULT, toasts);
+  await app.aiOrganizeAll();
+  const source = app.images[0].aiSource;
+  assert.ok(source, '识别完成后必须留下 aiSource');
+  assert.equal(source.slot, 'fallback', 'slot 必须是备用槽位');
+  assert.equal(source.service, '备用服务商乙', 'service 必须是实际生效的服务商名称');
+  assert.equal(source.model, 'backup-vision-model', 'model 必须是实际产出这段文案的模型');
+  // aiBaseline.source 是 ai_learning 落库时的取值来源 —— 整块拷贝 aiSource
+  assert.equal(app.images[0].aiBaseline.source.slot, 'fallback',
+    'aiBaseline.source 必须带上 slot，否则回灌过滤会漏掉备用素材');
+  assert.equal(app.images[0].aiBaseline.source.service, '备用服务商乙');
+});
+
+test('applyAnalysisResult：主/备两种归因都要写进 aiSource，缺字段也不许报错', () => {
+  const app = make();
+  const backup = { title: '框体就位', desc: '框体采用化学锚栓固定。', category: '框架施工',
+    highlights: [], uncertainties: [], _model: 'backup-vision-model',
+    _service: '备用服务商乙', _slot: 'fallback' };
+  const backupImg = {};
+  app.applyAnalysisResult(backupImg, backup, 'primary-vision-model');
+  assert.equal(backupImg.aiSource.slot, 'fallback');
+  assert.equal(backupImg.aiSource.service, '备用服务商乙');
+  assert.equal(backupImg.aiSource.model, 'backup-vision-model');
+
+  const primary = { ...backup, _model: 'primary-vision-model', _service: '主服务商甲', _slot: 'primary' };
+  const primaryImg = {};
+  app.applyAnalysisResult(primaryImg, primary, 'primary-vision-model');
+  assert.equal(primaryImg.aiSource.slot, 'primary');
+  assert.equal(primaryImg.aiSource.service, '主服务商甲');
+
+  // 老后端（没有 service/slot）也不许炸 —— 归因字段是可选的
+  const legacy = { title: '框体就位', desc: '框体采用化学锚栓固定。', category: '框架施工', highlights: [] };
+  const legacyImg = {};
+  app.applyAnalysisResult(legacyImg, legacy, 'primary-vision-model');
+  assert.equal(legacyImg.aiSource.slot, '');
+  assert.equal(legacyImg.aiSource.service, '');
+  assert.equal(legacyImg.aiSource.model, 'primary-vision-model');
+});
+
+test('单张「重分析」由备用完成时也要提示（批量之外的那条路径）', async () => {
+  const toasts = [];
+  const app = make({
+    showToast: (msg, kind) => toasts.push({ msg, kind }),
+    ensureCompanyAI: async () => true,
+    companyAIModel: 'primary-vision-model',
+    proposeAI: () => {},
+    analyzeImage: async function (candidate) {
+      AV.applyAnalysisResult(candidate, { title: '框体就位', desc: '框体采用化学锚栓固定。',
+        category: '框架施工', highlights: [], _model: 'backup-vision-model',
+        _service: '备用服务商乙', _slot: 'fallback' }, 'primary-vision-model');
+    },
+  });
+  await app.reAnalyze({ id: 'photo1', title: '', desc: '', highlights: [], _manual: {} });
+  assert.ok(toasts.length >= 1);
+  assert.ok(toasts[0].msg.includes('本次由备用服务商「备用服务商乙」完成'),
+    `单张重分析的备用归因提示缺失，实际提示：${toasts[0].msg}`);
+});

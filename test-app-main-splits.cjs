@@ -168,7 +168,16 @@ const SPLITS = [
     label: 'AI 视觉识别引擎（批量组织 / 单张重分析 / 健壮 JSON 提取 / 多模型投票去重）',
     start: 'window.aiVisionFeatures = {',
     // 2026-10-15：在原拆分基础上增加等待超时停止与状态清理；行为由 test-ai-wait 守护。
-    sha: 'c9fdcf6edfdc40e024e7b44b0093440635f67246ee2da6512ed6984998e3a3d3',
+    // 2026-11-07：AI 识别双服务商容灾（契约 ai-provider-fallback v1 / frozen）。
+    // 前端实现给本块加了归因三件套：结果信封的 service/slot 透传、
+    // aiSource 带上 service/slot、识别完成提示里出现「本次由备用服务商…」。
+    // **行数（561）与成员数（17）都没变** —— 改动是既有方法体内的增量，
+    // 没有新增方法、没有整块搬移，所以只更新 sha。
+    // sha 由本机独立重算核对过（不是照抄实现者给的值）：
+    //   node -e "…crypto.createHash('sha256').update(块文本)…"
+    // 块文本 = 从 `window.aiVisionFeatures = {` 到文件末尾（含末尾换行，
+    // 与本文件 blockOf() 的取法一致），不是整份文件的摘要。
+    sha: 'f2a6d7bf1be3eeeb91cd8c62735b3bf255c53cafd879447516823b2d510a588a',
     lines: 561,
     spread: 'aiVisionFeatures',
     forbiddenInAppMain: /^\s{8}(async\s+)?(aiOrganizeAll|applyCandidateAndAdopt|reAnalyze|captureDomEdits|ensureTitles|analyzeImage|applyAnalysisResult|buildAnalysisPrompt|dedupeDesc|dupWarnHtml|callVisionAPI|extractJSONRobust|_findMatchingBrace|_normalizeParsed|_extractFieldsByRegex|_extractSentenceFromRaw|testConnection)\s*\(/m,
