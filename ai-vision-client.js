@@ -45,7 +45,7 @@ window.aiVisionFeatures = {
           this.aiCancelRequested = false;
           this.processing = true;
           this.processedCount = 0;
-          const failures = [];
+          const failures = []; let fallbackService = ''; // 备用服务商归因（结果信封 slot='fallback'）
           const BATCH_MAX = 8; // 与后端 BATCH_MAX 一致：单次最多 8 张
           const SECTION_CONTEXT = { construction: '施工过程照片', arrival: '班组进场照片', finish: '完工/离场照片' };
           // 按 section 分组，组内每 8 张一批（同一批用该分区的提示词与上下文）
@@ -120,7 +120,7 @@ window.aiVisionFeatures = {
                 batch.forEach((img, k) => {
                   const candidate = { ...img, highlights: [...(img.highlights || [])], _manual: {} };
                   const r = items[k] || {};
-                  r._model = result.model || model;
+                  r._model = result.model || model; r._service = result.service || ''; r._slot = result.slot || ''; if (result.slot === 'fallback') fallbackService = result.service || '备用服务商';
                   this.applyAnalysisResult(candidate, r, model);
                   this.applyCandidateAndAdopt(img, candidate, beforeArr[k]);
                   img.analyzing = false;
@@ -131,8 +131,8 @@ window.aiVisionFeatures = {
             }
             if (this.aiCancelRequested && failures.length) { this.showToast(failures[0].error + '；已停止后续批次', 'error'); }
             else if (this.aiCancelRequested) { this.showToast('已停止后续识别，现有内容已保留'); }
-            else if (failures.length === 0) { this.showToast(`✨ AI 整理完成，本次共处理 ${this.processedCount} 张（已批量提交，更快更稳）— 点击文字可直接修改，导出时自动保留您的修改`); }
-            else { this.showToast(`⚠️ ${failures.length} 张识别失败：${failures[0].error.slice(0, 80)}`, 'error'); }
+            else if (failures.length === 0) { this.showToast(`✨ AI 整理完成，本次共处理 ${this.processedCount} 张（已批量提交，更快更稳）— 点击文字可直接修改，导出时自动保留您的修改` + (fallbackService ? `　本次由备用服务商「${fallbackService}」完成，请人工复核文案` : '')); }
+            else { this.showToast(`⚠️ ${failures.length} 张识别失败：${failures[0].error.slice(0, 80)}` + (fallbackService ? `　本次由备用服务商「${fallbackService}」完成` : ''), 'error'); }
           } finally {
             todo.forEach(img => img.analyzing = false);
             this.processing = false;
@@ -162,7 +162,7 @@ window.aiVisionFeatures = {
             const candidate = { ...img, highlights: [...(img.highlights || [])], _manual: {} };
             await this.analyzeImage(candidate);
             this.proposeAI(img, candidate);
-            this.showToast('新建议已生成，请比较后选择采用或保留当前内容');
+            this.showToast('新建议已生成，请比较后选择采用或保留当前内容' + (candidate.aiSource?.slot === 'fallback' ? `　本次由备用服务商「${candidate.aiSource?.service || '备用服务商'}」完成，请人工复核文案` : ''));
           } catch (e) {
             this.showToast('❌ 识别失败：' + e.message, 'error');
           } finally {
@@ -285,7 +285,7 @@ window.aiVisionFeatures = {
           img.aiConfirmed = false;
           img._analyzed = true;
           img.aiError = '';
-          img.aiSource = { model: result._model || model, generatedAt: new Date().toISOString(), kind: 'AI 建议，待人工确认' };
+          img.aiSource = { model: result._model || model, service: result._service || '', slot: result._slot || '', generatedAt: new Date().toISOString(), kind: 'AI 建议，待人工确认' };
         },
 
         buildAnalysisPrompt(section = 'construction') {
@@ -429,7 +429,7 @@ window.aiVisionFeatures = {
             parsed.category = parsed.category.trim();
           }
           // 挂模型名用于调试追踪
-          parsed._model = data.model || config.model || 'unknown';
+          parsed._model = data.model || config.model || 'unknown'; parsed._service = data.service || ''; parsed._slot = data.slot || '';
           return parsed;
         },
 

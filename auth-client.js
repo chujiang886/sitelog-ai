@@ -11,6 +11,9 @@ window.accountFeatures = {
   companyAI: { provider: 'qwen', name: '', protocol: 'openai', base_url: '', model: '', key: '' },
   aiPresets: [], companyAILoaded: false, companyAIModel: '',
   availableAIModels: [], aiModelMessage: '', aiConfigMessage: '',
+  // 备用 AI 服务商（容灾）：与主配置同构；configured/validated 决定三态显示。
+  fallbackAI: { provider: '', name: '', protocol: 'openai', base_url: '', model: '', key: '', configured: false, validated: false },
+  fallbackAILoaded: false, availableFallbackAIModels: [], fallbackAIModelMessage: '', fallbackAIMessage: '',
   aiModelReferences: [
     {name:'Hy4 preview',id:'hy4-preview'}, {name:'Hy3',id:'hy3'},
     {name:'DeepSeek-V4.1-Flash',id:'deepseek-flash'},
@@ -130,11 +133,13 @@ window.accountFeatures = {
     this.showAdmin = true; this.adminMessage = ''; this.companyAILoaded = false;
     this.availableAIModels = []; this.aiModelMessage = ''; this.aiConfigMessage = '';
     this.companyAI.key = '';
+    this.fallbackAILoaded = false; this.availableFallbackAIModels = []; this.fallbackAIModelMessage = ''; this.fallbackAIMessage = '';
     try {
       const data = await this.accountJSON('/admin/ai');
       this.aiPresets = data.presets;
       this.companyAI = { ...data.ai, key: '' };
       this.companyAILoaded = true;
+      await this.loadFallbackAI(data); // 复用同一次响应，不额外发请求
     } catch (error) { this.adminMessage = error.message; }
     await Promise.all([this.loadEmployees(), this.refreshOperations()]);
   },
@@ -228,5 +233,49 @@ window.accountFeatures = {
       this.aiConfigMessage = '公司 AI 设置已保存，员工再次点击 AI 整理即可使用，无需重新登录。';
     } catch (error) { this.aiConfigMessage = error.message; }
     finally { this.companyAI.key = ''; this.authBusy = false; }
+  },
+
+  // ── 备用 AI 服务商（容灾，可选）──
+  // 未配置时后端返回空串，这里原样保留：既不回落任何预设，也不影响现有识别流程。
+  async loadFallbackAI(payload) {
+    const data = payload || await this.accountJSON('/admin/ai');
+    const fb = (data && data.fallback) || {};
+    this.fallbackAI = { provider: fb.provider || '', name: fb.name || '', protocol: fb.protocol || 'openai', model: fb.model || '', base_url: fb.base_url || '', key: '', configured: !!fb.configured, validated: !!fb.validated };
+    this.fallbackAILoaded = true;
+    this.availableFallbackAIModels = []; this.fallbackAIModelMessage = '';
+    return this.fallbackAI;
+  },
+
+  async saveFallbackAI() {
+    if (this.authBusy || !this.fallbackAILoaded) return;
+    this.authBusy = true; this.fallbackAIMessage = '正在验证备用服务商的接口与图片识别能力，请稍候…';
+    try {
+      const saved = await this.accountJSON('/admin/ai/fallback', { provider: this.fallbackAI.provider, name: this.fallbackAI.name, protocol: this.fallbackAI.protocol, model: this.fallbackAI.model, base_url: this.fallbackAI.base_url, key: this.fallbackAI.key });
+      await this.loadFallbackAI({ fallback: saved.fallback });
+      this.fallbackAIMessage = '备用服务商已保存并通过验证；主服务商额度耗尽、鉴权失效或网络异常时自动改用它。';
+    } catch (error) { this.fallbackAIMessage = error.message; }
+    finally { this.fallbackAI.key = ''; this.authBusy = false; }
+  },
+
+  async clearFallbackAI() {
+    if (this.authBusy || !this.fallbackAILoaded) return;
+    this.authBusy = true; this.fallbackAIMessage = '正在清除备用服务商配置…';
+    try {
+      const saved = await this.accountJSON('/admin/ai/fallback/clear', {});
+      await this.loadFallbackAI({ fallback: saved.fallback });
+      this.fallbackAIMessage = '备用服务商已清除；识别只使用主服务商。';
+    } catch (error) { this.fallbackAIMessage = error.message; }
+    finally { this.authBusy = false; }
+  },
+
+  async loadFallbackAIModels() {
+    if (this.authBusy || !this.fallbackAILoaded) return;
+    this.authBusy = true; this.availableFallbackAIModels = []; this.fallbackAIModelMessage = '正在读取备用服务商模型列表…';
+    try {
+      const data = await this.accountJSON('/admin/ai/fallback/models', { provider: this.fallbackAI.provider, protocol: this.fallbackAI.protocol, base_url: this.fallbackAI.base_url, key: this.fallbackAI.key, model: this.fallbackAI.model });
+      this.availableFallbackAIModels = data.models || [];
+      this.fallbackAIModelMessage = '已获取 ' + this.availableFallbackAIModels.length + ' 个模型。列表不代表均支持识图，选定后仍需验证。';
+    } catch (error) { this.fallbackAIModelMessage = error.message; }
+    finally { this.authBusy = false; }
   },
 };
