@@ -236,13 +236,57 @@ function organizeApp(result, toasts) {
   });
 }
 
-test('备用服务商完成时，提示里出现「本次由备用服务商」并点名是哪一家', async () => {
+test('备用服务商完成时，提示里出现「由备用服务商」并点名是哪一家', async () => {
   const toasts = [];
   const app = organizeApp(FALLBACK_RESULT, toasts);
   await app.aiOrganizeAll();
   assert.ok(toasts.length >= 1, '识别完成必须有提示');
-  assert.ok(toasts[0].msg.includes('本次由备用服务商「备用服务商乙」完成'),
+  // 2026-11-08（契约 v2）：文案区分「本次全部 N 张」与「其中 N 张」，
+  // 所以这里断言的是「由备用服务商「X」完成」这个稳定片段 + 张数，
+  // 而不是钉死整句（旧句式已被 v2 细分）。
+  assert.ok(toasts[0].msg.includes('由备用服务商「备用服务商乙」完成'),
     `备用归因提示缺失，实际提示：${toasts[0].msg}`);
+  assert.ok(/[0-9]+ 张/.test(toasts[0].msg),
+    `备用归因提示必须带张数（否则无法判断是全部还是部分），实际提示：${toasts[0].msg}`);
+});
+
+test('只有部分批次走了备用时，提示必须说「其中 N 张」而不是「本次全部」（review #7）', async () => {
+  // 【为什么要这条】旧实现只有一个布尔标志 fallbackService：多批里只要有一批
+  // 回退，整句就变成「本次由备用服务商完成」—— 听起来像**全部**文案都来自别家。
+  // 操作员据此会把主服务商用心产出的文案也一并打折扣。
+  // 现在按张数累计，必须能区分「全部」与「其中 N 张」。
+  const toasts = [];
+  const BATCH_MAX = 8;
+  const images = [];
+  for (let i = 0; i < 10; i += 1) {
+    images.push({ id: 'photo' + i, section: 'construction', dataUrl: 'data:image/png;base64,aGVsbG8=',
+      title: '', desc: '', highlights: [], _manual: {} });
+  }
+  let call = 0;
+  const app = make({
+    images,
+    arrivalImages: [], finishImages: [],
+    companyAIModel: 'primary-vision-model',
+    processing: false, aiChecking: false, aiCancelRequested: false, processedCount: 0,
+    showToast: (msg, kind) => toasts.push({ msg, kind }),
+    ensureCompanyAI: async () => true,
+    compressDataUrl: async (d) => d,
+    // 第一批走主、第二批走备用 —— 10 张 > BATCH_MAX(8)，必然分两批。
+    runAIBatch: async (batch) => {
+      call += 1;
+      const base = call === 1 ? PRIMARY_RESULT : FALLBACK_RESULT;
+      const n = Math.min(BATCH_MAX, batch.length);
+      return { ...base, items: Array.from({ length: n }, () => base.items[0]) };
+    },
+    syncToReport: () => {},
+  });
+  await app.aiOrganizeAll();
+  assert.ok(toasts.length >= 1, '识别完成必须有提示');
+  const msg = toasts[0].msg;
+  assert.ok(msg.includes('备用服务商乙'), `部分批次走备用时必须点名是哪一家，实际提示：${msg}`);
+  assert.ok(msg.includes('其中'), `部分批次走备用时必须说「其中」而不是「本次全部」，实际提示：${msg}`);
+  assert.ok(!msg.includes('本次全部'), `部分批次走备用时不得说「本次全部」，实际提示：${msg}`);
+  assert.ok(/其中 [0-9]+ 张/.test(msg), `必须带具体张数，实际提示：${msg}`);
 });
 
 test('主服务商完成时，不得出现「本次由备用服务商」（否则员工会误以为文案来自别家）', async () => {

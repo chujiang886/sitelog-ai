@@ -177,8 +177,21 @@ const SPLITS = [
     //   node -e "…crypto.createHash('sha256').update(块文本)…"
     // 块文本 = 从 `window.aiVisionFeatures = {` 到文件末尾（含末尾换行，
     // 与本文件 blockOf() 的取法一致），不是整份文件的摘要。
-    sha: 'f2a6d7bf1be3eeeb91cd8c62735b3bf255c53cafd879447516823b2d510a588a',
-    lines: 561,
+    // 2026-11-08：契约 v2 + review 修复，行数 561 → 588（+27 行），仍**未新增方法**
+    // （成员数仍 17）。这次改了三处，全在既有方法体内：
+    //   1. aiOrganizeAll：新增 fallbackCount 变量，按**张数**统计走备用的照片；
+    //      toast 区分「本次全部 N 张由备用服务商完成」与「其中 N 张…」。
+    //      旧写法只有布尔标志，多批里只要有一批回退就整句说「本次由备用完成」，
+    //      听起来像全部都是 —— 操作员据此会把主服务商用心产出的文案也打折扣。
+    //   2. analyzeImage：多 return 一个原始结果（加法，不改既有行为）。
+    //      归因必须取自**源头**：applyAnalysisResult 的两个早退分支
+    //      （含无法认定的结论 / 无 JSON）都不写 img.aiSource，
+    //      从 img.aiSource 读归因会在这两种情况下静默丢掉「本次由备用完成」这条
+    //      **已计费**的事实。
+    //   3. reAnalyze：toast 的归因改从 analyzeImage 的原始返回取（回退到 aiSource）。
+    // sha 与行数均按本文件 blockOf() 的取法在本机独立重算，未照抄任何给定值。
+    sha: '39f27142d450d873aa7ec447b3799fbded73ce95659f5397c787c44c6fa3275f',
+    lines: 588,
     spread: 'aiVisionFeatures',
     forbiddenInAppMain: /^\s{8}(async\s+)?(aiOrganizeAll|applyCandidateAndAdopt|reAnalyze|captureDomEdits|ensureTitles|analyzeImage|applyAnalysisResult|buildAnalysisPrompt|dedupeDesc|dupWarnHtml|callVisionAPI|extractJSONRobust|_findMatchingBrace|_normalizeParsed|_extractFieldsByRegex|_extractSentenceFromRaw|testConnection)\s*\(/m,
     methods: [
@@ -371,4 +384,53 @@ test('覆盖关系必须真的生效：workflow 要排在 project 之后展开',
   assert.ok(pi < wi,
     'workflowFeatures 必须排在 projectFeatures 之后，否则那 5 个覆盖会静默失效，' +
     '归档工作流会退回 project-client 的 /projects 实现');
+});
+
+// ────────────────────────────────────────────────────────────────────
+// 缓存版本守卫：改了自有资源的内容，就必须 bump index.html 里的 ?v=。
+//
+// 【为什么要有这条】2026-11-05 事故：前端已发布新代码，用户「刷新后仍是旧界面」，
+// 旧 JS 里还留着已下线的「拍摄时间」标注。nginx 给的是 no-cache（每次回源校验），
+// 但部分 WebView / 代理缓存不按语义办事 —— **只有 URL 变了才必然取新文件**。
+// 上面那条「自有资源必须带 ?v=」只能保证「带了」，保证不了「改了内容会 bump」。
+// 本条补上后半截：内容 sha 变了 → ?v= 必须跟着变；内容没变 → ?v= 不许乱变
+// （白 bump 会让所有客户端无谓重载，且掩盖「以为改了其实没改」）。
+//
+// 【怎么维护】每次发布后，把改动过的文件在 CACHE_BASELINE 里的
+// { sha, v } 更新成当次的实际值。sha 取「块文本」摘要，与本文件 blockOf() 同口径。
+// ────────────────────────────────────────────────────────────────────
+const CACHE_BASELINE = {
+  // 2026-11-08：AI 识别双服务商容灾（契约 v2）+ review 修复。
+  // ai-vision-client.js：归因按张数累计、analyzeImage 返回原始结果、reAnalyze 归因取源头。
+  // auth-client.js：管理员备用服务商配置块（加载/保存/清除/模型列表）。
+  'ai-vision-client.js': {
+    sha: '39f27142d450d873aa7ec447b3799fbded73ce95659f5397c787c44c6fa3275f',
+    v: '20261108a',
+    start: 'window.aiVisionFeatures = {',
+  },
+  'auth-client.js': {
+    sha: '911f3bd1a3bf81607c288842e93ea4be0290f7eb3ea2f38bcb09cad57c1794ec',
+    v: '20261108a',
+    start: 'window.accountFeatures = {',
+  },
+};
+
+test('改了自有资源的内容就必须 bump ?v=（没改则不许白 bump）', () => {
+  for (const [file, base] of Object.entries(CACHE_BASELINE)) {
+    const text = read(file);
+    const { block } = blockOf(text, base.start);
+    const sha = crypto.createHash('sha256').update(block, 'utf8').digest('hex');
+    const m = HTML.match(new RegExp(`${file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\?v=([a-z0-9]+)`));
+    assert.ok(m, `index.html 里找不到 ${file} 的 ?v= 引用`);
+    const current = m[1];
+    if (sha === base.sha) {
+      assert.equal(current, base.v,
+        `${file} 的内容没有变化，?v= 不该变（白 bump 会让所有客户端无谓重载）`);
+    } else {
+      assert.notEqual(current, base.v,
+        `${file} 的内容已经变了（sha ${sha.slice(0, 12)}… ≠ 基线 ${base.sha.slice(0, 12)}…），`
+        + `但 index.html 里的 ?v= 仍是 ${base.v} —— 用户会拿到旧文件！`
+        + '请 bump ?v= 并把 CACHE_BASELINE 里该文件的 { sha, v } 更新为本次实际值。');
+    }
+  }
 });

@@ -45,7 +45,7 @@ window.aiVisionFeatures = {
           this.aiCancelRequested = false;
           this.processing = true;
           this.processedCount = 0;
-          const failures = []; let fallbackService = ''; // 备用服务商归因（结果信封 slot='fallback'）
+          const failures = []; let fallbackService = ''; let fallbackCount = 0; // 备用服务商归因（结果信封 slot='fallback'）；fallbackCount = 实际走备用的**张数**
           const BATCH_MAX = 8; // 与后端 BATCH_MAX 一致：单次最多 8 张
           const SECTION_CONTEXT = { construction: '施工过程照片', arrival: '班组进场照片', finish: '完工/离场照片' };
           // 按 section 分组，组内每 8 张一批（同一批用该分区的提示词与上下文）
@@ -120,7 +120,14 @@ window.aiVisionFeatures = {
                 batch.forEach((img, k) => {
                   const candidate = { ...img, highlights: [...(img.highlights || [])], _manual: {} };
                   const r = items[k] || {};
-                  r._model = result.model || model; r._service = result.service || ''; r._slot = result.slot || ''; if (result.slot === 'fallback') fallbackService = result.service || '备用服务商';
+                  r._model = result.model || model; r._service = result.service || ''; r._slot = result.slot || '';
+                  // 归因按**张数**累计，不用布尔标志。
+                  // 原因：一次 API 调用返回整批 items，slot 是**整批统一**的；
+                  // 多批时若只记「有没有批次走过备用」，那只要其中一批回退，
+                  // 整句提示就会变成「本次由备用服务商完成」—— 听起来像全部都是，
+                  // 而实际只有一部分。操作员据此判断「这批文案整体来自另一家模型」
+                  // 就会误判全部文案的可靠性。必须说清是「全部」还是「其中 N 张」。
+                  if (result.slot === 'fallback') { fallbackService = result.service || '备用服务商'; fallbackCount += batch.length; }
                   this.applyAnalysisResult(candidate, r, model);
                   this.applyCandidateAndAdopt(img, candidate, beforeArr[k]);
                   img.analyzing = false;
@@ -129,10 +136,19 @@ window.aiVisionFeatures = {
                 this.syncToReport();
               }
             }
+            // 备用服务商归因提示。**必须区分「全部」与「其中 N 张」**：
+            // 一次 API 调用返回整批 items、slot 是整批统一的，多批里只要有一批回退，
+            // 若笼统说「本次由备用服务商完成」，操作员会以为全部文案都来自另一家模型，
+            // 从而对本来由主服务商用心产出的文案也打折扣。
+            const fbNote = fallbackService
+              ? (fallbackCount >= this.processedCount
+                  ? `　本次全部 ${fallbackCount} 张由备用服务商「${fallbackService}」完成，请人工复核文案`
+                  : `　其中 ${fallbackCount} 张由备用服务商「${fallbackService}」完成，请重点复核这些文案`)
+              : '';
             if (this.aiCancelRequested && failures.length) { this.showToast(failures[0].error + '；已停止后续批次', 'error'); }
             else if (this.aiCancelRequested) { this.showToast('已停止后续识别，现有内容已保留'); }
-            else if (failures.length === 0) { this.showToast(`✨ AI 整理完成，本次共处理 ${this.processedCount} 张（已批量提交，更快更稳）— 点击文字可直接修改，导出时自动保留您的修改` + (fallbackService ? `　本次由备用服务商「${fallbackService}」完成，请人工复核文案` : '')); }
-            else { this.showToast(`⚠️ ${failures.length} 张识别失败：${failures[0].error.slice(0, 80)}` + (fallbackService ? `　本次由备用服务商「${fallbackService}」完成` : ''), 'error'); }
+            else if (failures.length === 0) { this.showToast(`✨ AI 整理完成，本次共处理 ${this.processedCount} 张（已批量提交，更快更稳）— 点击文字可直接修改，导出时自动保留您的修改` + fbNote); }
+            else { this.showToast(`⚠️ ${failures.length} 张识别失败：${failures[0].error.slice(0, 80)}` + fbNote, 'error'); }
           } finally {
             todo.forEach(img => img.analyzing = false);
             this.processing = false;
@@ -160,9 +176,14 @@ window.aiVisionFeatures = {
           img.analyzing = true;
           try {
             const candidate = { ...img, highlights: [...(img.highlights || [])], _manual: {} };
-            await this.analyzeImage(candidate);
+            const raw = await this.analyzeImage(candidate);
             this.proposeAI(img, candidate);
-            this.showToast('新建议已生成，请比较后选择采用或保留当前内容' + (candidate.aiSource?.slot === 'fallback' ? `　本次由备用服务商「${candidate.aiSource?.service || '备用服务商'}」完成，请人工复核文案` : ''));
+            // 归因取自 analyzeImage 的**原始返回**（源头），并回退到 img.aiSource。
+            // 不用 candidate.aiSource 单独作为依据：applyAnalysisResult 的早退分支
+            // 不写 aiSource，那样会丢掉「本次由备用服务商完成」这条已计费的事实。
+            const fbSlot = raw?._slot || candidate.aiSource?.slot;
+            const fbService = raw?._service || candidate.aiSource?.service;
+            this.showToast('新建议已生成，请比较后选择采用或保留当前内容' + (fbSlot === 'fallback' ? `　本次由备用服务商「${fbService || '备用服务商'}」完成，请人工复核文案` : ''));
           } catch (e) {
             this.showToast('❌ 识别失败：' + e.message, 'error');
           } finally {
@@ -260,6 +281,12 @@ window.aiVisionFeatures = {
           const model = this.companyAIModel;
           const result = await this.callVisionAPI(img.dataUrl, this.buildAnalysisPrompt(img.section || 'construction'), model);
           this.applyAnalysisResult(img, result, model);
+          // 把原始结果返回给调用方：归因（slot/service）**必须取自源头**。
+          // applyAnalysisResult 有两个早退分支（AI 建议含无法认定的结论 / 无 JSON），
+          // 都不写 img.aiSource —— 若调用方改从 img.aiSource 读归因，
+          // 这两种情况下就会静默丢掉「本次由备用服务商完成」的事实。
+          // 那是一次**真实发生且已计费**的调用，来源必须被记录。
+          return result;
         },
 
         // 把模型返回的解析结果落到 img（单图与批量复用同一套字段映射）
