@@ -18,7 +18,9 @@ const base=process.env.TEST_BASE,out=process.env.TEST_OUTPUT;if(!/^http:\/\/127\
   await view.goto(item.share.url);await view.locator('#document').waitFor({state:'visible'});await view.frameLocator('#document').getByText(item.title+'已确认内容',{exact:true}).waitFor();
   assert.equal(await view.locator('nav').count(),0);assert.equal(await view.locator('a[href^="/s/"]').count(),0);
   const root=base+'/api/share/publication/'+item.share.id,metadata=await(await guest.request.get(root)).json();assert.equal(metadata.title,item.title);assert.deepEqual(Object.keys(metadata).sort(),['ok','id','title','audience','expires','published_at'].sort());assert.equal(await view.locator('#status').innerText(),item.title);
-  const document=await(await guest.request.get(root+'/document')).text();assert.equal(document.includes('已审核版本'),false);assert.ok(document.includes('已确认工程档案'));
+  const document=await(await guest.request.get(root+'/document')).text();assert.equal(document.includes('已审核版本'),false);
+  // 2026-11-10 反向守护：扫码展示的成品归档不得再带合规话术与系统免责话术。
+  for(const bad of ['已确认工程档案','归档合规说明','本记录可作为竣工归档佐证','审核通过时间','不代表工程完工或款项结清'])assert.ok(!document.includes(bad),bad);
   for(const other of versions.filter(x=>x!==item)){assert.equal(JSON.stringify(metadata).includes(other.share.id),false);assert.equal(document.includes(other.title),false);assert.equal((await guest.request.get(root+'/media/'+other.media.id)).status(),403)}
   const f=view.frames().find(f=>f.url().includes('/document'));assert.equal(await f.evaluate(async()=>{await Promise.all([...document.images].map(i=>i.decode()));return document.images[0].naturalWidth>0}),true);
  }
