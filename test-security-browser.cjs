@@ -31,9 +31,17 @@ const { chromium } = require('playwright');
       const template = document.createElement('template');
       template.innerHTML = clean;
       const unsafe = template.content.querySelector('script,iframe,svg,math,[onerror],[onclick],[src],[href]');
+      // 2026-11-10：旧草稿 / 云端工程 / 工程包里可能仍存着已下线的「归档合规说明」卡片，
+      // 恢复时必须剥掉，否则「打开旧工程再导出」会把话术带回来。
+      const legacyReport = '<h1>施工归档</h1>' +
+        '<div class="pdf-compliance-note"><div class="pdf-compliance-note-title">归档合规说明</div>' +
+        '<p>本记录可作为竣工归档佐证；隐蔽工程留档可追溯。</p></div><p>正文应保留</p>';
+      const legacyClean = sitelogEditor.sanitizeReport(legacyReport);
       return { shadow, clean, unsafe: !!unsafe, text: template.content.textContent,
         table: !!template.content.querySelector('table td'),
         editable: !!template.content.querySelector('[contenteditable="true"][data-photo-id="fixture"]'),
+        legacyNote: legacyClean.includes('pdf-compliance-note') || legacyClean.includes('归档合规说明'),
+        legacyBody: legacyClean.includes('正文应保留'),
         executed: !!window.fixtureExecuted };
     });
     assert.doesNotMatch(result.shadow, /\$\{|\{\{|<%/, '影子树内残留模板表达式');
@@ -42,7 +50,9 @@ const { chromium } = require('playwright');
     assert.equal(result.table, true);
     assert.equal(result.editable, true);
     for (const text of ['施工归档', '人工核对完成', '客户已确认', '照片说明']) assert.ok(result.text.includes(text));
-    console.log('PASS：影子树模板绕过被阻断，归档正文、表格和人工编辑保留，活动内容已移除');
+    assert.equal(result.legacyNote, false, '旧草稿里的「归档合规说明」卡片没有被剥掉');
+    assert.equal(result.legacyBody, true, '剥掉合规卡片时误删了归档正文');
+    console.log('PASS：影子树模板绕过被阻断，归档正文、表格和人工编辑保留，活动内容已移除，旧合规话术已剥离');
   } finally {
     await browser.close();
   }

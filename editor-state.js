@@ -28,8 +28,20 @@
     });
   }
   function localDate() { return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); }
+  // 2026-11-10 业务要求：后续生成的施工归档不再带「归档合规说明」。
+  // 代码侧已停止注入，但旧草稿 / 云端工程 / 工程包里可能仍存着这张卡片的 HTML。
+  // 所有恢复路径（本机草稿、云端工程、工程包导入、撤销）都走 restoreSnapshot →
+  // sanitizeReport，所以在这里剥掉，才能覆盖「打开旧工程继续整理再导出」的场景。
+  function stripLegacyComplianceNote(html) {
+    if (typeof document === 'undefined') return html;
+    const holder = document.createElement('template');
+    holder.innerHTML = html;
+    holder.content.querySelectorAll('.pdf-compliance-note').forEach(node => node.remove());
+    return holder.innerHTML;
+  }
   function sanitizeReport(html) {
-    return DOMPurify.sanitize(html, { ADD_ATTR: ['contenteditable'], FORBID_TAGS: ['script','iframe','object','embed','form','input','button','style','link','meta','svg','math','video','audio','source'], FORBID_ATTR: ['srcset','src','href','style'], ALLOW_DATA_ATTR: true });
+    const clean = DOMPurify.sanitize(html, { ADD_ATTR: ['contenteditable'], FORBID_TAGS: ['script','iframe','object','embed','form','input','button','style','link','meta','svg','math','video','audio','source'], FORBID_ATTR: ['srcset','src','href','style'], ALLOW_DATA_ATTR: true });
+    return stripLegacyComplianceNote(clean);
   }
   function validateSnapshot(snapshot) {
     if (!snapshot || snapshot.format !== 'sitelog-project' || snapshot.schema !== 1 || typeof snapshot.report !== 'string' || !snapshot.meta) throw Error('不是受支持的施格归档工程包');

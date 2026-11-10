@@ -413,6 +413,13 @@ const CACHE_BASELINE = {
     v: '20261108a',
     start: 'window.accountFeatures = {',
   },
+  // 2026-11-10：sanitizeReport 增加「剥掉旧归档合规说明卡片」，
+  // 覆盖从旧草稿 / 云端工程 / 工程包恢复后继续导出的场景。
+  'editor-state.js': {
+    sha: '83abdbb9b73bb61bb19187f7e6fd2da24f2d2323bcd600b41a2313d3378893ae',
+    v: '20261110a',
+    start: '  function localDate() {',
+  },
 };
 
 test('改了自有资源的内容就必须 bump ?v=（没改则不许白 bump）', () => {

@@ -112,6 +112,26 @@ test('styles.css 不留归档合规说明的死样式', () => {
     'styles.css 仍残留 .pdf-compliance-note 样式或 @media print 规则');
 });
 
+// 只停掉注入还不够：生产库里已存着带这张卡片的云端草稿与历史工程包，
+// 「打开旧工程继续整理再导出」会把话术带回来。所有恢复路径都过 sanitizeReport，
+// 所以这里钉住「恢复时剥掉旧卡片」这一层兜底，防止有人只删注入就以为收口了。
+test('恢复旧草稿时会剥掉已下线的归档合规说明卡片', () => {
+  const editor = read('editor-state.js');
+  const start = editor.indexOf('function stripLegacyComplianceNote(html)');
+  assert.ok(start >= 0, 'editor-state.js 里找不到剥掉旧合规卡片的逻辑');
+  const strip = editor.slice(start, start + 500);
+  assert.ok(strip.includes(".pdf-compliance-note"), '剥离逻辑没有定位旧卡片的 class');
+  assert.ok(/node\.remove\(\)/.test(strip), '剥离逻辑没有真的移除节点');
+  const sanitize = editor.slice(editor.indexOf('function sanitizeReport(html)'), editor.indexOf('function sanitizeReport(html)') + 500);
+  assert.ok(sanitize.includes('stripLegacyComplianceNote(clean)'),
+    'sanitizeReport 没有调用剥离逻辑，旧草稿恢复仍会带出合规话术');
+});
+
+test('editor-state.js 改了内容就必须 bump ?v=', () => {
+  assert.ok(read('index.html').includes('editor-state.js?v=20261110a'),
+    'editor-state.js 的缓存版本号没跟上本次改动，用户会拿到旧文件');
+});
+
 // ────────────────────────────────────────────────────────────────
 // 2. 行为测试：真的能取到、且优先取 styles.css
 // ────────────────────────────────────────────────────────────────
