@@ -87,43 +87,29 @@ test('styles.css 必须非空且含报告模板的关键规则', () => {
 });
 
 // ────────────────────────────────────────────────────────────────
-// 合规价值文案（Issue #3 / PR-2-2）：纯展示，不删不改既有文案
+// 「归档合规说明」已下线（2026-11-10）：报告不得再带这段合规话术
 // ────────────────────────────────────────────────────────────────
-// 落点在 applyReportChrome（app-main.js），一处覆盖全部标准阶段模板，
-// 注入到 footer 之前（报告最末尾）。合规版第五段已有同义声明，故 complianceMode 时跳过。
-// 这几条钉住「文案存在 + 合规版不重复 + 样式配套 + 打印不被切断」。
+// 原 Issue #3 / PR-2-2 在 applyReportChrome 里往每份标准阶段模板末尾注入一张卡片，
+// 业务要求后续生成的施工归档不再带它。这里改成**反向守护**：谁把文案加回来就红。
+// 注意：合规版（?template=compliance）第五段「留档说明与合规声明」在 templates.js，
+// 是用户主动选择的独立合规导出视图，不在本次下线范围内 —— 别去断言 templates.js。
 
-test('合规价值文案在 applyReportChrome 注入，且合规版跳过（避免与第五段重复）', () => {
+test('applyReportChrome 不再注入归档合规说明卡片', () => {
   const app = read('app-main.js');
-  // 注入点在 applyReportChrome 内、footer 之前
-  const chrome = app.slice(app.indexOf('applyReportChrome(html)'));
-  assert.ok(/complianceNote/.test(chrome), 'applyReportChrome 里没有合规价值文案注入逻辑');
-  assert.ok(/本记录可作为竣工归档佐证/.test(app), '缺少「可作为竣工归档佐证」文案');
-  assert.ok(/隐蔽工程留档可追溯/.test(app), '缺少「隐蔽工程留档可追溯」文案');
-  // 合规版必须跳过：complianceMode ? '' : ...，否则第五段「留档说明与合规声明」会和这条重复
-  assert.ok(/this\.complianceMode\s*\?\s*''/.test(app), '合规版没有跳过合规价值文案，会与第五段声明重复');
+  const start = app.indexOf('applyReportChrome(html)');
+  const chrome = app.slice(start, start + 2500);
+  for (const marker of ['complianceNote', 'pdf-compliance-note', '本记录可作为竣工归档佐证', 'AI 辅助提示须经人工确认']) {
+    assert.ok(!chrome.includes(marker), `applyReportChrome 又出现了合规声明片段：${marker}`);
+  }
+  // 收尾职责本身不能丢：缺失的照片分区仍要补齐并拼进 footer 之前
+  assert.ok(/html\.replace\('<footer', missing \+ '<footer'\)/.test(chrome),
+    'applyReportChrome 的照片分区补齐逻辑被误删了');
 });
 
-test('合规价值文案的注入位置必须在 footer 之前（报告最末尾，不进首屏）', () => {
-  const app = read('app-main.js');
-  const chrome = app.slice(app.indexOf('applyReportChrome(html)'), app.indexOf('applyReportChrome(html)') + 2500);
-  // 注入语句必须把 complianceNote 拼在 '<footer' 之前，而不是 {{PROJECT_INFO}} 首屏区
-  const injectLine = chrome.split('\n').find((l) => l.includes('complianceNote') && l.includes('<footer'));
-  assert.ok(injectLine, '找不到把合规文案拼在 footer 之前的注入语句');
-  assert.ok(/missing \+ complianceNote \+ '<footer/.test(injectLine) ||
-            /complianceNote \+ '<footer/.test(injectLine), '合规文案没有紧贴 footer 之前注入：' + injectLine.trim());
-});
-
-test('styles.css 必须有合规价值文案的配套样式，且打印时不被分页切断', () => {
+test('styles.css 不留归档合规说明的死样式', () => {
   const css = read('styles.css');
-  assert.ok(css.includes('.pdf-compliance-note'), 'styles.css 缺少 .pdf-compliance-note 样式');
-  assert.ok(css.includes('.pdf-compliance-note-title'), 'styles.css 缺少 .pdf-compliance-note-title 样式');
-  // 打印保护：纳入 break-inside:avoid 与 print-color-adjust（否则 A4 分页会切断、金色边线不打印）
-  const printBlock = css.slice(css.indexOf('@media print'));
-  assert.ok(/\.pdf-compliance-note\s*\{[^}]*break-inside:\s*avoid/.test(printBlock),
-    '打印样式里 .pdf-compliance-note 没有 break-inside:avoid，A4 分页会被切断');
-  assert.ok(/print-color-adjust[\s\S]{0,120}\.pdf-compliance-note|\.pdf-compliance-note[\s\S]{0,200}print-color-adjust/.test(printBlock),
-    '.pdf-compliance-note 没有纳入 print-color-adjust，金色左边线不会打印');
+  assert.ok(!css.includes('pdf-compliance-note'),
+    'styles.css 仍残留 .pdf-compliance-note 样式或 @media print 规则');
 });
 
 // ────────────────────────────────────────────────────────────────
