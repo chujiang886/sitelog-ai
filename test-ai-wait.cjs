@@ -5,13 +5,16 @@ function app(){
  return {...ctx.window.accountFeatures,...ctx.window.projectFeatures,...ctx.window.aiVisionFeatures,
   aiWaitTimeoutMs:55,aiRequestTimeoutMs:15,aiPollIntervalMs:1};
 }
-test('永久排队和永久运行都有总等待上限，取消并清理忙碌标识',async()=>{
- for(const status of ['queued','running']){
-  const a=app();let submits=0,cancels=0;
-  a.accountJSON=async(path,payload)=>{if(path.endsWith('/cancel')){cancels++;return {status:'cancelled'}}if(payload){submits++;return {id:'job',status}}return {id:'job',status}};
-  await assert.rejects(a.runAIBatch(['photo'],'prompt','model'),/等待超时/);
-  assert.equal(a.aiJobId,'');assert.equal(a.aiJobStatus,'');assert.equal(submits,1);assert.equal(cancels,1);
- }
+test('慢任务跨过原等待上限，自动取回原任务结果',async()=>{
+ const a=app(),paths=[];
+ a.aiWaitTimeoutMs=20;
+ a.accountJSON=async(path,body)=>{
+  paths.push(path);
+  if(body)return {id:'original',status:'queued'};
+  return paths.length<32?{status:'running'}:{status:'succeeded',result:{desc:'完工'}};
+ };
+ assert.equal((await a.runAIJob('photo','prompt','model')).desc,'完工');
+ assert.deepEqual(paths,['/ai/jobs',...Array(31).fill('/ai/jobs/original')]);
 });
 test('单次提交卡住也会超时并中止网络请求，不会自动重复提交',async()=>{
  const a=app();let submits=0,signal;
@@ -19,10 +22,17 @@ test('单次提交卡住也会超时并中止网络请求，不会自动重复�
  await assert.rejects(a.runAIJob('photo','prompt','model'),/请求超时/);
  assert.equal(submits,1);assert.equal(signal.aborted,true);assert.equal(a.aiJobId,'');
 });
-test('取消请求也卡住时仍能结束等待',async()=>{
- const a=app();a.accountJSON=async(path,payload)=>path.endsWith('/cancel')?new Promise(()=>{}):{id:'job',status:'queued'};
- await assert.rejects(a.runAIJob('photo','prompt','model'),/等待超时/);
- assert.equal(a.aiJobId,'');
+test('员工点击取消只发送一次，查询原任务确认取消',async()=>{
+ const a=app();let cancels=0;
+ a.accountJSON=async(path,body)=>{
+  if(path.endsWith('/cancel')){cancels++;return {}}
+  if(body)return {id:'job',status:'running'};
+  return {status:cancels?'cancelled':'running'};
+ };
+ const work=a.runAIJob('photo','prompt','model');
+ await new Promise(r=>setTimeout(r,1));
+ await Promise.all([a.cancelAIJob(),a.cancelAIJob()]);
+ await assert.rejects(work,/取消/);assert.equal(cancels,1);
 });
 test('超时停止剩余批次并保留照片和人工内容',async()=>{
  const a=app();a.ensureCompanyAI=async()=>true;a.showToast=()=>{};a.syncToReport=()=>{};a.buildAnalysisPrompt=()=>'';let calls=0;
@@ -41,11 +51,17 @@ test('accountJSON 将 AbortSignal 传给会话请求',async()=>{
  a.sessionRequest=async(path,o)=>{options=o;return {ok:true,json:async()=>({ok:true})}};
  await a.accountJSON('/ai/jobs',{}, {signal:controller.signal});assert.equal(options.signal,controller.signal);
 });
-test('轮询卡住会超时，保留任务取消机会且不重复提交',async()=>{
- const a=app();let posts=0,cancels=0;
- a.accountJSON=(path,payload)=>{if(path.endsWith('/cancel')){cancels++;return Promise.resolve({})}if(payload){posts++;return Promise.resolve({id:'job',status:'queued'})}return new Promise(()=>{})};
- await assert.rejects(a.runAIJob('photo','prompt','model'),/请求超时/);
- assert.equal(posts,1);assert.equal(cancels,1);assert.equal(a.aiJobId,'');
+test('查询超时和断网后只重查同一个任务，保留结果',async()=>{
+ const a=app(),calls=[];
+ a.accountJSON=(path,payload)=>{
+  calls.push(path);
+  if(payload)return Promise.resolve({id:'original',status:'queued'});
+  if(calls.length===2)return new Promise(()=>{});
+  if(calls.length===3)return Promise.reject(new TypeError('网络请求已超时'));
+  return Promise.resolve({status:'succeeded',result:{items:['已识别']}});
+ };
+ assert.equal((await a.runAIBatch(['photo'],'prompt','model')).items[0],'已识别');
+ assert.deepEqual(calls,['/ai/jobs',...Array(3).fill('/ai/jobs/original')]);
 });
 test('AbortSignal 导致 fetch 拒绝时仍报告明确超时',async()=>{
  const a=app();a.accountJSON=(p,b,{signal})=>new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(new DOMException('aborted','AbortError'))));

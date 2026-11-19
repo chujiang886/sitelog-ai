@@ -5,7 +5,20 @@ window.projectFeatures = {
   colleagues:[],memberUser:'',memberRole:'editor',reviewNote:'',shareAudience:'public',shareDays:30,shareCode:'',
   publicationAttempt:null,reviewBusy:false,reviewMessage:'',shareStep:'',
   aiJobId:'',aiJobStatus:'',aiCancelRequested:false,aiUsage:null,aiBudget:{user_daily:100,company_daily:500},
-  async cancelAIJob(){this.aiCancelRequested=true;if(this.aiJobId)await this.projectAction(()=>this.aiRequest('/ai/jobs/'+this.aiJobId+'/cancel',{},Date.now()+this.aiRequestTimeoutMs));this.aiJobStatus='已请求取消；已提交的上游请求可能仍计费'},
+  async cancelAIJob(){
+    if(!this.aiJobId || this.aiCancelRequested)return;
+    this.aiCancelRequested=true;
+    const id=this.aiJobId;
+    this.aiJobStatus='正在请求取消识别…';
+    try{
+      await this.aiRequest('/ai/jobs/'+id+'/cancel',{},Date.now()+this.aiRequestTimeoutMs);
+    }catch(error){
+      if(this.aiJobId===id){
+        this.aiCancelRequested=false;
+        this.showToast('取消未确认，将继续查询原任务。'+error.message,'error');
+      }
+    }
+  },
   async loadAIUsage(){await this.projectAction(async()=>{this.aiUsage=await this.accountJSON('/ai/usage');this.aiBudget={...this.aiUsage.limits}})},
   async saveAIBudget(){await this.projectAction(async()=>{await this.accountJSON('/admin/ai-budget',{user_daily:Number(this.aiBudget.user_daily),company_daily:Number(this.aiBudget.company_daily)});await this.loadAIUsage();this.showToast('识别次数预算已保存')})},
   aiWaitTimeoutMs:600000,aiRequestTimeoutMs:20000,aiPollIntervalMs:1000,
@@ -22,25 +35,33 @@ window.projectFeatures = {
     }finally{clearTimeout(timer)}
   },
   async waitForAI(body){
-    const deadline=Date.now()+this.aiWaitTimeoutMs;let job;
     this.aiCancelRequested=false;
     try{
-      job=await this.aiRequest('/ai/jobs',body,deadline);this.aiJobId=job.id;this.aiJobStatus='识别任务已排队';
+      // 只有拿到任务号才轮询。提交响应丢失时不能假定该请求未被受理。
+      let job=await this.aiRequest('/ai/jobs',body,Date.now()+this.aiWaitTimeoutMs);
+      this.aiJobId=job.id;
+      this.aiJobStatus='识别任务已排队';
+      const slowAt=Date.now()+this.aiWaitTimeoutMs;
+      let delay=this.aiPollIntervalMs;
       while(['queued','running'].includes(job.status)){
-        if(this.aiCancelRequested){await this.aiRequest('/ai/jobs/'+job.id+'/cancel',{},deadline);throw Error('已停止识别，照片和人工编辑已保留')}
-        await new Promise(resolve=>setTimeout(resolve,Math.min(this.aiPollIntervalMs,Math.max(0,deadline-Date.now()))));
-        job=await this.aiRequest('/ai/jobs/'+job.id,undefined,deadline);
-        this.aiJobStatus=job.status==='queued'?'识别排队中':job.status==='running'?'正在识别…':'';
+        await new Promise(resolve=>setTimeout(resolve,delay));
+        try{
+          job=await this.aiRequest('/ai/jobs/'+this.aiJobId,undefined,Date.now()+this.aiWaitTimeoutMs);
+        }catch(error){
+          const transient=error.code==='AI_REQUEST_TIMEOUT'||error.code==='AI_WAIT_TIMEOUT'||
+            error.name==='SyntaxError'||error.name==='TypeError'||error.name==='TimeoutError'||error.name==='AbortError'||
+            error.status===408||error.status===429||error.status>=500;
+          if(!transient)throw error;
+          this.aiJobStatus='查询暂时中断，正在自动重查原任务，无需再次点击';
+          delay=Math.min(delay*2,10000);
+          continue;
+        }
+        delay=this.aiPollIntervalMs;
+        this.aiJobStatus=this.aiCancelRequested?'正在确认取消结果…':Date.now()>=slowAt?
+          '识别耗时较长，正在继续查询原任务':job.status==='queued'?'识别排队中':'正在识别…';
       }
       if(job.status!=='succeeded')throw Error(job.error||'识别已取消');
       return job.result;
-    }catch(error){
-      // Timeout ends the whole batch. Never auto-resubmit: the original request may have reached the server.
-      if(error.code==='AI_WAIT_TIMEOUT'||error.code==='AI_REQUEST_TIMEOUT'||error instanceof TypeError){
-        this.aiCancelRequested=true;
-        if(job?.id){try{await this.aiRequest('/ai/jobs/'+job.id+'/cancel',{},Date.now()+this.aiRequestTimeoutMs)}catch{}}
-      }
-      throw error;
     }finally{this.aiJobId='';this.aiJobStatus=''}
   },
   async runAIJob(image,prompt,model){return this.waitForAI({image,prompt,model})},
