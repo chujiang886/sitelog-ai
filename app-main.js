@@ -56,6 +56,8 @@
         showSettings: false,
         exportGuideOpen: false,
         dragOver: false,
+        movingNode: null,
+        nodeDropTarget: null,
         testing: false,
         testResult: '',
         toast: { show: false, msg: '', type: 'info' },
@@ -232,6 +234,33 @@
             reader.onerror = reject;
             reader.readAsDataURL(file);
           });
+        },
+
+        trackNodeDrop(event) {
+          if (this.movingNode === null || !event.isPrimary) return;
+          const list = event.currentTarget.closest('[data-node-list]');
+          const bounds = list.getBoundingClientRect();
+          if (event.clientY > bounds.bottom - 24) list.scrollTop += 18;
+          else if (event.clientY < bounds.top + 24) list.scrollTop -= 18;
+          const card = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-node-id]');
+          this.nodeDropTarget = card && list.contains(card) ? card.dataset.nodeId : null;
+        },
+
+        moveNode(id, targetId) {
+          const from = this.images.findIndex(img => img.id === id);
+          const to = this.images.findIndex(img => String(img.id) === String(targetId));
+          if (from < 0 || to < 0 || from === to || this.processing) return;
+          const ordered = this.images.slice();
+          ordered.splice(to, 0, ordered.splice(from, 1)[0]);
+          this.images = ordered;
+          for (const frame of this.frames || []) {
+            if (frame.nodeIds.includes(id)) {
+              const members = new Set(frame.nodeIds);
+              frame.nodeIds = ordered.map(img => img.id).filter(key => members.has(key));
+            }
+          }
+          this.syncToReport();
+          this.markDraftDirty();
         },
 
         removeImage(id) {
