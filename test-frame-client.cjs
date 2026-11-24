@@ -198,3 +198,30 @@ test('sanitizeFrames 补齐字段形状，保证后端 checked_frames 不拒收'
   const many = Array.from({ length: FRAME_LIMIT + 5 }, (_, i) => ({ id: 'f' + i, label: '窗' + i }));
   assert.equal(sf(many, [], []).length, FRAME_LIMIT);
 });
+
+test('侧栏按报告的框内顺序排序，跨框操作保留原分组', () => {
+  vm.runInContext(fs.readFileSync('app-main.js', 'utf8'), context);
+  const app = context.siteLogApp();
+  app.templateType = '框架1对1';
+  app.images = ['A', 'B', 'C', 'D'].map(id => ({ id }));
+  app.frames = [{ nodeIds: ['B', 'C', 'A'] }, { nodeIds: ['D'] }];
+  let writes = 0, notice = '';
+  app.syncToReport = () => {};
+  app.markDraftDirty = () => { writes++; };
+  app.showToast = message => { notice = message; };
+  const visible = () => copy(app.sidebarNodes.map(photo => photo.id));
+  assert.deepEqual(visible(), ['B', 'C', 'A', 'D']);
+  app.moveNode('C', 'D');
+  assert.match(notice, /同一窗框/);
+  assert.equal(writes, 0);
+  assert.deepEqual(visible(), ['B', 'C', 'A', 'D']);
+
+  app.moveNode('C', 'A');
+  assert.deepEqual(visible(), ['B', 'A', 'C', 'D']);
+  assert.deepEqual(app.frames.map(frame => frame.nodeIds), [['B', 'A', 'C'], ['D']]);
+  assert.equal(writes, 1);
+  app.templateType = '框架施工';
+  app.moveNode('B', 'D');
+  assert.deepEqual(visible(), ['A', 'C', 'D', 'B']);
+  assert.deepEqual(app.frames.map(frame => frame.nodeIds), [['B', 'A', 'C'], ['D']]);
+});
