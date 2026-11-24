@@ -246,18 +246,31 @@
           this.nodeDropTarget = card && list.contains(card) ? card.dataset.nodeId : null;
         },
 
+        get sidebarNodes() {
+          if (!this.isFramedTemplate()) return this.images;
+          return this.framePhotos(this.frames.flatMap(frame => frame.nodeIds), 'images');
+        },
+
         moveNode(id, targetId) {
-          const from = this.images.findIndex(img => img.id === id);
-          const to = this.images.findIndex(img => String(img.id) === String(targetId));
-          if (from < 0 || to < 0 || from === to || this.processing) return;
-          const ordered = this.images.slice();
-          ordered.splice(to, 0, ordered.splice(from, 1)[0]);
-          this.images = ordered;
-          for (const frame of this.frames || []) {
-            if (frame.nodeIds.includes(id)) {
-              const members = new Set(frame.nodeIds);
-              frame.nodeIds = ordered.map(img => img.id).filter(key => members.has(key));
+          const target = this.images.find(img => String(img.id) === String(targetId));
+          if (!target || id === target.id || this.processing) return;
+          if (this.isFramedTemplate()) {
+            const frame = this.frames.find(item => item.nodeIds.includes(id));
+            if (!frame || !frame.nodeIds.includes(target.id)) {
+              this.showToast('只能调整同一窗框内的节点顺序');
+              return;
             }
+            const to = frame.nodeIds.indexOf(target.id);
+            frame.nodeIds.splice(frame.nodeIds.indexOf(id), 1);
+            frame.nodeIds.splice(to, 0, id);
+          } else {
+            const ordered = this.images.slice();
+            const from = ordered.findIndex(img => img.id === id);
+            if (from < 0) return;
+            const to = ordered.indexOf(target);
+            const [photo] = ordered.splice(from, 1);
+            ordered.splice(to, 0, photo);
+            this.images = ordered;
           }
           this.syncToReport();
           this.markDraftDirty();
