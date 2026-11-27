@@ -128,7 +128,7 @@ test('恢复旧草稿时会剥掉已下线的归档合规说明卡片', () => {
 });
 
 test('editor-state.js 改了内容就必须 bump ?v=', () => {
-  assert.ok(read('index.html').includes('editor-state.js?v=20261110a'),
+  assert.ok(read('index.html').includes('editor-state.js?v=20261126a'),
     'editor-state.js 的缓存版本号没跟上本次改动，用户会拿到旧文件');
 });
 

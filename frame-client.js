@@ -203,7 +203,7 @@
           '\n                </div>' +
           '\n                ' + moveRow(photo) +
           '\n                <h3 class="text-base font-bold text-[#1F3D2A] mb-2 editable-block" style="padding:0 18px;">' + this.escapeHtml(photo.title || (isArrival ? '进场照片' : '未命名节点')) + '</h3>' +
-          (photo.stage ? '\n                <div style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 ' + this.escapeHtml(photo.stage) + '</span></div>' : '') +
+          (photo.stage ? '\n                <div style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 <span class="node-stage-text editable-block" contenteditable="true" aria-label="施工阶段">' + this.escapeHtml(photo.stage) + '</span></span></div>' : '') +
           '\n                <div class="node-card-body">' +
           '\n                  <div class="node-card-image"><img src="' + photo.dataUrl + '" alt="' + this.escapeHtml(photo.title || '') + '" loading="lazy"></div>' +
           '\n                  <div class="node-card-detail">' +

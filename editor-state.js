@@ -133,6 +133,10 @@
           if (img) {
             img._manual = img._manual || {};
             if (event.target.closest('h3')) { img.title = event.target.closest('h3').innerText.trim(); img._manual.title = true; }
+            else if (event.target.closest('.node-stage-text')) {
+              img.stage = event.target.closest('.node-stage-text').innerText.trim();
+              img._manual.stage = true;
+            }
             else if (event.target.closest('.node-card-desc')) { img.desc = event.target.closest('.node-card-desc').innerText.trim(); img._manual.desc = true; }
             else { const edit = event.target.closest('[contenteditable]'); if (edit) { img.highlights = edit.innerText.split(/\n|✦/).map(x => x.trim()).filter(Boolean); img._manual.highlights = true; } }
           }

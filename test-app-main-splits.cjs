@@ -144,6 +144,7 @@ const SPLITS = [
   },
   {
     kind: 'mixin',
+    // 进场和完工照片的阶段标签支持人工修改。
     file: 'gallery-client.js',
     label: '三组手动上传画廊（班组进场 / SOP / 完工）',
     start: 'window.galleryFeatures = {',
@@ -152,7 +153,7 @@ const SPLITS = [
     // 2026-11-05 更新基线：按产品要求移除照片卡片的「拍摄时间/上传整理时间」标注。
     // 2026-11-05 再次更新：syncFinishGallery 只在原标题为「完工照片」时才改名，
     // 修掉「合规版第四段『留档影像索引』被无条件改成『本阶段成果照片』」的缺陷。
-    sha: '17501cb50db9270f702ed3e55b619538bca9f0df18a94fb9ea0d494873f60c14',
+    sha: 'f5c4291b7e3ad172c52a5affd915726e394cec427411a3761ae3e745b12da21e',
     lines: 333,
     spread: 'galleryFeatures',
     forbiddenInAppMain: /^\s{8}sync(Arrival|Sop|Finish)Gallery\s*\(/m,
@@ -416,8 +417,8 @@ const CACHE_BASELINE = {
   // 2026-11-10：sanitizeReport 增加「剥掉旧归档合规说明卡片」，
   // 覆盖从旧草稿 / 云端工程 / 工程包恢复后继续导出的场景。
   'editor-state.js': {
-    sha: '83abdbb9b73bb61bb19187f7e6fd2da24f2d2323bcd600b41a2313d3378893ae',
-    v: '20261110a',
+    sha: '8a4364faf3bf7bca54ca5c189a147e7ec25425a5c42b40ed889a2c337d798a92',
+    v: '20261126a',
     start: '  function localDate() {',
   },
 };

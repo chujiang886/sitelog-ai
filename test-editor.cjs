@@ -17,10 +17,16 @@ async function login(page,password){await page.locator('#login-user').fill('admi
  assert.equal(await page.locator('#images-container .node-card-desc').innerText(),'人工审核的说明必须保留。');
  await page.getByRole('button',{name:'采用新建议',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#images-container .node-card-desc')?.innerText.includes('新的识别建议'));
  await page.getByRole('button',{name:'撤销上次操作',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#images-container .node-card-desc')?.innerText==='人工审核的说明必须保留。');
+ await page.evaluate(()=>{const a=Alpine.$data(document.body);a.images[0].stage='原施工阶段';a.syncToReport()});
+ const stage=page.locator('#images-container .node-stage-text');
+ const highlights=await page.evaluate(()=>Alpine.$data(document.body).images[0].highlights||[]);
+ await stage.fill('窗框上沿施胶复核');
+ assert.deepEqual(await page.evaluate(()=>{const img=Alpine.$data(document.body).images[0];return [img.stage,img._manual.stage,img.highlights||[]]}),['窗框上沿施胶复核',true,highlights]);
  await page.getByPlaceholder('项目名称',{exact:true}).fill('草稿恢复验收项目');await page.getByRole('button',{name:'保存本机草稿',exact:true}).click();await page.waitForFunction(()=>{const a=Alpine.$data(document.body);return !a.draftDirty&&!a.draftWriting&&a.draftRevision>0});
  await page.reload();await ready(page);await page.getByText('已恢复本机草稿',{exact:true}).waitFor();assert.equal(await page.getByPlaceholder('项目名称',{exact:true}).inputValue(),'草稿恢复验收项目');assert.equal(await page.locator('#images-container .node-block').count(),1);assert.equal(await page.locator('#images-container .node-card-desc').innerText(),'人工审核的说明必须保留。');
+ assert.equal(await stage.innerText(),'窗框上沿施胶复核');
  await context.setOffline(true);await page.getByPlaceholder('项目名称',{exact:true}).fill('断网仍保存');await page.waitForFunction(()=>{const a=Alpine.$data(document.body);return !a.draftDirty&&!a.draftWriting});await context.setOffline(false);await page.reload();await ready(page);assert.equal(await page.getByPlaceholder('项目名称',{exact:true}).inputValue(),'断网仍保存');
- const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'导出工程包',exact:true}).click();const download=await downloadPromise;const pack=path.join(out,'验收工程包.sitelog.json');await download.saveAs(pack);assert.equal(JSON.parse(fs.readFileSync(pack)).images.length,1);
+ const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'导出工程包',exact:true}).click();const download=await downloadPromise;const pack=path.join(out,'验收工程包.sitelog.json');await download.saveAs(pack);const exported=JSON.parse(fs.readFileSync(pack));assert.equal(exported.images.length,1);assert.equal(exported.images[0].stage,'窗框上沿施胶复核');assert.ok(exported.report.includes('窗框上沿施胶复核'));
  let dialogs=0;page.on('dialog',async d=>{dialogs++;await d.accept()});
  await page.locator('select[x-model="templateType"]').selectOption('玻扇施工');await page.waitForFunction(()=>Alpine.$data(document.body).activeTemplate==='玻扇施工');assert.equal(await page.locator('#images-container .node-block').count(),1);
  await page.getByRole('button',{name:'撤销上次操作',exact:true}).click();await page.waitForFunction(()=>Alpine.$data(document.body).templateType==='框架施工');assert.equal(await page.locator('select[x-model="templateType"]').inputValue(),'框架施工');
