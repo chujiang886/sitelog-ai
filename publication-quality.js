@@ -18,6 +18,9 @@
     "本次单扇（门洞）玻扇调试整体情况：调试部位与对应洞口编号、玻扇规格、入位与调缝方法、五金调试、开合复检结果、整体质量把控要点。建议 100-200 字。",
   ].map(text=>text.replace(/\s+/g,'')));
   function clean(root) {
+    root.querySelectorAll('.node-stage-row').forEach(row=>{
+      if(!row.querySelector('.node-stage-text')?.textContent.trim())row.remove();
+    });
     root.querySelectorAll('button,input,select,textarea,[data-action],details.debug-panel,.sop-upload-zone,.sop-grid-top-row,.sop-remove-btn,.frame-add-row,.frame-move-row,[data-public-exclude],.no-print').forEach(el=>el.remove());
     root.querySelectorAll('.pdf-editable-box,p,span').forEach(el=>{
       const text=el.textContent.replace(/\s+/g,'');

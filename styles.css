@@ -59,6 +59,8 @@
     }
 
     /* ═════ 封面 ═════ */
+    .node-stage-text[contenteditable] { display: inline-block; min-width: 4em; cursor: text; }
+    .node-stage-text[contenteditable]:empty::before { content: "填写施工阶段"; color: #596d61; }
     .node-card-desc { white-space: pre-wrap; overflow-wrap: anywhere; }
     .pdf-cover { margin-bottom: 36px; }
     .pdf-cover-band {

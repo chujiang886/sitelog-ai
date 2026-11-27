@@ -153,7 +153,7 @@ const SPLITS = [
     // 2026-11-05 更新基线：按产品要求移除照片卡片的「拍摄时间/上传整理时间」标注。
     // 2026-11-05 再次更新：syncFinishGallery 只在原标题为「完工照片」时才改名，
     // 修掉「合规版第四段『留档影像索引』被无条件改成『本阶段成果照片』」的缺陷。
-    sha: 'f5c4291b7e3ad172c52a5affd915726e394cec427411a3761ae3e745b12da21e',
+    sha: 'c43983a61e4bc1bc9de015d617fe70b83357bf00f6e43abda8429ce5109c4d9e',
     lines: 333,
     spread: 'galleryFeatures',
     forbiddenInAppMain: /^\s{8}sync(Arrival|Sop|Finish)Gallery\s*\(/m,

@@ -360,7 +360,7 @@
                   <span class="node-card-meta">${this.escapeHtml(img.category)}</span>
                 </div>
                 <h3 class="text-base font-bold text-[#1F3D2A] mb-2 px-5 editable-block" contenteditable="true" style="padding-left:18px;padding-right:18px;">${this.escapeHtml(img.title) || '未命名节点'}</h3>
-                ${img.stage ? `<div style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 <span class="node-stage-text editable-block" contenteditable="true" aria-label="施工阶段">${this.escapeHtml(img.stage)}</span></span></div>` : ''}
+                <div class="node-stage-row" style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 <span class="node-stage-text editable-block" contenteditable="true" aria-label="施工阶段">${this.escapeHtml(img.stage || '')}</span></span></div>
                 <div class="node-card-body">
                   <div class="node-card-image">
                     <img src="${img.dataUrl}" alt="${this.escapeHtml(img.title)}" loading="lazy">
