@@ -63,7 +63,7 @@ window.galleryFeatures = {
                   <span class="node-card-meta">班组进场</span>
                 </div>
                 <h3 class="text-base font-bold text-[#1F3D2A] mb-2 editable-block" contenteditable="true" style="padding:0 18px;">${this.escapeHtml(img.title || '进场照片')}</h3>
-                ${img.stage ? `<div style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 ${this.escapeHtml(img.stage)}</span></div>` : ''}
+                ${img.stage ? `<div style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 <span class="node-stage-text editable-block" contenteditable="true" aria-label="施工阶段">${this.escapeHtml(img.stage)}</span></span></div>` : ''}
                 <div class="node-card-body">
                   <div class="node-card-image">
                     <img src="${img.dataUrl}" alt="${this.escapeHtml(img.title || '进场照片')}" loading="lazy">
@@ -281,7 +281,7 @@ window.galleryFeatures = {
                   <span class="node-card-meta">本阶段成果</span>
                 </div>
                 <h3 class="text-base font-bold text-[#1F3D2A] mb-2 editable-block" contenteditable="true" style="padding:0 18px;">${this.escapeHtml(img.title || '本阶段成果照片')}</h3>
-                ${img.stage ? `<div style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 ${this.escapeHtml(img.stage)}</span></div>` : ''}
+                ${img.stage ? `<div style="padding:0 18px 10px"><span class="node-card-stage-badge">📍 <span class="node-stage-text editable-block" contenteditable="true" aria-label="施工阶段">${this.escapeHtml(img.stage)}</span></span></div>` : ''}
                 <div class="node-card-body">
                   <div class="node-card-image">
                     <img src="${img.dataUrl}" alt="${this.escapeHtml(img.title || '本阶段成果照片')}" loading="lazy">
