@@ -17,7 +17,7 @@ async function login(page,password){await page.locator('#login-user').fill('admi
  assert.equal(await page.locator('#images-container .node-card-desc').innerText(),'人工审核的说明必须保留。');
  await page.getByRole('button',{name:'采用新建议',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#images-container .node-card-desc')?.innerText.includes('新的识别建议'));
  await page.getByRole('button',{name:'撤销上次操作',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#images-container .node-card-desc')?.innerText==='人工审核的说明必须保留。');
- await page.evaluate(()=>{const a=Alpine.$data(document.body);a.images[0].stage='原施工阶段';a.syncToReport()});
+ // 新上传的照片没有阶段文字，也必须能在报告卡片直接填写。
  const stage=page.locator('#images-container .node-stage-text');
  const highlights=await page.evaluate(()=>Alpine.$data(document.body).images[0].highlights||[]);
  await stage.fill('窗框上沿施胶复核');
